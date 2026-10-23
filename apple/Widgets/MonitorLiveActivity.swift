@@ -17,7 +17,11 @@ struct MonitorLiveActivity: Widget {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 6) {
                     if let temp = context.state.temperature { Text("\(temp.formatted(.number.precision(.fractionLength(1)))) °C") }
-                    Text(context.isStale || !context.state.connected ? "Reading out of date" : "Monitoring").font(.caption2)
+                    if context.isStale || !context.state.connected {
+                        Text("Reading out of date").font(.caption2)
+                    } else {
+                        Text("Updated \(Date(timeIntervalSince1970: context.state.observedAt), style: .relative) ago").font(.caption2)
+                    }
                     Text(timerInterval: Date.now...max(Date.now, context.attributes.endsAt), countsDown: true).font(.caption.monospacedDigit())
                 }.foregroundStyle(.secondary)
             }.padding(18).activityBackgroundTint(AirkeepTheme.background).activitySystemActionForegroundColor(AirkeepTheme.ivory)
@@ -39,9 +43,9 @@ struct MonitorLiveActivity: Widget {
             } compactLeading: {
                 Image(systemName: "humidity.fill").foregroundStyle(AirkeepTheme.amber)
             } compactTrailing: {
-                Text(context.isStale ? "—" : context.state.humidity.map { "\(Int($0))%" } ?? "—").font(.caption.bold()).monospacedDigit()
+                Text(context.isStale || !context.state.connected ? "—" : context.state.humidity.map { "\(Int($0))%" } ?? "—").font(.caption.bold()).monospacedDigit()
             } minimal: {
-                Text(context.isStale ? "—" : context.state.humidity.map { "\(Int($0))" } ?? "—").font(.caption.bold()).foregroundStyle(AirkeepTheme.amber)
+                Text(context.isStale || !context.state.connected ? "—" : context.state.humidity.map { "\(Int($0))" } ?? "—").font(.caption.bold()).foregroundStyle(AirkeepTheme.amber)
             }.widgetURL(URL(string: "airkeep://dashboard")).keylineTint(AirkeepTheme.amber)
         }
     }

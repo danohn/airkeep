@@ -54,7 +54,7 @@ import WidgetKit
                 lastWidget = .now
             }
             #if os(iOS)
-            await LiveMonitor.shared.update(reading)
+            await LiveMonitor.shared.update(reading, staleAfter: data.staleAfter)
             #endif
         } catch { self.error = error.localizedDescription }
     }

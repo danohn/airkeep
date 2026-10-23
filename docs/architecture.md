@@ -24,7 +24,7 @@ Every client depends on the relay for fresh readings. If the Docker host stops, 
 
 The relay stores one rule for a selected AMS and registrations for multiple Apple devices. Each alert transition creates a delivery job for every device, with independent retries. A rotated push token replaces the old registration under the same installation ID. Each Live Activity has its own ID and token. Token rotation doesn't extend its expiry.
 
-SQLite keeps samples at 30-second intervals for seven days and updates the latest sample on each valid AMS report. History queries are limited to 168 hours and 3,000 points. Missing fields in a delta report leave the last known value intact. All clients use original timestamps to judge freshness.
+SQLite keeps samples at 30-second intervals for seven days and updates the latest sample on each valid AMS report. History queries are limited to 168 hours and 3,000 points. Missing fields in a delta report leave the last known value intact. Clients retain original sample timestamps. The dashboard and alerts judge sensor freshness from that timestamp. Live Activities also allow for their five-minute background update interval: a fresh reading remains current for six minutes after confirmation, while a reading already past the sensor freshness limit is marked out of date immediately. Live Activity freshness never extends beyond the session's end.
 
 The current service is single-user. Its shared bearer token allows reading telemetry, editing the rule and registering devices. To revoke access, rotate that token and update every client. Separate users and scoped device credentials would need additional access controls.
 

@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from collector import Collector
 from config import Settings
-from domain import AlertRule, activity_payload
+from domain import AlertRule, activity_payload, LIVE_ACTIVITY_DURATION_SECONDS, LIVE_ACTIVITY_UPDATE_SECONDS
 from push import APNs
 from storage import Store
 
@@ -64,11 +64,12 @@ async def tick(store: Store, settings: Settings, push: APNs, now: float):
             store.execute("UPDATE outbox SET attempts=attempts+1,next=? WHERE id=?",(now+min(3600,30*2**job["attempts"]),job["id"]))
     for activity in store.rows("SELECT * FROM activities"):
         end = now >= activity["expires"]
-        if not end and now - activity["last_sent"] < 300:
+        if not end and now - activity["last_sent"] < LIVE_ACTIVITY_UPDATE_SECONDS:
             continue
         try:
             status = await push.send(activity["token"], settings.ios_topic, activity["environment"],
-                activity_payload(readings.get(activity["ams"]),now,settings.stale_seconds,end=end),live=True)
+                activity_payload(readings.get(activity["ams"]),now,settings.stale_seconds,
+                                 end=end,expires_at=activity["expires"]),live=True)
         except Exception:
             status = 503
         if status == 410 or (status == 200 and end):
@@ -174,8 +175,8 @@ def create_app(settings: Settings | None = None):
     @app.post("/v1/activities",dependencies=[Depends(authorize)])
     def register_activity(activity: ActivityRegistration):
         now = time.time()
-        if not now < activity.expiresAt <= now+4*3600+60:
-            raise HTTPException(422,"Live Activity must end within four hours")
+        if not now < activity.expiresAt <= now+LIVE_ACTIVITY_DURATION_SECONDS+60:
+            raise HTTPException(422,"Live Activity must end within eight hours")
         # Token rotation must not extend the originally requested session.
         old = store.rows("SELECT expires FROM activities WHERE id=?",(activity.id,))
         expires = min(activity.expiresAt,old[0][0]) if old else activity.expiresAt

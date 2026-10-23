@@ -27,9 +27,9 @@ AIRKEEP_MAC_TOPIC=io.airkeep.mac
 
 The relay sends HTTP/2 requests with ES256 authorization tokens refreshed every 50 minutes. Each device registration carries its APNs environment and platform topic.
 
-Live Activity updates use `<ios bundle id>.push-type.liveactivity`, `apns-push-type: liveactivity` and priority 5. The content state matches the app's Codable model. Updates carry the sample's stale date, and the relay sends an end event at the requested expiry.
+Live Activity updates use `<ios bundle id>.push-type.liveactivity`, `apns-push-type: liveactivity` and priority 5. The relay sends updates every five minutes. If the sensor reading is fresh, the display stays current for six minutes after the update, allowing one minute for delivery. Missing or old sensor readings are marked out of date immediately in that update. The original sample timestamp stays visible. A missed or delayed push can still cause the display to become stale. The dashboard and alert engine keep their separate sensor freshness checks.
 
-Start a monitoring session in the app. It registers that activity's update token, watches for token rotation and resumes watching existing sessions when reopened. Airkeep doesn't use push-to-start tokens or broadcast channels. Sessions last four hours.
+Choose Start Live Activity in the app. Sessions last up to eight hours, show their end time and can be ended early with End Live Activity. The app registers the activity's update token, watches for token rotation and resumes watching existing sessions when reopened. Token rotation does not extend the session. The relay sends an end event at expiry. Airkeep doesn't use push-to-start tokens or broadcast channels.
 
 The relay must stay running to check humidity limits while the app is closed. It needs outbound Internet access to APNs. Fetching readings also needs a network route to the relay, including when the phone is away from home. APNs is optional for local readings and history. The ESP32 uses the same relay API and never receives the APNs keys.
 

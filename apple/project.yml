@@ -79,6 +79,7 @@ targets:
       - App/NotificationManager.swift
       - Shared/Configuration.swift
       - Shared/Models.swift
+      - Shared/LiveActivityTiming.swift
       - Shared/RelayClient.swift
     settings:
       base:

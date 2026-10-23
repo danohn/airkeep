@@ -23,7 +23,7 @@ The default identifiers are:
 4. Build and run with automatic signing on a device. An unsigned simulator build checks compilation and UI, but cannot verify device Keychain or APNs entitlements.
 5. In Connection, save the relay URL and token. Add a humidity widget through the system gallery and edit it to choose the AMS. The first AMS has ID `0`.
 6. In Humidity alerts, enable notifications and save an enabled rule when ready to receive alerts. Debug builds register for sandbox APNs, and Release builds use production. The relay follows each registration's environment.
-7. Start monitoring while a fresh reading is available to check Live Activities. A supporting iPhone can show the Dynamic Island views. Other supported iPhones use the Lock Screen.
+7. Choose Start Live Activity while a fresh reading is available. Check the eight-hour session's end time and End Live Activity action. A supporting iPhone can show the Dynamic Island views. Other supported iPhones use the Lock Screen.
 
 The apps require iOS/macOS 26 and were built here with Xcode 27.1. They use Swift 6, Observation, async/await, Swift Charts, App Intents and ActivityKit, with no third-party Swift dependencies. Widgets run as system extensions.
 

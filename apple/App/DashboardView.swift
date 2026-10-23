@@ -55,15 +55,25 @@ struct DashboardView: View {
                         .disabled(model.refreshing).accessibilityLabel("Refresh readings")
                 }.buttonStyle(.glass)
                 #if os(iOS)
-                Button {
-                    Task {
-                        do { try await LiveMonitor.shared.start(model.reading, demo: model.demo) }
-                        catch { model.error = error.localizedDescription }
+                if let activity = LiveMonitor.shared.currentActivity {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Live Activity · \(activity.attributes.amsName)", systemImage: "waveform.path")
+                        Text("Ends \(activity.attributes.endsAt, format: .dateTime.hour().minute())")
+                            .font(.caption).foregroundStyle(AirkeepTheme.secondary)
+                        Button("End Live Activity", role: .destructive) { Task { await LiveMonitor.shared.stopAll() } }
+                            .buttonStyle(.glass)
                     }
-                } label: { Label("Monitor for 4 hours", systemImage: "waveform.path") }
-                    .buttonStyle(.glass).disabled(model.reading == nil || model.demo || model.isStale)
-                if !LiveMonitor.shared.activities.isEmpty {
-                    Button("End monitoring", role: .destructive) { Task { await LiveMonitor.shared.stopAll() } }
+                } else {
+                    Button {
+                        Task {
+                            do { try await LiveMonitor.shared.start(model.reading, demo: model.demo,
+                                                                   staleAfter: model.snapshot?.staleAfter ?? 90) }
+                            catch { model.error = error.localizedDescription }
+                        }
+                    } label: { Label("Start Live Activity", systemImage: "waveform.path") }
+                        .buttonStyle(.glass).disabled(model.reading == nil || model.demo || model.isStale)
+                    Text("Show humidity on your Lock Screen and Dynamic Island for up to eight hours.")
+                        .font(.caption).foregroundStyle(AirkeepTheme.secondary)
                 }
                 #endif
                 if let error = model.error {
