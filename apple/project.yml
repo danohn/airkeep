@@ -71,6 +71,18 @@ targets:
         ENABLE_APP_SANDBOX: YES
         APPLICATION_EXTENSION_API_ONLY: YES
         SKIP_INSTALL: YES
+  AirkeepNotificationsTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests
+      - App/NotificationManager.swift
+      - Shared/Configuration.swift
+      - Shared/Models.swift
+      - Shared/RelayClient.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(AIRKEEP_BUNDLE_ID_PREFIX).notification-tests
 schemes:
   Airkeep-iOS:
     build:
@@ -80,3 +92,9 @@ schemes:
     build:
       targets:
         Airkeep-macOS: all
+  AirkeepNotificationsTests:
+    build:
+      targets:
+        AirkeepNotificationsTests: all
+    test:
+      targets: [AirkeepNotificationsTests]

@@ -53,6 +53,7 @@ struct ConnectionView: View {
                                 SharedConfiguration.endpoint = url
                                 model.demo = false
                                 await model.refresh(forceHistory: true)
+                                await NotificationManager.shared.refresh()
                                 dismiss()
                             } catch { self.error = error.localizedDescription }
                         }

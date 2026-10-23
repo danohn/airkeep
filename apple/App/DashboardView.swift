@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DashboardView: View {
     @Bindable var model: MonitorModel
+    @Environment(\.scenePhase) private var scenePhase
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -89,7 +90,13 @@ struct DashboardView: View {
         }
         .background(AirkeepTheme.background).foregroundStyle(AirkeepTheme.ivory)
         .tint(AirkeepTheme.amber).preferredColorScheme(.dark)
-        .task { model.start() }
+        .task {
+            model.start()
+            if !model.demo { await NotificationManager.shared.refresh() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active && !model.demo { Task { await NotificationManager.shared.refresh() } }
+        }
         .sheet(isPresented: $model.showSettings) { ConnectionView(model: model) }
         .sheet(isPresented: $model.showAlerts) { AlertsView(model: model) }
         #if os(macOS)

@@ -19,8 +19,9 @@ AIRKEEP_IOS_TOPIC=io.airkeep
 AIRKEEP_MAC_TOPIC=io.airkeep.mac
 ```
 
-4. Restart the relay. The Humidity alerts sheet should show "Relay APNs: Configured". That confirms configuration is present. A device delivery check is still needed to establish that the credentials work for those topics.
-5. On each signed device, choose Enable notifications. The app registers its device token through the authenticated relay connection. Enable a humidity rule with the threshold and hold period you want. Setup doesn't send a test notification.
+4. Restart the relay. In Humidity alerts, check Server push setup. "Configuration found" means the relay has a readable P-256 key for this app's topic and push environment. It does not verify Apple's topic authorization or delivery. Expand Server details for setup errors. Older relays show "Relay update needed" until they support this status check.
+5. On each signed device, choose Enable notifications if permission hasn't been requested. Once allowed, the action becomes Notification settings. Airkeep refreshes system permission and relay registration when opened or made active, without asking for permission again. Denied permission must be changed in system settings. Relay registration confirms the current server has this device token; it does not confirm delivery.
+6. Save an enabled humidity rule with the threshold and hold period you want. The rule applies to registered devices. Device permission and registration take effect immediately, independently of Save or Cancel. Setup doesn't send a test notification.
 
 ## Delivery and monitoring sessions
 

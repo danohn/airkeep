@@ -18,10 +18,13 @@ import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        NotificationManager.shared.received(token: deviceToken)
+        Task { await NotificationManager.shared.received(token: deviceToken) }
     }
     func application(_ application: NSApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        NotificationManager.shared.status = error.localizedDescription
+        NotificationManager.shared.registrationFailed(error)
+    }
+    func applicationDidBecomeActive(_ notification: Notification) {
+        Task { await NotificationManager.shared.refresh() }
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }

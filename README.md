@@ -74,7 +74,7 @@ uv run uvicorn app:create_app --factory --host 127.0.0.1 --port 8787
 
 This listens on loopback. The iPhone simulator can use `http://localhost:8787`. Other devices need the HTTPS route described in the deployment guide.
 
-From the repository root, run the relay tests and unsigned Apple builds with:
+From the repository root, run relay and notification-state tests and unsigned Apple builds with:
 
 ```sh
 scripts/check.sh

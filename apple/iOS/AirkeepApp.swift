@@ -49,9 +49,9 @@ import UserNotifications
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        NotificationManager.shared.received(token: deviceToken)
+        Task { await NotificationManager.shared.received(token: deviceToken) }
     }
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        NotificationManager.shared.status = error.localizedDescription
+        NotificationManager.shared.registrationFailed(error)
     }
 }
