@@ -1,0 +1,7 @@
+// Choose a prefix registered to your Apple Developer team before signing.
+AIRKEEP_BUNDLE_ID_PREFIX = io.airkeep
+AIRKEEP_APP_GROUP = group.$(AIRKEEP_BUNDLE_ID_PREFIX)
+AIRKEEP_KEYCHAIN_GROUP = $(AppIdentifierPrefix)$(AIRKEEP_BUNDLE_ID_PREFIX).shared
+
+// Local signing settings stay outside version control.
+#include? "Local.xcconfig"

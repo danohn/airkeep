@@ -1,0 +1,20 @@
+menu "Airkeep connection"
+config AIRKEEP_WIFI_SSID
+    string "Wi-Fi SSID (2.4 GHz)"
+    default ""
+config AIRKEEP_WIFI_PASSWORD
+    string "Wi-Fi password"
+    default ""
+config AIRKEEP_RELAY_URL
+    string "Airkeep relay HTTPS URL (including port, if needed)"
+    default ""
+    help
+        For example https://airkeep.example.com:8443. The server certificate
+        and hostname are verified with the ESP-IDF public CA bundle.
+config AIRKEEP_RELAY_TOKEN
+    string "Airkeep relay bearer token"
+    default ""
+config AIRKEEP_AMS_ID
+    string "AMS identifier"
+    default "0"
+endmenu

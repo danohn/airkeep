@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AirkeepAppGroup</key>
+	<string>$(AIRKEEP_APP_GROUP)</string>
+	<key>AirkeepKeychainGroup</key>
+	<string>$(AIRKEEP_KEYCHAIN_GROUP)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Airkeep</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>Airkeep</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>airkeep</string>
+			</array>
+		</dict>
+	</array>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Airkeep reads humidity from your Airkeep relay on the local network.</string>
+</dict>
+</plist>

@@ -1,0 +1,30 @@
+name: airkeep
+services:
+  airkeep:
+    image: airkeep-relay:${AIRKEEP_IMAGE_TAG:-0.1.1}
+    pull_policy: never
+    build: .
+    restart: unless-stopped
+    init: true
+    env_file: private/relay.env
+    environment:
+      AIRKEEP_DB_PATH: /data/airkeep.sqlite3
+    ports:
+      - '127.0.0.1:8787:8787'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    mem_limit: 256m
+    pids_limit: 64
+    stop_grace_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    volumes:
+      - airkeep-data:/data
+volumes:
+  airkeep-data:

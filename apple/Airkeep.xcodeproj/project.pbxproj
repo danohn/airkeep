@@ -1,0 +1,789 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0065366D2AA839150DEC3B9D /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = F4EE0E1C731B0FD7391C3141 /* AppIcon.icon */; };
+		0CA758D64A2F60268F501F1B /* AirkeepWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8E6FE5855D944EF74A6CF9F /* AirkeepWidgets.swift */; };
+		0D000129F5A72497D0E99F23 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90D2C4C5758A3D1FACF767B /* Theme.swift */; };
+		0DB7AC7728C71C978556B5FF /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38C2728CA3712EAC2D51E16B /* Configuration.swift */; };
+		1A3B10BA9FBFE01E35AD8465 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90D2C4C5758A3D1FACF767B /* Theme.swift */; };
+		1D1DAE9CB5DEA0A11C7EC936 /* MonitorLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0BCBD863DB6989FF82B0F16 /* MonitorLiveActivity.swift */; };
+		1DC0801D520B4987AA4CD437 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1DB4886A3FDF55872BBD78 /* Models.swift */; };
+		1F23575566D5B1931865567D /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D023DF191CDF108295056FBE /* RelayClient.swift */; };
+		20005842230E80A7E6650B36 /* LiveMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2421B63F739506CF0D57ADD0 /* LiveMonitor.swift */; };
+		294BE4905F4ABA627EA8DAAC /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1DB4886A3FDF55872BBD78 /* Models.swift */; };
+		2C923CC9B5BEE58E82946505 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40A00CA41C906188F9CC4A80 /* DashboardView.swift */; };
+		3281FCC5DEBBC1521F2FBF7B /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70CA9BF577566983215A154 /* NotificationManager.swift */; };
+		33426E8C20AFAC14EAD90B7A /* MonitorAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD62B603226DF5B13DCA4C4 /* MonitorAttributes.swift */; };
+		3B6E1B88F76DB35672970372 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70CA9BF577566983215A154 /* NotificationManager.swift */; };
+		3ECA3A4F65B264DB3167161D /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = F4EE0E1C731B0FD7391C3141 /* AppIcon.icon */; };
+		3EE744EF32D563719C0B2440 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38C2728CA3712EAC2D51E16B /* Configuration.swift */; };
+		4269188CB494DBF1A20A087C /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38C2728CA3712EAC2D51E16B /* Configuration.swift */; };
+		4CE2495A51E5242FC3568344 /* AirkeepWidgets-iOS.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F752477F37DF85FEDB5E38B0 /* AirkeepWidgets-iOS.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		5171D8BA731E378BEF23766E /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38C2728CA3712EAC2D51E16B /* Configuration.swift */; };
+		5DFFB7CCA76E42995714C6CF /* MonitorLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0BCBD863DB6989FF82B0F16 /* MonitorLiveActivity.swift */; };
+		5E870AA5FBE6F98EE4D019AF /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C44A5EEEC49510E3B55E58A /* MenuBarView.swift */; };
+		6FB7B690AF0A0EBD082B547D /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1DB4886A3FDF55872BBD78 /* Models.swift */; };
+		77A8CBDA3E4A66858E7A22C7 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90D2C4C5758A3D1FACF767B /* Theme.swift */; };
+		781DBA147761DC8B72ABCF4A /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D023DF191CDF108295056FBE /* RelayClient.swift */; };
+		82DA77D360B0C039B72117D8 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1DB4886A3FDF55872BBD78 /* Models.swift */; };
+		93BCFEAF510BFC5B8AB4CC5F /* AlertsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78357A924B65198BDC69A5CD /* AlertsView.swift */; };
+		9BE769DC95C87B2419D64865 /* ChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FFF9C4333814393241E70DD /* ChartView.swift */; };
+		9C6DD11B44F28B89ED332BBA /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90D2C4C5758A3D1FACF767B /* Theme.swift */; };
+		9E3A20775FAFF53290EB0B65 /* RefreshIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02AED6709E1040FAB4F5E6EF /* RefreshIntent.swift */; };
+		A4BE94AD48DD60EE7E916D52 /* MonitorAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD62B603226DF5B13DCA4C4 /* MonitorAttributes.swift */; };
+		A70BEECFA2A696A1BE6E38AB /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC6B8778F752D0D723E8BD3 /* ConnectionView.swift */; };
+		B8B41851F44B87BF560DE168 /* MonitorAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD62B603226DF5B13DCA4C4 /* MonitorAttributes.swift */; };
+		C0B1CFB35AFDD623B3D40401 /* MonitorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7CBBCD7F1448B58DDED8A87 /* MonitorModel.swift */; };
+		C4908F84E187E2BDAF4BE551 /* AlertsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78357A924B65198BDC69A5CD /* AlertsView.swift */; };
+		C7712D39DEA9C8C0DC8F7B86 /* MonitorAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD62B603226DF5B13DCA4C4 /* MonitorAttributes.swift */; };
+		CCD73B9D14628A6A3135C756 /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D023DF191CDF108295056FBE /* RelayClient.swift */; };
+		CD878AA7FD98C9039DE14B97 /* MonitorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7CBBCD7F1448B58DDED8A87 /* MonitorModel.swift */; };
+		D0BB92A5D6513CCA2DA82595 /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D023DF191CDF108295056FBE /* RelayClient.swift */; };
+		D0FAA7683F3CA92986C3869C /* AirkeepApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ACB387FEA818091E3036031 /* AirkeepApp.swift */; };
+		D8794EA62CF40441F0A23443 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40A00CA41C906188F9CC4A80 /* DashboardView.swift */; };
+		E0F9F47A4F67F166FC5B1F28 /* ChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FFF9C4333814393241E70DD /* ChartView.swift */; };
+		E9C1C554BEB31A902CAF99EE /* AirkeepApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5B6D99C65B201622A6F44C4 /* AirkeepApp.swift */; };
+		EA7EFE14CC9DE971D6489EA4 /* RefreshIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02AED6709E1040FAB4F5E6EF /* RefreshIntent.swift */; };
+		EF1E3B06C03EC3B40C041289 /* AirkeepWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8E6FE5855D944EF74A6CF9F /* AirkeepWidgets.swift */; };
+		F252CCC23BFF26BECE2418F3 /* RefreshIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02AED6709E1040FAB4F5E6EF /* RefreshIntent.swift */; };
+		F2EEB742A39F982AB362145D /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC6B8778F752D0D723E8BD3 /* ConnectionView.swift */; };
+		FCF295014DEEBC06722364E9 /* AirkeepWidgets-macOS.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0591C52E875EE17272A2A40B /* AirkeepWidgets-macOS.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		FEE4BCE3F13C203B1D5BFD73 /* RefreshIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02AED6709E1040FAB4F5E6EF /* RefreshIntent.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		10ECD765CE6450F5E217B271 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8DFFBEACD63B73D398C0121F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 23DC6EEDE089B114B696574C;
+			remoteInfo = "AirkeepWidgets-macOS";
+		};
+		FE5FE33DB4D4900CB48DE593 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8DFFBEACD63B73D398C0121F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C2CFD4D2A1085BC60D7D43C7;
+			remoteInfo = "AirkeepWidgets-iOS";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		2DAAD8D8ECC5BA875EF8E827 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				4CE2495A51E5242FC3568344 /* AirkeepWidgets-iOS.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		40AA497761D5188365958845 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				FCF295014DEEBC06722364E9 /* AirkeepWidgets-macOS.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		02AED6709E1040FAB4F5E6EF /* RefreshIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshIntent.swift; sourceTree = "<group>"; };
+		0591C52E875EE17272A2A40B /* AirkeepWidgets-macOS.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "AirkeepWidgets-macOS.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		0966A6340FF1B45C828ED14A /* Airkeep.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Airkeep.entitlements; sourceTree = "<group>"; };
+		0A1DB4886A3FDF55872BBD78 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		1814B1034DDCC5351494E4CA /* iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iOS.entitlements; sourceTree = "<group>"; };
+		1ACB387FEA818091E3036031 /* AirkeepApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirkeepApp.swift; sourceTree = "<group>"; };
+		1D3473456A664B19E499B55E /* macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = macOS.entitlements; sourceTree = "<group>"; };
+		2421B63F739506CF0D57ADD0 /* LiveMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveMonitor.swift; sourceTree = "<group>"; };
+		3071C151299FE4E4F42FDF03 /* Airkeep.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Airkeep.entitlements; sourceTree = "<group>"; };
+		38C2728CA3712EAC2D51E16B /* Configuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
+		395EE5412080F364F344B67A /* Airkeep-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Airkeep-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		40A00CA41C906188F9CC4A80 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		42BD2348CE25F29932A53C95 /* Airkeep-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "Airkeep-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		4C44A5EEEC49510E3B55E58A /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
+		4E36F555FC3AD1C27A33B83A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		6982B2505016558F4B918A21 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		78357A924B65198BDC69A5CD /* AlertsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertsView.swift; sourceTree = "<group>"; };
+		9FFF9C4333814393241E70DD /* ChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartView.swift; sourceTree = "<group>"; };
+		A0BCBD863DB6989FF82B0F16 /* MonitorLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorLiveActivity.swift; sourceTree = "<group>"; };
+		A0EE4BC2DC640E1BBAAF6039 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		A8E6FE5855D944EF74A6CF9F /* AirkeepWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirkeepWidgets.swift; sourceTree = "<group>"; };
+		C32743AF97BD35AEEA5B49E8 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		C90D2C4C5758A3D1FACF767B /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		D023DF191CDF108295056FBE /* RelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayClient.swift; sourceTree = "<group>"; };
+		DEC6B8778F752D0D723E8BD3 /* ConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionView.swift; sourceTree = "<group>"; };
+		E70CA9BF577566983215A154 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
+		E7CBBCD7F1448B58DDED8A87 /* MonitorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorModel.swift; sourceTree = "<group>"; };
+		EDD62B603226DF5B13DCA4C4 /* MonitorAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorAttributes.swift; sourceTree = "<group>"; };
+		F4EE0E1C731B0FD7391C3141 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		F5B6D99C65B201622A6F44C4 /* AirkeepApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirkeepApp.swift; sourceTree = "<group>"; };
+		F752477F37DF85FEDB5E38B0 /* AirkeepWidgets-iOS.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = "AirkeepWidgets-iOS.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		017AF1860CDB9345575CB6E2 /* apple */ = {
+			isa = PBXGroup;
+			children = (
+				C32743AF97BD35AEEA5B49E8 /* Config.xcconfig */,
+			);
+			name = apple;
+			path = .;
+			sourceTree = "<group>";
+		};
+		459FB929122947CBBE732443 = {
+			isa = PBXGroup;
+			children = (
+				F4EE0E1C731B0FD7391C3141 /* AppIcon.icon */,
+				7BAF4C1ED44F7CCFD2E58645 /* App */,
+				017AF1860CDB9345575CB6E2 /* apple */,
+				8D9937D8D17CBFBB746ADE2A /* iOS */,
+				A5581F18BB45CE7FC8E52DA2 /* macOS */,
+				E146D8EA43C54FE890A22D7D /* Shared */,
+				7D9AB5B5B93198E18370B222 /* Widgets */,
+				CD2615A8AAAF25A6F46E2052 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		7BAF4C1ED44F7CCFD2E58645 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				78357A924B65198BDC69A5CD /* AlertsView.swift */,
+				9FFF9C4333814393241E70DD /* ChartView.swift */,
+				DEC6B8778F752D0D723E8BD3 /* ConnectionView.swift */,
+				40A00CA41C906188F9CC4A80 /* DashboardView.swift */,
+				E7CBBCD7F1448B58DDED8A87 /* MonitorModel.swift */,
+				E70CA9BF577566983215A154 /* NotificationManager.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		7D9AB5B5B93198E18370B222 /* Widgets */ = {
+			isa = PBXGroup;
+			children = (
+				A8E6FE5855D944EF74A6CF9F /* AirkeepWidgets.swift */,
+				A0EE4BC2DC640E1BBAAF6039 /* Info.plist */,
+				1814B1034DDCC5351494E4CA /* iOS.entitlements */,
+				1D3473456A664B19E499B55E /* macOS.entitlements */,
+				A0BCBD863DB6989FF82B0F16 /* MonitorLiveActivity.swift */,
+			);
+			path = Widgets;
+			sourceTree = "<group>";
+		};
+		8D9937D8D17CBFBB746ADE2A /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				3071C151299FE4E4F42FDF03 /* Airkeep.entitlements */,
+				1ACB387FEA818091E3036031 /* AirkeepApp.swift */,
+				6982B2505016558F4B918A21 /* Info.plist */,
+				2421B63F739506CF0D57ADD0 /* LiveMonitor.swift */,
+			);
+			path = iOS;
+			sourceTree = "<group>";
+		};
+		A5581F18BB45CE7FC8E52DA2 /* macOS */ = {
+			isa = PBXGroup;
+			children = (
+				0966A6340FF1B45C828ED14A /* Airkeep.entitlements */,
+				F5B6D99C65B201622A6F44C4 /* AirkeepApp.swift */,
+				4E36F555FC3AD1C27A33B83A /* Info.plist */,
+				4C44A5EEEC49510E3B55E58A /* MenuBarView.swift */,
+			);
+			path = macOS;
+			sourceTree = "<group>";
+		};
+		CD2615A8AAAF25A6F46E2052 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				42BD2348CE25F29932A53C95 /* Airkeep-iOS.app */,
+				395EE5412080F364F344B67A /* Airkeep-macOS.app */,
+				F752477F37DF85FEDB5E38B0 /* AirkeepWidgets-iOS.appex */,
+				0591C52E875EE17272A2A40B /* AirkeepWidgets-macOS.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		E146D8EA43C54FE890A22D7D /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				38C2728CA3712EAC2D51E16B /* Configuration.swift */,
+				0A1DB4886A3FDF55872BBD78 /* Models.swift */,
+				EDD62B603226DF5B13DCA4C4 /* MonitorAttributes.swift */,
+				02AED6709E1040FAB4F5E6EF /* RefreshIntent.swift */,
+				D023DF191CDF108295056FBE /* RelayClient.swift */,
+				C90D2C4C5758A3D1FACF767B /* Theme.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		15F8573AE24B2670C502269C /* Airkeep-macOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C95AB683ED6A326D8AFBB8EF /* Build configuration list for PBXNativeTarget "Airkeep-macOS" */;
+			buildPhases = (
+				8499AE78E018C09EDF6D3916 /* Sources */,
+				B2465DC4B5E7CE109A6A185F /* Resources */,
+				40AA497761D5188365958845 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				1733018598BA80D18D49B2D9 /* PBXTargetDependency */,
+			);
+			name = "Airkeep-macOS";
+			packageProductDependencies = (
+			);
+			productName = "Airkeep-macOS";
+			productReference = 395EE5412080F364F344B67A /* Airkeep-macOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		23DC6EEDE089B114B696574C /* AirkeepWidgets-macOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B4EFE7745ACE0D579435599A /* Build configuration list for PBXNativeTarget "AirkeepWidgets-macOS" */;
+			buildPhases = (
+				EDED2267E0EE2F5EB6E4538A /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "AirkeepWidgets-macOS";
+			packageProductDependencies = (
+			);
+			productName = "AirkeepWidgets-macOS";
+			productReference = 0591C52E875EE17272A2A40B /* AirkeepWidgets-macOS.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		69761E03105557F8E20F5D94 /* Airkeep-iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8A5CDA58B4C4BB1838738CC5 /* Build configuration list for PBXNativeTarget "Airkeep-iOS" */;
+			buildPhases = (
+				DC28E2DD128181D289FB2621 /* Sources */,
+				47AAB5A91FD6D2CDAE4295C3 /* Resources */,
+				2DAAD8D8ECC5BA875EF8E827 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				1E62C0CBFA2A8D358C7DF53B /* PBXTargetDependency */,
+			);
+			name = "Airkeep-iOS";
+			packageProductDependencies = (
+			);
+			productName = "Airkeep-iOS";
+			productReference = 42BD2348CE25F29932A53C95 /* Airkeep-iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		C2CFD4D2A1085BC60D7D43C7 /* AirkeepWidgets-iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 050ED01FAA61440AFE014294 /* Build configuration list for PBXNativeTarget "AirkeepWidgets-iOS" */;
+			buildPhases = (
+				644CF4B45C18652A64F33237 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "AirkeepWidgets-iOS";
+			packageProductDependencies = (
+			);
+			productName = "AirkeepWidgets-iOS";
+			productReference = F752477F37DF85FEDB5E38B0 /* AirkeepWidgets-iOS.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		8DFFBEACD63B73D398C0121F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					15F8573AE24B2670C502269C = {
+						ProvisioningStyle = Automatic;
+					};
+					23DC6EEDE089B114B696574C = {
+						ProvisioningStyle = Automatic;
+					};
+					69761E03105557F8E20F5D94 = {
+						ProvisioningStyle = Automatic;
+					};
+					C2CFD4D2A1085BC60D7D43C7 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = CABB056C8ED5DFC9BE31D9AE /* Build configuration list for PBXProject "Airkeep" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 459FB929122947CBBE732443;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = CD2615A8AAAF25A6F46E2052 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				69761E03105557F8E20F5D94 /* Airkeep-iOS */,
+				15F8573AE24B2670C502269C /* Airkeep-macOS */,
+				C2CFD4D2A1085BC60D7D43C7 /* AirkeepWidgets-iOS */,
+				23DC6EEDE089B114B696574C /* AirkeepWidgets-macOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		47AAB5A91FD6D2CDAE4295C3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3ECA3A4F65B264DB3167161D /* AppIcon.icon in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B2465DC4B5E7CE109A6A185F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0065366D2AA839150DEC3B9D /* AppIcon.icon in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		644CF4B45C18652A64F33237 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EF1E3B06C03EC3B40C041289 /* AirkeepWidgets.swift in Sources */,
+				5171D8BA731E378BEF23766E /* Configuration.swift in Sources */,
+				82DA77D360B0C039B72117D8 /* Models.swift in Sources */,
+				A4BE94AD48DD60EE7E916D52 /* MonitorAttributes.swift in Sources */,
+				1D1DAE9CB5DEA0A11C7EC936 /* MonitorLiveActivity.swift in Sources */,
+				9E3A20775FAFF53290EB0B65 /* RefreshIntent.swift in Sources */,
+				1F23575566D5B1931865567D /* RelayClient.swift in Sources */,
+				77A8CBDA3E4A66858E7A22C7 /* Theme.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8499AE78E018C09EDF6D3916 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E9C1C554BEB31A902CAF99EE /* AirkeepApp.swift in Sources */,
+				C4908F84E187E2BDAF4BE551 /* AlertsView.swift in Sources */,
+				E0F9F47A4F67F166FC5B1F28 /* ChartView.swift in Sources */,
+				4269188CB494DBF1A20A087C /* Configuration.swift in Sources */,
+				A70BEECFA2A696A1BE6E38AB /* ConnectionView.swift in Sources */,
+				D8794EA62CF40441F0A23443 /* DashboardView.swift in Sources */,
+				5E870AA5FBE6F98EE4D019AF /* MenuBarView.swift in Sources */,
+				294BE4905F4ABA627EA8DAAC /* Models.swift in Sources */,
+				C7712D39DEA9C8C0DC8F7B86 /* MonitorAttributes.swift in Sources */,
+				C0B1CFB35AFDD623B3D40401 /* MonitorModel.swift in Sources */,
+				3281FCC5DEBBC1521F2FBF7B /* NotificationManager.swift in Sources */,
+				FEE4BCE3F13C203B1D5BFD73 /* RefreshIntent.swift in Sources */,
+				781DBA147761DC8B72ABCF4A /* RelayClient.swift in Sources */,
+				9C6DD11B44F28B89ED332BBA /* Theme.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DC28E2DD128181D289FB2621 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D0FAA7683F3CA92986C3869C /* AirkeepApp.swift in Sources */,
+				93BCFEAF510BFC5B8AB4CC5F /* AlertsView.swift in Sources */,
+				9BE769DC95C87B2419D64865 /* ChartView.swift in Sources */,
+				0DB7AC7728C71C978556B5FF /* Configuration.swift in Sources */,
+				F2EEB742A39F982AB362145D /* ConnectionView.swift in Sources */,
+				2C923CC9B5BEE58E82946505 /* DashboardView.swift in Sources */,
+				20005842230E80A7E6650B36 /* LiveMonitor.swift in Sources */,
+				6FB7B690AF0A0EBD082B547D /* Models.swift in Sources */,
+				33426E8C20AFAC14EAD90B7A /* MonitorAttributes.swift in Sources */,
+				CD878AA7FD98C9039DE14B97 /* MonitorModel.swift in Sources */,
+				3B6E1B88F76DB35672970372 /* NotificationManager.swift in Sources */,
+				EA7EFE14CC9DE971D6489EA4 /* RefreshIntent.swift in Sources */,
+				D0BB92A5D6513CCA2DA82595 /* RelayClient.swift in Sources */,
+				0D000129F5A72497D0E99F23 /* Theme.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EDED2267E0EE2F5EB6E4538A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0CA758D64A2F60268F501F1B /* AirkeepWidgets.swift in Sources */,
+				3EE744EF32D563719C0B2440 /* Configuration.swift in Sources */,
+				1DC0801D520B4987AA4CD437 /* Models.swift in Sources */,
+				B8B41851F44B87BF560DE168 /* MonitorAttributes.swift in Sources */,
+				5DFFB7CCA76E42995714C6CF /* MonitorLiveActivity.swift in Sources */,
+				F252CCC23BFF26BECE2418F3 /* RefreshIntent.swift in Sources */,
+				CCD73B9D14628A6A3135C756 /* RelayClient.swift in Sources */,
+				1A3B10BA9FBFE01E35AD8465 /* Theme.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		1733018598BA80D18D49B2D9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 23DC6EEDE089B114B696574C /* AirkeepWidgets-macOS */;
+			targetProxy = 10ECD765CE6450F5E217B271 /* PBXContainerItemProxy */;
+		};
+		1E62C0CBFA2A8D358C7DF53B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C2CFD4D2A1085BC60D7D43C7 /* AirkeepWidgets-iOS */;
+			targetProxy = FE5FE33DB4D4900CB48DE593 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0782CAFE9704CC4F4F2F3709 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = iOS/Airkeep.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(AIRKEEP_BUNDLE_ID_PREFIX)";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		2562315E14537808290F1FAD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Widgets/iOS.entitlements;
+				INFOPLIST_FILE = Widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(AIRKEEP_BUNDLE_ID_PREFIX).widgets";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		64F4FA6484D690C813C4646A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = iOS/Airkeep.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(AIRKEEP_BUNDLE_ID_PREFIX)";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		69615799A42B662626C50809 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = macOS/Airkeep.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = YES;
+				INFOPLIST_FILE = macOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(AIRKEEP_BUNDLE_ID_PREFIX).mac";
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		71E8FAECAB602B6626189CDB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Widgets/macOS.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = YES;
+				INFOPLIST_FILE = Widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(AIRKEEP_BUNDLE_ID_PREFIX).mac.widgets";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		90F244E5DBC351BAB48508A4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C32743AF97BD35AEEA5B49E8 /* Config.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				APNS_ENVIRONMENT = development;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.1;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A0B40FE12E77F8C0392F2E04 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Widgets/macOS.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = YES;
+				INFOPLIST_FILE = Widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(AIRKEEP_BUNDLE_ID_PREFIX).mac.widgets";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		C2B691C8F3406C6DE88F05F4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = macOS/Airkeep.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = YES;
+				INFOPLIST_FILE = macOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(AIRKEEP_BUNDLE_ID_PREFIX).mac";
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		C88A4EA36E9117697DB1CF86 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C32743AF97BD35AEEA5B49E8 /* Config.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				APNS_ENVIRONMENT = production;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.1;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		D075FA8B4938851D37C8E4EB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Widgets/iOS.entitlements;
+				INFOPLIST_FILE = Widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(AIRKEEP_BUNDLE_ID_PREFIX).widgets";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		050ED01FAA61440AFE014294 /* Build configuration list for PBXNativeTarget "AirkeepWidgets-iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D075FA8B4938851D37C8E4EB /* Debug */,
+				2562315E14537808290F1FAD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8A5CDA58B4C4BB1838738CC5 /* Build configuration list for PBXNativeTarget "Airkeep-iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0782CAFE9704CC4F4F2F3709 /* Debug */,
+				64F4FA6484D690C813C4646A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B4EFE7745ACE0D579435599A /* Build configuration list for PBXNativeTarget "AirkeepWidgets-macOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				71E8FAECAB602B6626189CDB /* Debug */,
+				A0B40FE12E77F8C0392F2E04 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C95AB683ED6A326D8AFBB8EF /* Build configuration list for PBXNativeTarget "Airkeep-macOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				69615799A42B662626C50809 /* Debug */,
+				C2B691C8F3406C6DE88F05F4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		CABB056C8ED5DFC9BE31D9AE /* Build configuration list for PBXProject "Airkeep" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				90F244E5DBC351BAB48508A4 /* Debug */,
+				C88A4EA36E9117697DB1CF86 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 8DFFBEACD63B73D398C0121F /* Project object */;
+}

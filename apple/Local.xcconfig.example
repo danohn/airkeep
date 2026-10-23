@@ -1,0 +1,5 @@
+// Copy this file to Local.xcconfig and fill in your own signing settings.
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
+AIRKEEP_BUNDLE_ID_PREFIX = com.example.airkeep
+AIRKEEP_APP_GROUP = group.$(AIRKEEP_BUNDLE_ID_PREFIX)
+AIRKEEP_KEYCHAIN_GROUP = $(AppIdentifierPrefix)$(AIRKEEP_BUNDLE_ID_PREFIX).shared
