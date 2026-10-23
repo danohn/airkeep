@@ -58,7 +58,7 @@ Alerts start disabled. In Humidity alerts, choose a threshold, hold duration and
 
 Remote alerts and background Live Activity updates need an Apple Developer Program account and your own APNs signing keys. Follow [push setup](docs/push-setup.md). Readings, history and widgets work without APNs.
 
-Start a four-hour monitoring session in the iPhone app to show a Live Activity on the Lock Screen and in Dynamic Island on supported iPhones. Widget refreshes follow the system's schedule, and push updates can be delayed. Cached readings retain their original timestamps so their age stays visible.
+Choose Start Live Activity in the iPhone app to show humidity on the Lock Screen and in Dynamic Island on supported iPhones for up to eight hours. The app shows when the session ends. Widget refreshes follow the system's schedule, and push updates can be delayed. Cached readings retain their original timestamps so their age stays visible.
 
 ## Development
 
@@ -74,7 +74,7 @@ uv run uvicorn app:create_app --factory --host 127.0.0.1 --port 8787
 
 This listens on loopback. The iPhone simulator can use `http://localhost:8787`. Other devices need the HTTPS route described in the deployment guide.
 
-From the repository root, run the relay tests and unsigned Apple builds with:
+From the repository root, run relay and notification-state tests and unsigned Apple builds with:
 
 ```sh
 scripts/check.sh

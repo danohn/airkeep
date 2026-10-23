@@ -4,6 +4,10 @@ import math
 import time
 from pydantic import BaseModel, Field, model_validator
 
+LIVE_ACTIVITY_DURATION_SECONDS = 8 * 3600
+LIVE_ACTIVITY_UPDATE_SECONDS = 300
+LIVE_ACTIVITY_DELIVERY_GRACE_SECONDS = 60
+
 
 class Reading(BaseModel):
     amsID: str
@@ -92,14 +96,21 @@ class AlertState:
         return None
 
 
-def activity_payload(reading: Reading | None, now: float, stale: int, *, end: bool = False) -> dict:
+def activity_payload(reading: Reading | None, now: float, stale: int, *, end: bool = False,
+                     expires_at: float | None = None) -> dict:
     sampled = reading.observedAt if reading else now - stale - 1
+    connected = reading is not None and now - sampled <= stale
+    # Sensor freshness and background delivery use separate clocks. Old sensor
+    # data is stale immediately; fresh data lasts until the next push plus grace.
+    stale_at = now + LIVE_ACTIVITY_UPDATE_SECONDS + LIVE_ACTIVITY_DELIVERY_GRACE_SECONDS if connected else now
+    if expires_at is not None:
+        stale_at = min(stale_at, expires_at)
     # Use Unix seconds because Swift Date's default encoding uses another epoch.
     state = {"humidity": reading.humidity if reading else None,
              "temperature": reading.temperature if reading else None,
-             "observedAt": sampled, "connected": now - sampled <= stale}
+             "observedAt": sampled, "connected": connected}
     aps = {"timestamp": int(now), "event": "end" if end else "update",
-           "content-state": state, "stale-date": int(sampled + stale),
+           "content-state": state, "stale-date": int(stale_at),
            # Match the app's relevance score. Omitting it resets the value to zero,
            # which left the session missing from Dynamic Island during testing.
            "relevance-score": 50}

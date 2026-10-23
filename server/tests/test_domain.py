@@ -37,7 +37,20 @@ def test_stale_data_breaks_hold_and_does_not_recover_active_alert():
 def test_live_payload_matches_swift_numeric_epoch_contract():
     p=activity_payload(reading(24,1000),1050,90)
     assert p["aps"]["content-state"]=={"humidity":24,"temperature":31.6,"observedAt":1000,"connected":True}
-    assert p["aps"]["stale-date"]==1090
+    assert p["aps"]["stale-date"]==1410
     assert p["aps"]["relevance-score"]==50
     assert activity_payload(reading(24,1000),1200,90)["aps"]["content-state"]["connected"] is False
     assert activity_payload(None,1200,90,end=True)["aps"]["dismissal-date"]==1200
+
+def test_live_freshness_covers_push_interval_but_preserves_sensor_age():
+    first = activity_payload(reading(24,1000),1050,90)["aps"]
+    second = activity_payload(reading(24,1300),1350,90)["aps"]
+    assert first["stale-date"] > second["timestamp"]
+    assert first["content-state"]["observedAt"] == 1000
+    assert second["content-state"]["observedAt"] == 1300
+    assert second["stale-date"] == 1710
+    for value in (reading(24,1000), None):
+        old = activity_payload(value,1350,90)["aps"]
+        assert old["content-state"]["connected"] is False
+        assert old["stale-date"] == 1350
+    assert activity_payload(reading(24,1000),1050,90,expires_at=1080)["aps"]["stale-date"] == 1080

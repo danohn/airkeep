@@ -45,6 +45,20 @@ struct RelayClient: Sendable {
         _ = try await request("v1/devices", method: "POST", body: JSONSerialization.data(withJSONObject:
             ["id": SharedConfiguration.deviceID, "token": token, "platform": platform, "environment": SharedConfiguration.environment]))
     }
+    func notificationStatus() async throws -> NotificationRelayStatus {
+        #if os(macOS)
+        let platform = "mac"
+        #else
+        let platform = "ios"
+        #endif
+        var query = URLComponents()
+        query.queryItems = [URLQueryItem(name: "device", value: SharedConfiguration.deviceID),
+                           URLQueryItem(name: "platform", value: platform),
+                           URLQueryItem(name: "environment", value: SharedConfiguration.environment),
+                           URLQueryItem(name: "bundle_id", value: Bundle.main.bundleIdentifier ?? "")]
+        return try JSONDecoder().decode(NotificationRelayStatus.self,
+            from: await request("v1/notifications/status?\(query.percentEncodedQuery ?? "")"))
+    }
     func registerActivity(id: String, token: String, amsID: String, expiresAt: Double) async throws {
         _ = try await request("v1/activities", method: "POST", body: JSONSerialization.data(withJSONObject:
             ["id": id, "token": token, "amsID": amsID, "expiresAt": expiresAt, "environment": SharedConfiguration.environment]))

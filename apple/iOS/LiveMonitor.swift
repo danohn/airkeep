@@ -9,19 +9,30 @@ import Observation
     private let relevanceScore = 50.0
     var activities: [Activity<MonitorAttributes>] = Activity<MonitorAttributes>.activities
     private var tokenTasks: [String: Task<Void, Never>] = [:]
-    func state(_ reading: Reading?) -> MonitorAttributes.ContentState {
-        .init(humidity: reading?.humidity, temperature: reading?.temperature,
-              observedAt: reading?.observedAt ?? 0, connected: !(reading?.isStale() ?? true))
+    var currentActivity: Activity<MonitorAttributes>? {
+        activities.first {
+            ($0.activityState == .active || $0.activityState == .stale) && $0.attributes.endsAt > .now
+        }
     }
-    func start(_ reading: Reading?, demo: Bool) async throws {
-        guard let reading, !demo, !reading.isStale(), ActivityAuthorizationInfo().areActivitiesEnabled else {
+    func state(_ reading: Reading?, now: Date, staleAfter: TimeInterval) -> MonitorAttributes.ContentState {
+        .init(humidity: reading?.humidity, temperature: reading?.temperature,
+              observedAt: reading?.observedAt ?? 0,
+              connected: !(reading?.isStale(after: staleAfter, now: now) ?? true))
+    }
+    private func content(_ reading: Reading?, endsAt: Date, staleAfter: TimeInterval) -> ActivityContent<MonitorAttributes.ContentState> {
+        let now = Date.now
+        return ActivityContent(state: state(reading, now: now, staleAfter: staleAfter),
+            staleDate: LiveActivityTiming.staleDate(for: reading, now: now, endsAt: endsAt, sensorStaleAfter: staleAfter),
+            relevanceScore: relevanceScore)
+    }
+    func start(_ reading: Reading?, demo: Bool, staleAfter: TimeInterval = 90) async throws {
+        guard let reading, !demo, !reading.isStale(after: staleAfter), ActivityAuthorizationInfo().areActivitiesEnabled else {
             throw LiveError.unavailable
         }
         await stopAll()
-        let end = Date.now.addingTimeInterval(4 * 3600)
+        let end = Date.now.addingTimeInterval(LiveActivityTiming.duration)
         let activity = try Activity.request(attributes: MonitorAttributes(amsName: reading.amsName, amsID: reading.amsID, endsAt: end),
-            content: ActivityContent(state: state(reading), staleDate: reading.date.addingTimeInterval(90),
-                                     relevanceScore: relevanceScore), pushType: .token)
+            content: content(reading, endsAt: end, staleAfter: staleAfter), pushType: .token)
         activities = Activity<MonitorAttributes>.activities
         observe(activity)
     }
@@ -41,7 +52,7 @@ import Observation
             }
         }
     }
-    func update(_ reading: Reading?) async {
+    func update(_ reading: Reading?, staleAfter: TimeInterval = 90) async {
         activities = Activity<MonitorAttributes>.activities
         for activity in activities {
             if Date.now >= activity.attributes.endsAt {
@@ -49,8 +60,7 @@ import Observation
             } else {
                 observe(activity)
                 if activity.attributes.amsID == reading?.amsID {
-                    await activity.update(ActivityContent(state: state(reading), staleDate: reading?.date.addingTimeInterval(90),
-                                                          relevanceScore: relevanceScore))
+                    await activity.update(content(reading, endsAt: activity.attributes.endsAt, staleAfter: staleAfter))
                 }
             }
         }

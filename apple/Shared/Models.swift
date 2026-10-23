@@ -33,6 +33,14 @@ struct Snapshot: Codable, Sendable {
     var alertActive: Bool
 }
 
+struct NotificationRelayStatus: Decodable, Sendable {
+    enum Configuration: String, Decodable, Sendable { case missing, invalid, available }
+    var registered: Bool
+    var configuration: Configuration
+    var reason: String
+    var environment: String
+}
+
 enum PreviewData {
     static var reading: Reading {
         Reading(amsID: "0", humidity: 24, temperature: 31.6, rawIndex: 3, observedAt: Date.now.timeIntervalSince1970)

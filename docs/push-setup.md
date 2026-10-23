@@ -19,16 +19,17 @@ AIRKEEP_IOS_TOPIC=io.airkeep
 AIRKEEP_MAC_TOPIC=io.airkeep.mac
 ```
 
-4. Restart the relay. The Humidity alerts sheet should show "Relay APNs: Configured". That confirms configuration is present. A device delivery check is still needed to establish that the credentials work for those topics.
-5. On each signed device, choose Enable notifications. The app registers its device token through the authenticated relay connection. Enable a humidity rule with the threshold and hold period you want. Setup doesn't send a test notification.
+4. Restart the relay. In Humidity alerts, check Server push setup. "Configuration found" means the relay has a readable P-256 key for this app's topic and push environment. It does not verify Apple's topic authorization or delivery. Expand Server details for setup errors. Older relays show "Relay update needed" until they support this status check.
+5. On each signed device, choose Enable notifications if permission hasn't been requested. Once allowed, the action becomes Notification settings. Airkeep refreshes system permission and relay registration when opened or made active, without asking for permission again. Denied permission must be changed in system settings. Relay registration confirms the current server has this device token; it does not confirm delivery.
+6. Save an enabled humidity rule with the threshold and hold period you want. The rule applies to registered devices. Device permission and registration take effect immediately, independently of Save or Cancel. Setup doesn't send a test notification.
 
 ## Delivery and monitoring sessions
 
 The relay sends HTTP/2 requests with ES256 authorization tokens refreshed every 50 minutes. Each device registration carries its APNs environment and platform topic.
 
-Live Activity updates use `<ios bundle id>.push-type.liveactivity`, `apns-push-type: liveactivity` and priority 5. The content state matches the app's Codable model. Updates carry the sample's stale date, and the relay sends an end event at the requested expiry.
+Live Activity updates use `<ios bundle id>.push-type.liveactivity`, `apns-push-type: liveactivity` and priority 5. The relay sends updates every five minutes. If the sensor reading is fresh, the display stays current for six minutes after the update, allowing one minute for delivery. Missing or old sensor readings are marked out of date immediately in that update. The original sample timestamp stays visible. A missed or delayed push can still cause the display to become stale. The dashboard and alert engine keep their separate sensor freshness checks.
 
-Start a monitoring session in the app. It registers that activity's update token, watches for token rotation and resumes watching existing sessions when reopened. Airkeep doesn't use push-to-start tokens or broadcast channels. Sessions last four hours.
+Choose Start Live Activity in the app. Sessions last up to eight hours, show their end time and can be ended early with End Live Activity. The app registers the activity's update token, watches for token rotation and resumes watching existing sessions when reopened. Token rotation does not extend the session. The relay sends an end event at expiry. Airkeep doesn't use push-to-start tokens or broadcast channels.
 
 The relay must stay running to check humidity limits while the app is closed. It needs outbound Internet access to APNs. Fetching readings also needs a network route to the relay, including when the phone is away from home. APNs is optional for local readings and history. The ESP32 uses the same relay API and never receives the APNs keys.
 
