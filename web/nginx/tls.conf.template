@@ -1,0 +1,16 @@
+server {
+    listen 8443 ssl default_server;
+    ssl_reject_handshake on;
+}
+server {
+    listen 8443 ssl;
+    http2 on;
+    server_name ${AIRKEEP_HOST};
+    ssl_certificate /run/tls/fullchain.pem;
+    ssl_certificate_key /run/tls/key.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:TLS:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+    include /etc/airkeep/locations.conf;
+}

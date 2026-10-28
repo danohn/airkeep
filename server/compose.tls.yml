@@ -1,35 +1,14 @@
 # Reuse an existing ACME-managed certificate directory on a separate TLS port.
 services:
-  tls:
-    image: nginx:stable-alpine
-    restart: unless-stopped
-    init: true
+  web:
     user: ${AIRKEEP_TLS_UID:-1000}:${AIRKEEP_TLS_GID:-1000}
-    depends_on:
-      airkeep:
-        condition: service_healthy
     environment:
+      AIRKEEP_TLS_ENABLED: 'true'
       AIRKEEP_HOST: ${AIRKEEP_HOST:?Set AIRKEEP_HOST to the certificate-covered hostname}
       AIRKEEP_TLS_RELOAD_SECONDS: '60'
-    entrypoint: [/bin/sh, /etc/nginx/airkeep-tls-entrypoint.sh]
     ports:
       - '${AIRKEEP_BIND_ADDRESS:-127.0.0.1}:${AIRKEEP_HTTPS_PORT:-8443}:8443'
-    read_only: true
-    cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
-    tmpfs:
-      - /tmp:rw,noexec,nosuid,size=32m,mode=1777
-    mem_limit: 128m
-    pids_limit: 32
-    stop_grace_period: 20s
-    logging:
-      driver: json-file
-      options:
-        max-size: 10m
-        max-file: '3'
     volumes:
-      - ./tls/nginx.conf.template:/etc/nginx/airkeep.conf.template:ro
-      - ./tls/entrypoint.sh:/etc/nginx/airkeep-tls-entrypoint.sh:ro
       - type: bind
         source: ${AIRKEEP_TLS_DIR:?Set AIRKEEP_TLS_DIR to the ACME-managed certificate directory}
         target: /run/tls

@@ -32,7 +32,6 @@ class Settings(BaseSettings):
     web_password_hash: str = ""
     web_origin: str = ""
     web_secure_cookies: bool = True
-    web_dist_path: Path = Path(__file__).parent.parent / "web" / "dist"
 
     @model_validator(mode='after')
     def browser_settings(self):

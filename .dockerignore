@@ -1,5 +1,6 @@
 # Build context is the repository root; only relay and browser source enter it.
 **
+!LICENSE
 !server/
 !server/Dockerfile
 !server/*.py
@@ -7,6 +8,9 @@
 !server/uv.lock
 !server/bambu-ca.pem
 !web/
+!web/Dockerfile
+!web/nginx/
+!web/nginx/**
 !web/package.json
 !web/package-lock.json
 !web/index.html
