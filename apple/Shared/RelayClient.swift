@@ -8,6 +8,11 @@ struct RelayClient: Sendable {
         self.token = token
     }
     func request(_ path: String, method: String = "GET", body: Data? = nil, revision: Int? = nil) async throws -> Data {
+        let (data, http) = try await response(path, method: method, body: body, revision: revision)
+        guard (200..<300).contains(http.statusCode) else { throw RelayError.http(http.statusCode) }
+        return data
+    }
+    func response(_ path: String, method: String = "GET", body: Data? = nil, revision: Int? = nil) async throws -> (Data, HTTPURLResponse) {
         guard var components = URLComponents(string: endpoint),
               ["http", "https"].contains(components.scheme ?? ""), components.host != nil,
               components.user == nil, components.password == nil,
@@ -25,8 +30,7 @@ struct RelayClient: Sendable {
         request.cachePolicy = .reloadIgnoringLocalCacheData
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw RelayError.transport }
-        guard (200..<300).contains(http.statusCode) else { throw RelayError.http(http.statusCode) }
-        return data
+        return (data, http)
     }
     func snapshot() async throws -> Snapshot { try JSONDecoder().decode(Snapshot.self, from: await request("v1/snapshot")) }
     func history(amsID: String, hours: Int) async throws -> [Reading] {

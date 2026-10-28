@@ -14,12 +14,16 @@
 		0D26FF65F53D56B23B57CBFC /* LiveActivityTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D319A487EBF679137A93D2 /* LiveActivityTiming.swift */; };
 		0DB7AC7728C71C978556B5FF /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38C2728CA3712EAC2D51E16B /* Configuration.swift */; };
 		152C85766D60FCE352AF4EB3 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 540CBBB611F0AB4052AD53B3 /* SettingsView.swift */; };
+		15BC2C6F1EF9E54C1DF0223B /* WatchState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50832CB4F4F2814A275B53FC /* WatchState.swift */; };
 		1A3B10BA9FBFE01E35AD8465 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90D2C4C5758A3D1FACF767B /* Theme.swift */; };
+		1A5FA9B103B67D8CF13A6CED /* WatchRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E844DCA12EF3149EB7A6A0 /* WatchRelay.swift */; };
 		1D1DAE9CB5DEA0A11C7EC936 /* MonitorLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0BCBD863DB6989FF82B0F16 /* MonitorLiveActivity.swift */; };
 		1DC0801D520B4987AA4CD437 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1DB4886A3FDF55872BBD78 /* Models.swift */; };
 		1F23575566D5B1931865567D /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D023DF191CDF108295056FBE /* RelayClient.swift */; };
 		20005842230E80A7E6650B36 /* LiveMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2421B63F739506CF0D57ADD0 /* LiveMonitor.swift */; };
 		266850E652148E19189EB0D2 /* ActivityUpdateRegistrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C166F8BDCAB0FBB4B08409 /* ActivityUpdateRegistrationTests.swift */; };
+		28C658179A4932C94192D6C9 /* WatchBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 965831A6AC0B33D725EAECE7 /* WatchBridge.swift */; };
+		290E18CBEE3125277018DE19 /* WatchCompanionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9510B7600328346F6089C8B4 /* WatchCompanionTests.swift */; };
 		294BE4905F4ABA627EA8DAAC /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1DB4886A3FDF55872BBD78 /* Models.swift */; };
 		29B8EE242EC8889C2AA74821 /* LiveActivityTimingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D6997A7B93579466D71E1DB /* LiveActivityTimingTests.swift */; };
 		2AAAD394984041CCA8DB245F /* ActivityUpdateRegistration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18703F94E54245B02C9E10AE /* ActivityUpdateRegistration.swift */; };
@@ -27,6 +31,7 @@
 		2CC34FA2FDAE1FD5568C62B9 /* AlertRulesModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FD30FD0343CB9A40A50A4A3 /* AlertRulesModelTests.swift */; };
 		3281FCC5DEBBC1521F2FBF7B /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70CA9BF577566983215A154 /* NotificationManager.swift */; };
 		33426E8C20AFAC14EAD90B7A /* MonitorAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD62B603226DF5B13DCA4C4 /* MonitorAttributes.swift */; };
+		3694931692FCAF83467BB771 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1DB4886A3FDF55872BBD78 /* Models.swift */; };
 		3B3843D0E67110337DACC4D7 /* NotificationManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44D10A3EFF857880D1098814 /* NotificationManagerTests.swift */; };
 		3B6E1B88F76DB35672970372 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70CA9BF577566983215A154 /* NotificationManager.swift */; };
 		3ECA3A4F65B264DB3167161D /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = F4EE0E1C731B0FD7391C3141 /* AppIcon.icon */; };
@@ -34,15 +39,23 @@
 		4269188CB494DBF1A20A087C /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38C2728CA3712EAC2D51E16B /* Configuration.swift */; };
 		4CE2495A51E5242FC3568344 /* AirkeepWidgets-iOS.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F752477F37DF85FEDB5E38B0 /* AirkeepWidgets-iOS.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5171D8BA731E378BEF23766E /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38C2728CA3712EAC2D51E16B /* Configuration.swift */; };
+		525831603F0C3895E5829F44 /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D023DF191CDF108295056FBE /* RelayClient.swift */; };
+		54B5DED6E56EDD93C00A67C2 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1DB4886A3FDF55872BBD78 /* Models.swift */; };
 		5DFFB7CCA76E42995714C6CF /* MonitorLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0BCBD863DB6989FF82B0F16 /* MonitorLiveActivity.swift */; };
 		5E870AA5FBE6F98EE4D019AF /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C44A5EEEC49510E3B55E58A /* MenuBarView.swift */; };
+		5EE349F194D450ACFD3054AB /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = F4EE0E1C731B0FD7391C3141 /* AppIcon.icon */; };
+		612333A0C672C6B50DEB5C5A /* AirkeepWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35C254892B1B824E5858C2C2 /* AirkeepWatchApp.swift */; };
 		658B7B30223798631447F79B /* ActivityUpdateRegistration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18703F94E54245B02C9E10AE /* ActivityUpdateRegistration.swift */; };
 		6CF37655E4EC3C4D820BE053 /* LiveActivityTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D319A487EBF679137A93D2 /* LiveActivityTiming.swift */; };
 		6FB221AA8FD2BA8A1BEF682D /* ActivityUpdateRegistration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18703F94E54245B02C9E10AE /* ActivityUpdateRegistration.swift */; };
 		6FB7B690AF0A0EBD082B547D /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1DB4886A3FDF55872BBD78 /* Models.swift */; };
+		7068986D73F20B335909AE70 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90D2C4C5758A3D1FACF767B /* Theme.swift */; };
 		70814F42111627E14BA3E986 /* LiveActivitiesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40BE96C78C2C605CF2CD60A /* LiveActivitiesView.swift */; };
+		71E7F648D977DB81B8F8CFA1 /* WatchWidgetIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BC8D82B6B407FD7C9A6890A /* WatchWidgetIntent.swift */; };
 		77A8CBDA3E4A66858E7A22C7 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90D2C4C5758A3D1FACF767B /* Theme.swift */; };
 		781DBA147761DC8B72ABCF4A /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D023DF191CDF108295056FBE /* RelayClient.swift */; };
+		7C2B2A2F4D9D0DC459DFD699 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38C2728CA3712EAC2D51E16B /* Configuration.swift */; };
+		7EC8FCC0F83707A9BFAE6E79 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38C2728CA3712EAC2D51E16B /* Configuration.swift */; };
 		7F085A1551C9B0EF6AEA8A8E /* LiveActivityTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D319A487EBF679137A93D2 /* LiveActivityTiming.swift */; };
 		823F642C2E21E28680DEDF21 /* ActivityUpdateRegistration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18703F94E54245B02C9E10AE /* ActivityUpdateRegistration.swift */; };
 		82DA77D360B0C039B72117D8 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1DB4886A3FDF55872BBD78 /* Models.swift */; };
@@ -52,17 +65,24 @@
 		99A257587A7E83C66A4EC227 /* LiveActivitiesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40BE96C78C2C605CF2CD60A /* LiveActivitiesView.swift */; };
 		9BE769DC95C87B2419D64865 /* ChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FFF9C4333814393241E70DD /* ChartView.swift */; };
 		9C6DD11B44F28B89ED332BBA /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90D2C4C5758A3D1FACF767B /* Theme.swift */; };
+		9D1B4BCEAC310A4CF5257BC0 /* WatchWidgetIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BC8D82B6B407FD7C9A6890A /* WatchWidgetIntent.swift */; };
 		9E3A20775FAFF53290EB0B65 /* RefreshIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02AED6709E1040FAB4F5E6EF /* RefreshIntent.swift */; };
+		A218239772F11B95BE8F9D02 /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D023DF191CDF108295056FBE /* RelayClient.swift */; };
 		A4BE94AD48DD60EE7E916D52 /* MonitorAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD62B603226DF5B13DCA4C4 /* MonitorAttributes.swift */; };
 		A70BEECFA2A696A1BE6E38AB /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC6B8778F752D0D723E8BD3 /* ConnectionView.swift */; };
+		ACCED2D96A3600D5F3398F71 /* WatchState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50832CB4F4F2814A275B53FC /* WatchState.swift */; };
 		AF2245DBB26349BEC9F6DDFD /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1DB4886A3FDF55872BBD78 /* Models.swift */; };
 		B4165ABEC5D04BFFAD985136 /* LiveActivityTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D319A487EBF679137A93D2 /* LiveActivityTiming.swift */; };
+		B4F31A6B0EA780C27F4928AC /* WatchRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E844DCA12EF3149EB7A6A0 /* WatchRelay.swift */; };
+		B5B9BF6F00DBA5B9E0B60702 /* WatchCompanion.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57502BA6DFC22D9F7C4666E /* WatchCompanion.swift */; };
 		B8B41851F44B87BF560DE168 /* MonitorAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD62B603226DF5B13DCA4C4 /* MonitorAttributes.swift */; };
 		BAC6F507A5E7B6A999940F6A /* ActivityUpdateRegistration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18703F94E54245B02C9E10AE /* ActivityUpdateRegistration.swift */; };
+		BD28F00530248548F60DF7E2 /* Airkeep-watchOS.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = B744B1CDFFFB2CFA91C6C587 /* Airkeep-watchOS.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BE59C74CB4F655597ABD35F8 /* AlertRulesModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30AEEA8F381CAE2C1C4138C9 /* AlertRulesModel.swift */; };
 		C0B1CFB35AFDD623B3D40401 /* MonitorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7CBBCD7F1448B58DDED8A87 /* MonitorModel.swift */; };
 		C4908F84E187E2BDAF4BE551 /* AlertsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78357A924B65198BDC69A5CD /* AlertsView.swift */; };
 		C7712D39DEA9C8C0DC8F7B86 /* MonitorAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD62B603226DF5B13DCA4C4 /* MonitorAttributes.swift */; };
+		C8565CAA12A27363F99136C2 /* WatchState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50832CB4F4F2814A275B53FC /* WatchState.swift */; };
 		CA3AF025A6D9C61C52E11A43 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38C2728CA3712EAC2D51E16B /* Configuration.swift */; };
 		CCD73B9D14628A6A3135C756 /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D023DF191CDF108295056FBE /* RelayClient.swift */; };
 		CD878AA7FD98C9039DE14B97 /* MonitorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7CBBCD7F1448B58DDED8A87 /* MonitorModel.swift */; };
@@ -70,15 +90,22 @@
 		D0FAA7683F3CA92986C3869C /* AirkeepApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ACB387FEA818091E3036031 /* AirkeepApp.swift */; };
 		D14BEA204C1D977A293107A4 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70CA9BF577566983215A154 /* NotificationManager.swift */; };
 		D2B7025E0DF50694C50E14C0 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 540CBBB611F0AB4052AD53B3 /* SettingsView.swift */; };
+		D81727B61D7627D6CF38F16D /* WatchState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50832CB4F4F2814A275B53FC /* WatchState.swift */; };
 		D8794EA62CF40441F0A23443 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40A00CA41C906188F9CC4A80 /* DashboardView.swift */; };
+		E0F5E0F6E24F5760F32064BC /* WatchDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA48A175DE4EA045776139D4 /* WatchDashboardView.swift */; };
 		E0F9F47A4F67F166FC5B1F28 /* ChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FFF9C4333814393241E70DD /* ChartView.swift */; };
 		E3E959B7D3C071BE50FB1D77 /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D023DF191CDF108295056FBE /* RelayClient.swift */; };
 		E9C1C554BEB31A902CAF99EE /* AirkeepApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5B6D99C65B201622A6F44C4 /* AirkeepApp.swift */; };
 		EA7EFE14CC9DE971D6489EA4 /* RefreshIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02AED6709E1040FAB4F5E6EF /* RefreshIntent.swift */; };
 		EF1E3B06C03EC3B40C041289 /* AirkeepWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8E6FE5855D944EF74A6CF9F /* AirkeepWidgets.swift */; };
+		F24A729C1C6DD2842BF65DCA /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90D2C4C5758A3D1FACF767B /* Theme.swift */; };
 		F252CCC23BFF26BECE2418F3 /* RefreshIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02AED6709E1040FAB4F5E6EF /* RefreshIntent.swift */; };
 		F2EEB742A39F982AB362145D /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC6B8778F752D0D723E8BD3 /* ConnectionView.swift */; };
+		FAA073CAF95A18AF09FE117E /* WatchRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E844DCA12EF3149EB7A6A0 /* WatchRelay.swift */; };
+		FAD5B85DEA49E583E0546893 /* AirkeepWatchWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BCCA0C2DF4E7D98CD9CED16 /* AirkeepWatchWidgets.swift */; };
 		FCF295014DEEBC06722364E9 /* AirkeepWidgets-macOS.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0591C52E875EE17272A2A40B /* AirkeepWidgets-macOS.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		FDCA15D060E3E38DCFEDBB0B /* AirkeepWidgets-watchOS.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F2E6CC8A350C4DF2BE426B56 /* AirkeepWidgets-watchOS.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		FE951A02394D65450D59172F /* WatchWidgetIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BC8D82B6B407FD7C9A6890A /* WatchWidgetIntent.swift */; };
 		FEE4BCE3F13C203B1D5BFD73 /* RefreshIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02AED6709E1040FAB4F5E6EF /* RefreshIntent.swift */; };
 /* End PBXBuildFile section */
 
@@ -90,6 +117,20 @@
 			remoteGlobalIDString = 23DC6EEDE089B114B696574C;
 			remoteInfo = "AirkeepWidgets-macOS";
 		};
+		3F354A8DA30A8253BE93B1BD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8DFFBEACD63B73D398C0121F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E30310907FDA5DC5DE0B130C;
+			remoteInfo = "AirkeepWidgets-watchOS";
+		};
+		8D4019BB67B8ABDEDD1863B9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8DFFBEACD63B73D398C0121F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4810A76FB5FF5B05703B941A;
+			remoteInfo = "Airkeep-watchOS";
+		};
 		FE5FE33DB4D4900CB48DE593 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 8DFFBEACD63B73D398C0121F /* Project object */;
@@ -100,6 +141,17 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		2214065F01E2C361C33A57AB /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				BD28F00530248548F60DF7E2 /* Airkeep-watchOS.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		2DAAD8D8ECC5BA875EF8E827 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -122,6 +174,17 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7DBB0292D476459D261E51ED /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				FDCA15D060E3E38DCFEDBB0B /* AirkeepWidgets-watchOS.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -133,36 +196,51 @@
 		1814B1034DDCC5351494E4CA /* iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iOS.entitlements; sourceTree = "<group>"; };
 		18703F94E54245B02C9E10AE /* ActivityUpdateRegistration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityUpdateRegistration.swift; sourceTree = "<group>"; };
 		1ACB387FEA818091E3036031 /* AirkeepApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirkeepApp.swift; sourceTree = "<group>"; };
+		1BCCA0C2DF4E7D98CD9CED16 /* AirkeepWatchWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirkeepWatchWidgets.swift; sourceTree = "<group>"; };
 		1D3473456A664B19E499B55E /* macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = macOS.entitlements; sourceTree = "<group>"; };
 		2421B63F739506CF0D57ADD0 /* LiveMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveMonitor.swift; sourceTree = "<group>"; };
 		2D6997A7B93579466D71E1DB /* LiveActivityTimingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityTimingTests.swift; sourceTree = "<group>"; };
+		2DE8B1C8E714A14AD6E03EE6 /* Airkeep.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Airkeep.entitlements; sourceTree = "<group>"; };
 		3071C151299FE4E4F42FDF03 /* Airkeep.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Airkeep.entitlements; sourceTree = "<group>"; };
 		30AEEA8F381CAE2C1C4138C9 /* AlertRulesModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertRulesModel.swift; sourceTree = "<group>"; };
+		328014F57285404831E55E68 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		35C254892B1B824E5858C2C2 /* AirkeepWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirkeepWatchApp.swift; sourceTree = "<group>"; };
 		38C2728CA3712EAC2D51E16B /* Configuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
 		395EE5412080F364F344B67A /* Airkeep-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Airkeep-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		3E3BC1034CC7E6A28F4F7933 /* Airkeep.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Airkeep.entitlements; sourceTree = "<group>"; };
 		40A00CA41C906188F9CC4A80 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		42BD2348CE25F29932A53C95 /* Airkeep-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "Airkeep-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		44D10A3EFF857880D1098814 /* NotificationManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManagerTests.swift; sourceTree = "<group>"; };
 		4C44A5EEEC49510E3B55E58A /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		4E36F555FC3AD1C27A33B83A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4FD30FD0343CB9A40A50A4A3 /* AlertRulesModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertRulesModelTests.swift; sourceTree = "<group>"; };
+		50832CB4F4F2814A275B53FC /* WatchState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchState.swift; sourceTree = "<group>"; };
 		540CBBB611F0AB4052AD53B3 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		5BC8D82B6B407FD7C9A6890A /* WatchWidgetIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchWidgetIntent.swift; sourceTree = "<group>"; };
+		65E844DCA12EF3149EB7A6A0 /* WatchRelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchRelay.swift; sourceTree = "<group>"; };
 		6982B2505016558F4B918A21 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		78357A924B65198BDC69A5CD /* AlertsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertsView.swift; sourceTree = "<group>"; };
+		9510B7600328346F6089C8B4 /* WatchCompanionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCompanionTests.swift; sourceTree = "<group>"; };
+		965831A6AC0B33D725EAECE7 /* WatchBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchBridge.swift; sourceTree = "<group>"; };
+		99E658523EB6001641E2CD7C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		9FFF9C4333814393241E70DD /* ChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartView.swift; sourceTree = "<group>"; };
 		A0BCBD863DB6989FF82B0F16 /* MonitorLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorLiveActivity.swift; sourceTree = "<group>"; };
 		A0EE4BC2DC640E1BBAAF6039 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		A7C166F8BDCAB0FBB4B08409 /* ActivityUpdateRegistrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityUpdateRegistrationTests.swift; sourceTree = "<group>"; };
 		A8E6FE5855D944EF74A6CF9F /* AirkeepWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirkeepWidgets.swift; sourceTree = "<group>"; };
 		B40BE96C78C2C605CF2CD60A /* LiveActivitiesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivitiesView.swift; sourceTree = "<group>"; };
+		B744B1CDFFFB2CFA91C6C587 /* Airkeep-watchOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Airkeep-watchOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C32743AF97BD35AEEA5B49E8 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 		C90D2C4C5758A3D1FACF767B /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		D023DF191CDF108295056FBE /* RelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayClient.swift; sourceTree = "<group>"; };
+		D57502BA6DFC22D9F7C4666E /* WatchCompanion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCompanion.swift; sourceTree = "<group>"; };
 		D6D319A487EBF679137A93D2 /* LiveActivityTiming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityTiming.swift; sourceTree = "<group>"; };
 		DEC6B8778F752D0D723E8BD3 /* ConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionView.swift; sourceTree = "<group>"; };
 		E70CA9BF577566983215A154 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 		E7CBBCD7F1448B58DDED8A87 /* MonitorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorModel.swift; sourceTree = "<group>"; };
+		EA48A175DE4EA045776139D4 /* WatchDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchDashboardView.swift; sourceTree = "<group>"; };
 		EDD62B603226DF5B13DCA4C4 /* MonitorAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorAttributes.swift; sourceTree = "<group>"; };
+		F2E6CC8A350C4DF2BE426B56 /* AirkeepWidgets-watchOS.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "AirkeepWidgets-watchOS.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F4EE0E1C731B0FD7391C3141 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		F5B6D99C65B201622A6F44C4 /* AirkeepApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirkeepApp.swift; sourceTree = "<group>"; };
 		F752477F37DF85FEDB5E38B0 /* AirkeepWidgets-iOS.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = "AirkeepWidgets-iOS.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -178,6 +256,28 @@
 			path = .;
 			sourceTree = "<group>";
 		};
+		13ECC35DBA7A78005BA4FCE5 /* Watch */ = {
+			isa = PBXGroup;
+			children = (
+				3E3BC1034CC7E6A28F4F7933 /* Airkeep.entitlements */,
+				35C254892B1B824E5858C2C2 /* AirkeepWatchApp.swift */,
+				328014F57285404831E55E68 /* Info.plist */,
+				965831A6AC0B33D725EAECE7 /* WatchBridge.swift */,
+				EA48A175DE4EA045776139D4 /* WatchDashboardView.swift */,
+			);
+			path = Watch;
+			sourceTree = "<group>";
+		};
+		3AB92301E6CD677D61F6BD2D /* WatchWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				2DE8B1C8E714A14AD6E03EE6 /* Airkeep.entitlements */,
+				1BCCA0C2DF4E7D98CD9CED16 /* AirkeepWatchWidgets.swift */,
+				99E658523EB6001641E2CD7C /* Info.plist */,
+			);
+			path = WatchWidgets;
+			sourceTree = "<group>";
+		};
 		459FB929122947CBBE732443 = {
 			isa = PBXGroup;
 			children = (
@@ -188,6 +288,9 @@
 				A5581F18BB45CE7FC8E52DA2 /* macOS */,
 				E146D8EA43C54FE890A22D7D /* Shared */,
 				E5924944757518FA1F9AE050 /* Tests */,
+				13ECC35DBA7A78005BA4FCE5 /* Watch */,
+				D7EF957E698D7AB9A22B49BF /* WatchShared */,
+				3AB92301E6CD677D61F6BD2D /* WatchWidgets */,
 				7D9AB5B5B93198E18370B222 /* Widgets */,
 				CD2615A8AAAF25A6F46E2052 /* Products */,
 			);
@@ -228,6 +331,7 @@
 				1ACB387FEA818091E3036031 /* AirkeepApp.swift */,
 				6982B2505016558F4B918A21 /* Info.plist */,
 				2421B63F739506CF0D57ADD0 /* LiveMonitor.swift */,
+				D57502BA6DFC22D9F7C4666E /* WatchCompanion.swift */,
 			);
 			path = iOS;
 			sourceTree = "<group>";
@@ -248,11 +352,23 @@
 			children = (
 				42BD2348CE25F29932A53C95 /* Airkeep-iOS.app */,
 				395EE5412080F364F344B67A /* Airkeep-macOS.app */,
+				B744B1CDFFFB2CFA91C6C587 /* Airkeep-watchOS.app */,
 				08A15B46EB3DECD8D624074E /* AirkeepNotificationsTests.xctest */,
 				F752477F37DF85FEDB5E38B0 /* AirkeepWidgets-iOS.appex */,
 				0591C52E875EE17272A2A40B /* AirkeepWidgets-macOS.appex */,
+				F2E6CC8A350C4DF2BE426B56 /* AirkeepWidgets-watchOS.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		D7EF957E698D7AB9A22B49BF /* WatchShared */ = {
+			isa = PBXGroup;
+			children = (
+				65E844DCA12EF3149EB7A6A0 /* WatchRelay.swift */,
+				50832CB4F4F2814A275B53FC /* WatchState.swift */,
+				5BC8D82B6B407FD7C9A6890A /* WatchWidgetIntent.swift */,
+			);
+			path = WatchShared;
 			sourceTree = "<group>";
 		};
 		E146D8EA43C54FE890A22D7D /* Shared */ = {
@@ -277,6 +393,7 @@
 				4FD30FD0343CB9A40A50A4A3 /* AlertRulesModelTests.swift */,
 				2D6997A7B93579466D71E1DB /* LiveActivityTimingTests.swift */,
 				44D10A3EFF857880D1098814 /* NotificationManagerTests.swift */,
+				9510B7600328346F6089C8B4 /* WatchCompanionTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -321,6 +438,26 @@
 			productReference = 0591C52E875EE17272A2A40B /* AirkeepWidgets-macOS.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		4810A76FB5FF5B05703B941A /* Airkeep-watchOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BA8A24676634A11AA8AEB700 /* Build configuration list for PBXNativeTarget "Airkeep-watchOS" */;
+			buildPhases = (
+				ADBF995428951551F0BB6D9D /* Sources */,
+				DEEFB8FC6B28643241DB6536 /* Resources */,
+				7DBB0292D476459D261E51ED /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2BE95AD5AF27E1F3D628B5AC /* PBXTargetDependency */,
+			);
+			name = "Airkeep-watchOS";
+			packageProductDependencies = (
+			);
+			productName = "Airkeep-watchOS";
+			productReference = B744B1CDFFFB2CFA91C6C587 /* Airkeep-watchOS.app */;
+			productType = "com.apple.product-type.application";
+		};
 		69761E03105557F8E20F5D94 /* Airkeep-iOS */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 8A5CDA58B4C4BB1838738CC5 /* Build configuration list for PBXNativeTarget "Airkeep-iOS" */;
@@ -328,11 +465,13 @@
 				DC28E2DD128181D289FB2621 /* Sources */,
 				47AAB5A91FD6D2CDAE4295C3 /* Resources */,
 				2DAAD8D8ECC5BA875EF8E827 /* Embed Foundation Extensions */,
+				2214065F01E2C361C33A57AB /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				1E62C0CBFA2A8D358C7DF53B /* PBXTargetDependency */,
+				C9AABD1AB1E8F2475DCBE788 /* PBXTargetDependency */,
 			);
 			name = "Airkeep-iOS";
 			packageProductDependencies = (
@@ -375,6 +514,23 @@
 			productReference = F752477F37DF85FEDB5E38B0 /* AirkeepWidgets-iOS.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		E30310907FDA5DC5DE0B130C /* AirkeepWidgets-watchOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8D22B00755CD3313B068105E /* Build configuration list for PBXNativeTarget "AirkeepWidgets-watchOS" */;
+			buildPhases = (
+				9D1FA6E6405F3E207E53698B /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "AirkeepWidgets-watchOS";
+			packageProductDependencies = (
+			);
+			productName = "AirkeepWidgets-watchOS";
+			productReference = F2E6CC8A350C4DF2BE426B56 /* AirkeepWidgets-watchOS.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -390,6 +546,9 @@
 					23DC6EEDE089B114B696574C = {
 						ProvisioningStyle = Automatic;
 					};
+					4810A76FB5FF5B05703B941A = {
+						ProvisioningStyle = Automatic;
+					};
 					69761E03105557F8E20F5D94 = {
 						ProvisioningStyle = Automatic;
 					};
@@ -397,6 +556,9 @@
 						ProvisioningStyle = Automatic;
 					};
 					C2CFD4D2A1085BC60D7D43C7 = {
+						ProvisioningStyle = Automatic;
+					};
+					E30310907FDA5DC5DE0B130C = {
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -419,6 +581,8 @@
 				15F8573AE24B2670C502269C /* Airkeep-macOS */,
 				C2CFD4D2A1085BC60D7D43C7 /* AirkeepWidgets-iOS */,
 				23DC6EEDE089B114B696574C /* AirkeepWidgets-macOS */,
+				4810A76FB5FF5B05703B941A /* Airkeep-watchOS */,
+				E30310907FDA5DC5DE0B130C /* AirkeepWidgets-watchOS */,
 				9D6C509507E9D5B403C6FAFE /* AirkeepNotificationsTests */,
 			);
 		};
@@ -441,6 +605,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DEEFB8FC6B28643241DB6536 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5EE349F194D450ACFD3054AB /* AppIcon.icon in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -459,6 +631,10 @@
 				D14BEA204C1D977A293107A4 /* NotificationManager.swift in Sources */,
 				3B3843D0E67110337DACC4D7 /* NotificationManagerTests.swift in Sources */,
 				E3E959B7D3C071BE50FB1D77 /* RelayClient.swift in Sources */,
+				290E18CBEE3125277018DE19 /* WatchCompanionTests.swift in Sources */,
+				1A5FA9B103B67D8CF13A6CED /* WatchRelay.swift in Sources */,
+				15BC2C6F1EF9E54C1DF0223B /* WatchState.swift in Sources */,
+				71E7F648D977DB81B8F8CFA1 /* WatchWidgetIntent.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -505,6 +681,38 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9D1FA6E6405F3E207E53698B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FAD5B85DEA49E583E0546893 /* AirkeepWatchWidgets.swift in Sources */,
+				7C2B2A2F4D9D0DC459DFD699 /* Configuration.swift in Sources */,
+				3694931692FCAF83467BB771 /* Models.swift in Sources */,
+				525831603F0C3895E5829F44 /* RelayClient.swift in Sources */,
+				7068986D73F20B335909AE70 /* Theme.swift in Sources */,
+				FAA073CAF95A18AF09FE117E /* WatchRelay.swift in Sources */,
+				D81727B61D7627D6CF38F16D /* WatchState.swift in Sources */,
+				FE951A02394D65450D59172F /* WatchWidgetIntent.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		ADBF995428951551F0BB6D9D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				612333A0C672C6B50DEB5C5A /* AirkeepWatchApp.swift in Sources */,
+				7EC8FCC0F83707A9BFAE6E79 /* Configuration.swift in Sources */,
+				54B5DED6E56EDD93C00A67C2 /* Models.swift in Sources */,
+				A218239772F11B95BE8F9D02 /* RelayClient.swift in Sources */,
+				F24A729C1C6DD2842BF65DCA /* Theme.swift in Sources */,
+				28C658179A4932C94192D6C9 /* WatchBridge.swift in Sources */,
+				E0F5E0F6E24F5760F32064BC /* WatchDashboardView.swift in Sources */,
+				B4F31A6B0EA780C27F4928AC /* WatchRelay.swift in Sources */,
+				ACCED2D96A3600D5F3398F71 /* WatchState.swift in Sources */,
+				9D1B4BCEAC310A4CF5257BC0 /* WatchWidgetIntent.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		DC28E2DD128181D289FB2621 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -528,6 +736,8 @@
 				D0BB92A5D6513CCA2DA82595 /* RelayClient.swift in Sources */,
 				D2B7025E0DF50694C50E14C0 /* SettingsView.swift in Sources */,
 				0D000129F5A72497D0E99F23 /* Theme.swift in Sources */,
+				B5B9BF6F00DBA5B9E0B60702 /* WatchCompanion.swift in Sources */,
+				C8565CAA12A27363F99136C2 /* WatchState.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -560,6 +770,16 @@
 			isa = PBXTargetDependency;
 			target = C2CFD4D2A1085BC60D7D43C7 /* AirkeepWidgets-iOS */;
 			targetProxy = FE5FE33DB4D4900CB48DE593 /* PBXContainerItemProxy */;
+		};
+		2BE95AD5AF27E1F3D628B5AC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E30310907FDA5DC5DE0B130C /* AirkeepWidgets-watchOS */;
+			targetProxy = 3F354A8DA30A8253BE93B1BD /* PBXContainerItemProxy */;
+		};
+		C9AABD1AB1E8F2475DCBE788 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4810A76FB5FF5B05703B941A /* Airkeep-watchOS */;
+			targetProxy = 8D4019BB67B8ABDEDD1863B9 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -613,6 +833,37 @@
 				SDKROOT = macosx;
 			};
 			name = Debug;
+		};
+		44BF3E25A1D083B59861BA10 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = WatchWidgets/Airkeep.entitlements;
+				INFOPLIST_FILE = WatchWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(AIRKEEP_BUNDLE_ID_PREFIX).watch.widgets";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Debug;
+		};
+		475D8701A1E4F1AB963782A8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Watch/Airkeep.entitlements;
+				INFOPLIST_FILE = Watch/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(AIRKEEP_BUNDLE_ID_PREFIX).watch";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Release;
 		};
 		64F4FA6484D690C813C4646A /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -720,7 +971,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 5;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -742,7 +993,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.3.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -750,6 +1001,7 @@
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 6.0;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Debug;
 		};
@@ -827,7 +1079,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 5;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -843,13 +1095,14 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.3.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 6.0;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Release;
 		};
@@ -868,6 +1121,37 @@
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D8C7BD6137341171C26818E3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = WatchWidgets/Airkeep.entitlements;
+				INFOPLIST_FILE = WatchWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(AIRKEEP_BUNDLE_ID_PREFIX).watch.widgets";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Release;
+		};
+		F374A782174AC57CFDDBDD53 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Watch/Airkeep.entitlements;
+				INFOPLIST_FILE = Watch/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(AIRKEEP_BUNDLE_ID_PREFIX).watch";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
 			};
 			name = Debug;
 		};
@@ -892,11 +1176,29 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		8D22B00755CD3313B068105E /* Build configuration list for PBXNativeTarget "AirkeepWidgets-watchOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				44BF3E25A1D083B59861BA10 /* Debug */,
+				D8C7BD6137341171C26818E3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		B4EFE7745ACE0D579435599A /* Build configuration list for PBXNativeTarget "AirkeepWidgets-macOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				71E8FAECAB602B6626189CDB /* Debug */,
 				A0B40FE12E77F8C0392F2E04 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BA8A24676634A11AA8AEB700 /* Build configuration list for PBXNativeTarget "Airkeep-watchOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F374A782174AC57CFDDBDD53 /* Debug */,
+				475D8701A1E4F1AB963782A8 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

@@ -226,6 +226,9 @@ struct RelaySettingsView: View {
                     LabeledContent("App topic", value: Bundle.main.bundleIdentifier ?? "Unknown")
                 }
             }
+            #if os(iOS)
+            WatchCompanionSettings(amsID: model.selectedAMS, demo: model.demo)
+            #endif
             Section("Privacy") {
                 Text("Your connection token is stored securely in Keychain.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -236,3 +239,29 @@ struct RelaySettingsView: View {
         .task { if !model.demo { await model.refresh(); await notifications.refresh() } }
     }
 }
+
+#if os(iOS)
+private struct WatchCompanionSettings: View {
+    var amsID: String
+    var demo: Bool
+    private var watch: WatchCompanion { .shared }
+    var body: some View {
+        Section("Apple Watch") {
+            LabeledContent("Connection", value: demo ? "Preview" : watch.waiting ? "Waiting for Apple Watch…" : watch.error != nil ? "Needs attention" : watch.connected ? "Connected" : "Not connected")
+            if !watch.paired {
+                Text("Pair an Apple Watch with this iPhone to connect Airkeep.").font(.caption).foregroundStyle(.secondary)
+            } else if !watch.installed {
+                Text("Install Airkeep on your Apple Watch to connect.").font(.caption).foregroundStyle(.secondary)
+            }
+            Button(watch.connected ? "Update Watch connection" : "Connect Apple Watch") {
+                Task { await watch.connect(amsID: amsID) }
+            }.disabled(demo || !watch.ready || !watch.paired || !watch.installed || watch.waiting)
+            if watch.waiting || watch.error != nil { Button("Retry") { watch.retry() }.disabled(demo) }
+            if watch.connected || watch.waiting {
+                Button("Disconnect Apple Watch", role: .destructive) { watch.disconnect() }.disabled(demo)
+            }
+            if let error = watch.error { Text(error).font(.caption).foregroundStyle(.orange) }
+        }.task { watch.activate() }
+    }
+}
+#endif

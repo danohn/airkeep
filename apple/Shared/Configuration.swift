@@ -55,10 +55,10 @@ enum SharedConfiguration {
 }
 
 enum TokenStore {
-    private static var query: [String: Any] {
+    private static func query(account: String) -> [String: Any] {
         var query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
                                    kSecAttrService as String: "Airkeep relay",
-                                   kSecAttrAccount as String: "bearer-token"]
+                                   kSecAttrAccount as String: account]
         #if os(macOS)
         // Use the data-protection Keychain so signed access groups control sharing.
         // The login Keychain's per-binary ACLs repeatedly prompted after rebuilds.
@@ -71,8 +71,8 @@ enum TokenStore {
         }
         return query
     }
-    static func read() -> String {
-        var query = query
+    static func read(account: String = "bearer-token") -> String {
+        var query = query(account: account)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         // A background read must not open an authentication prompt.
@@ -84,16 +84,20 @@ enum TokenStore {
               let data = item as? Data else { return "" }
         return String(data: data, encoding: .utf8) ?? ""
     }
-    static func save(_ value: String) throws {
+    static func save(_ value: String, account: String = "bearer-token") throws {
         let data = Data(value.utf8)
+        var query = query(account: account)
         let update = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
         if update == errSecSuccess { return }
         guard update == errSecItemNotFound else { throw StorageError.keychain(update) }
-        var query = query
         query[kSecValueData as String] = data
         query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         let result = SecItemAdd(query as CFDictionary, nil)
         guard result == errSecSuccess else { throw StorageError.keychain(result) }
+    }
+    static func delete(account: String) throws {
+        let status = SecItemDelete(query(account: account) as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else { throw StorageError.keychain(status) }
     }
     enum StorageError: LocalizedError {
         case keychain(OSStatus)
