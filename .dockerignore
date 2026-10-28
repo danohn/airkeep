@@ -1,0 +1,18 @@
+# Build context is the repository root; only relay and browser source enter it.
+**
+!server/
+!server/Dockerfile
+!server/*.py
+!server/pyproject.toml
+!server/uv.lock
+!server/bambu-ca.pem
+!web/
+!web/package.json
+!web/package-lock.json
+!web/index.html
+!web/tsconfig.json
+!web/vite.config.ts
+!web/src/
+!web/src/**
+!web/public/
+!web/public/**

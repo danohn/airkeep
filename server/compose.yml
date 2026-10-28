@@ -1,9 +1,11 @@
 name: airkeep
 services:
   airkeep:
-    image: airkeep-relay:${AIRKEEP_IMAGE_TAG:-0.2.0}
+    image: airkeep-relay:${AIRKEEP_IMAGE_TAG:-0.3.0}
     pull_policy: never
-    build: .
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
     restart: unless-stopped
     init: true
     env_file: private/relay.env

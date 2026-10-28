@@ -39,3 +39,27 @@ def test_sandbox_only_key_is_not_used_for_production():
     assert settings.apns_ready
     assert settings.apns_credentials('sandbox')==('D','/fake')
     assert settings.apns_credentials('production') is None
+
+
+async def test_widget_headers_structured_failures_and_retry_after(tmp_path):
+    key=ec.generate_private_key(ec.SECP256R1())
+    path=tmp_path/'watch.p8'
+    path.write_bytes(key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()))
+    settings=Settings(api_token='x'*40,apns_team_id='TEAM',watch_apns_key_id='WATCH',watch_apns_key_path=str(path),_env_file=None)
+    requests=[]
+    def receive(request):
+        requests.append(request)
+        return httpx.Response(429,json={'reason':'TooManyRequests'},headers={'apns-id':'request-id','retry-after':'900'})
+    push=APNs(settings);await push.client.aclose();push.client=httpx.AsyncClient(transport=httpx.MockTransport(receive))
+    result=await push.send_request('a'*64,'io.airkeep.watch','sandbox',{'aps':{'content-changed':True}},
+                                   push_type='widgets',expiration=2000,collapse_id='airkeep.widgets')
+    assert result.status==429 and result.reason=='TooManyRequests' and result.apns_id=='request-id' and result.retry_after_seconds==900
+    headers=requests[0].headers
+    assert headers['apns-topic']=='io.airkeep.watch.push-type.widgets'
+    assert headers['apns-push-type']=='widgets' and headers['apns-priority']=='5'
+    assert headers['apns-expiration']=='2000' and headers['apns-collapse-id']=='airkeep.widgets'
+    assert jwt.get_unverified_header(headers['authorization'].split()[1])['kid']=='WATCH'
+    # Watch-only credentials never authorize ordinary iOS pushes.
+    missing=await push.send_request('b'*64,'io.airkeep','sandbox',{'aps':{'alert':'test'}})
+    assert missing.status is None and missing.reason=='credentials_missing' and len(requests)==1
+    await push.close()

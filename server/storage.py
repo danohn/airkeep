@@ -33,6 +33,7 @@ class Store:
             self.db.execute('ALTER TABLE outbox ADD COLUMN created REAL DEFAULT 0')
             self.db.commit()
         self._migrate_alerts()
+        self._migrate_dashboard()
 
     def _migrate_alerts(self):
         with self.lock:
@@ -59,6 +60,30 @@ class Store:
             except BaseException:
                 self.db.rollback()
                 raise
+
+    def _migrate_dashboard(self):
+        with self.lock, self.db:
+            self.db.executescript("""
+                BEGIN IMMEDIATE;
+                CREATE TABLE IF NOT EXISTS web_sessions(id TEXT PRIMARY KEY,csrf TEXT,created REAL,expires REAL,version TEXT);
+                CREATE TABLE IF NOT EXISTS alert_events(id TEXT PRIMARY KEY,at REAL NOT NULL,rule_id TEXT NOT NULL,ams TEXT NOT NULL,json TEXT NOT NULL);
+                CREATE INDEX IF NOT EXISTS alert_events_at ON alert_events(at DESC,id DESC);
+                CREATE TABLE IF NOT EXISTS push_attempts(id INTEGER PRIMARY KEY,at REAL NOT NULL,kind TEXT,destination TEXT,fingerprint TEXT,environment TEXT,topic TEXT,status INTEGER,reason TEXT,apns_id TEXT);
+                CREATE INDEX IF NOT EXISTS push_attempts_at ON push_attempts(at DESC,id DESC);
+                CREATE TABLE IF NOT EXISTS widget_installations(id TEXT PRIMARY KEY,generation INTEGER NOT NULL,deleted INTEGER NOT NULL DEFAULT 0,token TEXT,environment TEXT,bundle_id TEXT,ams_ids TEXT,created REAL,updated REAL,last_sent REAL DEFAULT 0,last_attempt REAL DEFAULT 0,last_fingerprint TEXT,next_attempt REAL DEFAULT 0,attempts INTEGER DEFAULT 0,last_status INTEGER,last_reason TEXT);
+            """)
+            self.db.execute("INSERT OR IGNORE INTO config VALUES('events_started_at',?)",(json.dumps(time.time()),))
+            # Restart follows configuration changes; retry provider authorization failures.
+            # Invalid device tokens remain paused until a new generation arrives.
+            self.db.execute('UPDATE widget_installations SET last_status=NULL,last_reason=NULL,next_attempt=0,attempts=0 WHERE last_status=403')
+            columns = {r[1] for r in self.db.execute('PRAGMA table_info(devices)')}
+            for name in ('created_at','registered_at'):
+                if name not in columns:
+                    self.db.execute(f'ALTER TABLE devices ADD COLUMN {name} REAL')
+            activity_columns={r[1] for r in self.db.execute('PRAGMA table_info(activities)')}
+            for name in ('created_at','registered_at'):
+                if name not in activity_columns:
+                    self.db.execute(f'ALTER TABLE activities ADD COLUMN {name} REAL')
 
     def execute(self, sql, params=()):
         with self.lock, self.db:
@@ -169,6 +194,12 @@ class Store:
                 self.db.execute('UPDATE alert_rules SET state=? WHERE id=?',(json.dumps(vars(state)),row['id']))
                 if not event or reading is None:
                     continue
+                event_id = str(uuid.uuid4())
+                event_data = {'id': event_id, 'occurredAt': now, 'type': event,
+                              'ruleID': row['id'], 'name': row['name'], 'amsID': rule.amsID,
+                              'condition': rule.model_dump(), 'reading': reading.model_dump()}
+                self.db.execute('INSERT INTO alert_events VALUES(?,?,?,?,?)',
+                                (event_id,now,row['id'],rule.amsID,json.dumps(event_data)))
                 title = f"{row['name']}: humidity {'above your limit' if event == 'high' else 'recovered'}"
                 ams = int(reading.amsID)+1 if reading.amsID.isdigit() else reading.amsID
                 body = f'AMS {ams}: {reading.humidity:g}% RH. Your limit is {rule.threshold:g}%.'
@@ -180,9 +211,14 @@ class Store:
 
     def upsert_device(self, identifier, token, topic, environment, initial_receive=False):
         with self.lock, self.db:
+            existing = self.db.execute('SELECT 1 FROM devices WHERE id=?',(identifier,)).fetchone()
             self.db.execute('''INSERT INTO devices(id,token,topic,environment,receive_alerts) VALUES(?,?,?,?,?)
                 ON CONFLICT(id) DO UPDATE SET token=excluded.token,topic=excluded.topic,environment=excluded.environment''',
                 (identifier,token,topic,environment,int(initial_receive)))
+            now = time.time()
+            self.db.execute('UPDATE devices SET registered_at=? WHERE id=?',(now,identifier))
+            if existing is None:
+                self.db.execute('UPDATE devices SET created_at=? WHERE id=?',(now,identifier))
             return bool(self.db.execute('SELECT receive_alerts FROM devices WHERE id=?',(identifier,)).fetchone()[0])
 
     def set_subscription(self, identifier, enabled):

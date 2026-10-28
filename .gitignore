@@ -25,3 +25,6 @@ firmware/sdkconfig.secrets
 apple/Local.xcconfig
 server/private/
 *.log
+web/node_modules/
+web/dist/
+web/*.tsbuildinfo

@@ -24,7 +24,9 @@ curl --fail http://127.0.0.1:8787/health
 
 The base Compose file exposes port 8787 on loopback. `/health` confirms that the API responds. After connecting an app, check that the authenticated snapshot reports a fresh printer reading.
 
-The image contains code, locked dependencies and the public Bambu CA bundle. Credentials and databases stay outside it. Keep `private/` out of version control and image archives.
+The build uses the repository root as its context and includes the browser frontend. Keep `server/` and `web/` together when copying source to another host. The root `.dockerignore` restricts the context to application source.
+
+The image contains code, built browser assets, locked dependencies and the public Bambu CA bundle. Credentials and databases stay outside it. Keep `private/` out of version control and image archives.
 
 ## HTTPS for clients
 
@@ -73,3 +75,12 @@ The data volume preserves history, device registrations, Live Activities and ale
 ## Upgrading to shared alerts
 
 Back up SQLite before starting version 0.2.0. The first start migrates the existing rule to Alert 1, preserves its evaluation state and enables subscriptions for existing device registrations. Deploy the relay before updating Apple clients. Older clients can still read telemetry and receive alerts, but their single-rule editor returns an update-required error. Keep the pre-upgrade database and image available for rollback; restoring only the old image will not undo the migration.
+
+
+## Browser access and Watch widgets
+
+Follow [web dashboard setup](web-dashboard.md) to generate the owner password hash and set `AIRKEEP_WEB_ORIGIN` to the exact HTTPS origin, including its port. Keep the hash single-quoted in `private/relay.env`. Browser assets are built into the existing relay image and served through the same HTTPS route.
+
+Watch widget push updates use their own app topic and APNs key settings. Add topic-authorized Watch keys to the existing read-only private key mount. The iOS and Mac provider credentials stay in place.
+
+Back up SQLite before the upgrade. New migrations add browser sessions, past-alert events, redacted push attempts and Watch widget registrations. The ESP32 and existing Apple bearer APIs keep their current response shapes.
