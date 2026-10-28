@@ -42,8 +42,8 @@ extension Notification.Name { static let airkeepWatchChanged = Notification.Name
         let encoded = try JSONEncoder().encode(request)
         let reply: Data = try await withCheckedThrowingContinuation { continuation in
             let gate = WatchReplyGate(continuation)
-            session.sendMessageData(encoded, replyHandler: { gate.finish(.success($0)) },
-                                    errorHandler: { gate.finish(.failure($0)) })
+            session.sendMessageData(encoded, replyHandler: { @Sendable in gate.finish(.success($0)) },
+                                    errorHandler: { @Sendable in gate.finish(.failure($0)) })
             Task {
                 try? await Task.sleep(for: .seconds(8))
                 gate.finish(.failure(RelayClient.RelayError.transport))
