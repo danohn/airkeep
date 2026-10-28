@@ -146,6 +146,7 @@ export function App() {
       document.removeEventListener("visibilitychange", load);
     };
   }, [session?.authenticated]);
+  const enabledAlerts = rules.filter((rule) => rule.enabled).length;
   const reading = snapshot?.readings.find((r) => r.amsID === ams);
   const stale =
     !reading || tick - reading.observedAt > (snapshot?.staleAfter || 90);
@@ -337,7 +338,8 @@ export function App() {
                 <button className="alert-summary" onClick={() => go("alerts")}>
                   <Bell size={29} weight="light" />
                   <span>
-                    {rules.filter((r) => r.enabled).length} alerts enabled
+                    {enabledAlerts} {enabledAlerts === 1 ? "alert" : "alerts"}{" "}
+                    enabled
                   </span>
                   <span className="text-action">
                     View alerts <CaretRight size={20} />
@@ -500,7 +502,7 @@ function HistoryChart({
     ...points.map((p) => Math.ceil(p.humidityMax / 20) * 20),
   );
   const historySummary = points.length
-    ? `${amsName(ams)} humidity over the past ${hours === 168 ? "seven days" : hours + " hours"}. Minimum ${Math.min(...points.map((p) => p.humidityMin)).toFixed(1)} percent, maximum ${Math.max(...points.map((p) => p.humidityMax)).toFixed(1)} percent. Latest source reading ${when(points[points.length - 1].lastObservedAt)}. ${data?.series.length && data.series.length > 1 ? "Gaps indicate interruptions in readings." : ""}`
+    ? `${amsName(ams)} humidity over the past ${hours === 168 ? "seven days" : `${hours} ${hours === 1 ? "hour" : "hours"}`}. Minimum ${Math.min(...points.map((p) => p.humidityMin)).toFixed(1)} percent, maximum ${Math.max(...points.map((p) => p.humidityMax)).toFixed(1)} percent. Latest source reading ${when(points[points.length - 1].lastObservedAt)}. ${data?.series.length && data.series.length > 1 ? "Gaps indicate interruptions in readings." : ""}`
     : "Humidity history is loading or empty.";
   return (
     <section className={"history " + (expanded ? "expanded" : "")}>

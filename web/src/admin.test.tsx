@@ -105,3 +105,33 @@ describe("Admin navigation", () => {
     expect(screen.queryByText("late-device")).toBeNull();
   });
 });
+
+describe("Overview copy", () => {
+  it.each([0, 1, 2])(
+    "uses the correct alert noun for %i enabled rules",
+    async (count) => {
+      const rules = Array.from({ length: count }, (_, index) => ({
+        id: "rule" + index,
+        name: "Alert " + index,
+        amsID: "0",
+        enabled: true,
+        revision: 1,
+        threshold: 30,
+        holdSeconds: 300,
+        hysteresis: 3,
+        active: false,
+      }));
+      request.mockImplementation(async (path) =>
+        path === "/v2/alerts" ? (rules as never) : (reply(path) as never),
+      );
+      render(<App />);
+      expect(
+        await screen.findByRole("button", {
+          name: new RegExp(
+            `${count} ${count === 1 ? "alert" : "alerts"} enabled`,
+          ),
+        }),
+      ).toBeTruthy();
+    },
+  );
+});
