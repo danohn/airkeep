@@ -7,7 +7,7 @@ struct DashboardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 HStack {
-                    Text("Airkeep").font(.system(size: 34, weight: .medium, design: .serif))
+                    AirkeepWordmark()
                     Spacer()
                     Button { model.showSettings = true } label: { Image(systemName: "gearshape") }
                         .buttonStyle(.glass).accessibilityLabel("Connection settings")

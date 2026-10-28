@@ -6,7 +6,8 @@ struct MenuBarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Airkeep").font(.title3.weight(.semibold)); Spacer()
+                AirkeepWordmark(size: 22)
+                Spacer()
                 Text(model.demo ? "Preview" : model.isStale ? "Stale" : "Connected").font(.caption).foregroundStyle(.secondary)
             }
             Text("P2S / \(model.reading?.amsName ?? "AMS")").font(.caption).foregroundStyle(.secondary)

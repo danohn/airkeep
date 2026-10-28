@@ -7,6 +7,17 @@ enum AirkeepTheme {
     static let secondary = Color(red: 0.62, green: 0.62, blue: 0.60)
 }
 
+struct AirkeepWordmark: View {
+    var size: CGFloat = 34
+
+    var body: some View {
+        Text("Airkeep")
+            .font(.system(size: size, weight: .medium, design: .serif))
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+    }
+}
+
 struct HumidityValue: View {
     var reading: Reading?
     var size: CGFloat = 110
@@ -15,10 +26,11 @@ struct HumidityValue: View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(reading?.humidityText ?? "—")
                 .font(.system(size: size, weight: .bold, design: .rounded))
-                .monospacedDigit().tracking(-size * 0.065)
+                .monospacedDigit()
                 .foregroundStyle(stale ? AirkeepTheme.secondary : AirkeepTheme.ivory)
                 .minimumScaleFactor(0.5).lineLimit(1)
             Text("% RH").font(.system(size: size * 0.22, weight: .semibold)).foregroundStyle(AirkeepTheme.amber)
+                .lineLimit(1).fixedSize(horizontal: true, vertical: false)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Relative humidity")
