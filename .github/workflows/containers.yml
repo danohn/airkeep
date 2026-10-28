@@ -1,0 +1,105 @@
+name: Container images
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/containers.yml'
+      - '.dockerignore'
+      - 'server/**'
+      - 'web/**'
+      - 'scripts/check-containers.py'
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - '.github/workflows/containers.yml'
+      - '.dockerignore'
+      - 'server/**'
+      - 'web/**'
+      - 'scripts/check-containers.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: containers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: '0.11.15'
+          python-version: '3.14'
+          enable-cache: true
+          cache-dependency-glob: server/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Relay tests
+        run: uv run --locked --directory server pytest -q
+      - name: Browser tests
+        run: npm ci --prefix web && npm test --prefix web
+      - name: Build images
+        run: |
+          docker build -f server/Dockerfile -t airkeep-relay:ci .
+          docker build -f web/Dockerfile -t airkeep-web:ci .
+      - name: Check HTTPS and browser access
+        run: uv run --locked --directory server python ../scripts/check-containers.py --relay-image airkeep-relay:ci --web-image airkeep-web:ci
+
+  publish:
+    needs: checks
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: airkeep-relay
+            dockerfile: server/Dockerfile
+          - image: airkeep-web
+            dockerfile: web/Dockerfile
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Registry namespace
+        id: namespace
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: echo "owner=${OWNER,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        id: meta
+        with:
+          images: ghcr.io/${{ steps.namespace.outputs.owner }}/${{ matrix.image }}
+          tags: |
+            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,format=long
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max
+          provenance: mode=max
+          sbom: true

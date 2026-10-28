@@ -3,12 +3,9 @@ import base64
 import binascii
 import hashlib
 import json
-from pathlib import Path
 import time
 
 from fastapi import Depends, HTTPException, Query, Request, Response
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from web_auth import COOKIE, LIFETIME
@@ -211,11 +208,3 @@ def install_web(app, store, settings, auth, authorize_user, collector):
     def queue():
         return [{'id':r['id'],'deviceID':r['device'],'ruleID':r['rule_id'],'attempts':r['attempts'],
                  'nextAttemptAt':r['next'],'createdAt':r['created']} for r in store.rows('SELECT * FROM outbox ORDER BY next LIMIT 100')]
-
-    if settings.web_dist_path.is_dir():
-        app.mount('/assets', StaticFiles(directory=settings.web_dist_path/'assets'), name='assets')
-        app.mount('/brand', StaticFiles(directory=settings.web_dist_path/'brand'), name='brand')
-
-        @app.get('/', include_in_schema=False)
-        def dashboard():
-            return FileResponse(settings.web_dist_path/'index.html',headers={'Cache-Control':'no-cache'})

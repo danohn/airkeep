@@ -1,0 +1,14 @@
+# Optional source build. The base Compose file pulls published images.
+services:
+  airkeep:
+    image: airkeep-relay:${AIRKEEP_IMAGE_TAG:-local}
+    pull_policy: never
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+  web:
+    image: airkeep-web:${AIRKEEP_IMAGE_TAG:-local}
+    pull_policy: never
+    build:
+      context: ..
+      dockerfile: web/Dockerfile

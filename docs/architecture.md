@@ -3,11 +3,14 @@
 ```mermaid
 flowchart LR
     P[P2S MQTT · TLS 8883] --> R[Always-on Airkeep relay]
-    R -->|Authenticated HTTPS · 5 second polling| E[ESP32-S3 · LVGL]
+    B[Browser dashboard] --> F[Nginx · static frontend and HTTPS]
+    F -->|API requests| R
+    E[ESP32-S3 · LVGL] -->|HTTPS · 5 second polling| F
     R --> D[(SQLite · 7 days history)]
     R --> A[Alert engine · hold + hysteresis]
-    R -->|Authenticated HTTPS snapshots| M[SwiftUI iOS/macOS app]
-    R -->|Scheduled HTTPS snapshots| W[WidgetKit]
+    M[SwiftUI iOS/macOS app] -->|HTTPS snapshots| F
+    C[Watch app] -->|HTTPS snapshots| F
+    W[WidgetKit] -->|Scheduled HTTPS snapshots| F
     A --> N[Apple Push Notification service]
     R -->|Time-bounded updates| N
     N --> I[iPhone/Mac notification]
@@ -17,6 +20,8 @@ flowchart LR
 Run the relay on an always-on machine on the printer's LAN, such as a Mac mini, Raspberry Pi or NAS. It needs outbound HTTPS to APNs. For remote app and widget access, give it an authenticated HTTPS route with suitable DNS and routing. Tailscale can provide a private route. A cloud host needs a LAN bridge or VPN to reach the printer.
 
 Only the relay subscribes to the printer's MQTT report topic. The ESP32 and Apple clients share an authenticated HTTPS snapshot API. The board stores no printer IP, serial, LAN access code or Bambu CA bundle. The relay maps `humidity_raw` to percentage, rejects invalid or zero startup readings, and keeps the sample's original timestamp. The raw MQTT index runs in the opposite direction to the UI display level, so no percentage thresholds are inferred from it.
+
+Docker runs the Python backend and Nginx frontend as separate services. Nginx serves the built HTML, JavaScript, CSS and brand assets, and proxies `/v1`, `/v2`, `/auth` and `/health` to the backend. It can terminate HTTPS using mounted certificates or sit behind an existing reverse proxy. The backend owns browser sessions, authorization and data. Both images use matching publication tags; credentials, APNs keys and SQLite stay outside the images.
 
 The ESP32 polls every five seconds with the relay bearer token. After NTP synchronization, TLS checks the public certificate chain and hostname. Redirects are rejected to keep the token from reaching another host, and snapshots are limited to 16 KiB. The original UTC sample time maps to the display's monotonic clock using the later of relay time and synchronized local time. Fetching the same sample again leaves its age intact. The relay's `staleAfter` sets when it turns grey. A failed request leaves the last value visible as it ages. The local chart starts at boot.
 

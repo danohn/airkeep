@@ -1,6 +1,6 @@
 # Web dashboard
 
-The relay serves Airkeep's browser dashboard at its HTTPS address. User view shows readings, seven-day history, shared humidity rules and past alerts. Admin view shows registered Apple devices, Watch widgets, Live Activities, Apple push configuration, recent requests and pending notifications.
+Nginx serves Airkeep's browser dashboard and proxies API requests to the Python backend at the same HTTPS address. User view shows readings, seven-day history, shared humidity rules and past alerts. Admin view shows registered Apple devices, Watch widgets, Live Activities, Apple push configuration, recent requests and pending notifications.
 
 Both views belong to the relay's owner. Admin screens are for inspection. Manage a device's alert subscription in its Apple app.
 
@@ -11,6 +11,8 @@ Create the owner password hash from the repository root:
 ```sh
 uv run --directory server setup_web.py
 ```
+
+For an image-only deployment, run `docker compose run --rm --no-deps airkeep python setup_web.py` from the Compose directory instead.
 
 The command prompts for a password and confirmation. Copy the generated, single-quoted `AIRKEEP_WEB_PASSWORD_HASH` line into your ignored relay environment file, then set the browser origin:
 
@@ -63,7 +65,7 @@ npm test --prefix web
 uv run --directory server pytest -q
 ```
 
-The FastAPI app serves `web/dist` after a build. For live frontend development, run the relay on port 8789 and Vite on port 4173:
+Docker builds `web/dist` into the Nginx image. For live frontend development, run the backend on port 8789 and Vite on port 4173. Vite proxies API calls to the backend:
 
 ```sh
 uv run --directory server uvicorn app:create_app --factory --host 127.0.0.1 --port 8789

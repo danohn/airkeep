@@ -198,22 +198,19 @@ def test_parallel_password_verification_is_bounded(tmp_path):
     store.close()
 
 
-def test_static_assets_security_headers_and_quoted_password_hash(tmp_path):
-    dist=tmp_path/'web';(dist/'assets').mkdir(parents=True);(dist/'brand').mkdir()
-    (dist/'index.html').write_text('<!doctype html><title>Airkeep</title>')
-    (dist/'assets'/'main.js').write_text('console.log("Airkeep")')
+def test_backend_only_routes_security_headers_and_quoted_password_hash(tmp_path):
     environment=tmp_path/'relay.env'
     environment.write_text("AIRKEEP_WEB_PASSWORD_HASH='"+HASH+"'\n")
     parsed=Settings(api_token=TOKEN,web_origin=ORIGIN,_env_file=environment)
     assert parsed.web_password_hash==HASH
-    app=create_app(configured(tmp_path,web_dist_path=dist))
+    app=create_app(configured(tmp_path))
     with TestClient(app,base_url=ORIGIN) as client:
         response=client.get('/')
-        assert response.status_code==200 and '<title>Airkeep</title>' in response.text
+        assert response.status_code==404
         assert response.headers['x-frame-options']=='DENY'
         assert "frame-ancestors 'none'" in response.headers['content-security-policy']
-        assert client.get('/assets/main.js').status_code==200
-        assert client.get('/assets/no-file').status_code==404
+        assert client.get('/assets/main.js').status_code==404
+        assert client.get('/brand/mark.svg').status_code==404
         assert client.get('/auth/session').headers['cache-control']=='no-store'
 
 

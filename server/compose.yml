@@ -1,18 +1,13 @@
 name: airkeep
 services:
   airkeep:
-    image: airkeep-relay:${AIRKEEP_IMAGE_TAG:-0.3.0}
-    pull_policy: never
-    build:
-      context: ..
-      dockerfile: server/Dockerfile
+    image: ${AIRKEEP_RELAY_IMAGE:-ghcr.io/danohn/airkeep-relay}:${AIRKEEP_IMAGE_TAG:-main}
     restart: unless-stopped
     init: true
     env_file: private/relay.env
     environment:
       AIRKEEP_DB_PATH: /data/airkeep.sqlite3
-    ports:
-      - '127.0.0.1:8787:8787'
+    expose: ['8787']
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -28,5 +23,27 @@ services:
         max-file: '3'
     volumes:
       - airkeep-data:/data
+  web:
+    image: ${AIRKEEP_WEB_IMAGE:-ghcr.io/danohn/airkeep-web}:${AIRKEEP_IMAGE_TAG:-main}
+    restart: unless-stopped
+    init: true
+    depends_on:
+      airkeep:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:8787:8080'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m,mode=1777
+    mem_limit: 128m
+    pids_limit: 32
+    stop_grace_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
 volumes:
   airkeep-data:

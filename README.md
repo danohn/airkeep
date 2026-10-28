@@ -59,7 +59,7 @@ The Watch app fetches directly from the relay, with a reachable-iPhone fallback 
 
 ## Web dashboard
 
-The dashboard is bundled into the relay's Docker image and uses the same HTTPS address. Configure an owner password and browser origin using [web dashboard setup](docs/web-dashboard.md), restart the relay, then sign in. The browser password is separate from the bearer token used by native clients.
+The dashboard runs in an Nginx container alongside the Python backend. Nginx serves the frontend and forwards API requests, so the dashboard and native clients use the same HTTPS address. [Docker deployment](docs/docker-deployment.md) covers the two GHCR images and shared image tags. Configure an owner password and browser origin using [web dashboard setup](docs/web-dashboard.md), restart the backend, then sign in.
 
 Switch between User and Admin views with the same owner account. User view includes shared rules and a seven-day timeline of triggered and recovered alerts. Admin view shows relay health, device subscriptions, Live Activity sessions, Watch widget registrations and recent APNs requests. Manage rules in User view and device subscriptions in each Apple app. Successful push requests are labelled **Accepted by Apple**.
 
