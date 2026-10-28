@@ -1,15 +1,16 @@
 import SwiftUI
-#if os(macOS)
-import ServiceManagement
-#endif
 
 struct ConnectionView: View {
     var model: MonitorModel
     @Environment(\.dismiss) private var dismiss
     @State private var endpoint = SharedConfiguration.endpoint
     @State private var token = TokenStore.read()
+    @State private var initialEndpoint = SharedConfiguration.endpoint
+    @State private var initialToken = TokenStore.read()
     @State private var error: String?
     @State private var saving = false
+    @State private var discard = false
+    private var changed: Bool { endpoint != initialEndpoint || token != initialToken }
     var body: some View {
         NavigationStack {
             Form {
@@ -19,28 +20,25 @@ struct ConnectionView: View {
                         .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                         #endif
                     SecureField("Relay bearer token", text: $token)
-                    Text("Enter your relay's address, such as https://airkeep.your-tailnet.ts.net. The printer's access code stays on the relay.")
+                    Text("Enter your relay's HTTPS address, such as https://airkeep.example.com.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Section("Privacy") {
-                    Text("Your relay token stays in Keychain and is shared with Airkeep's widgets. You don't need a Bambu cloud account.")
+                    Text("Your connection token is stored securely in Keychain.")
                         .font(.caption)
                 }
-                #if os(macOS)
-                Section("Menu bar") {
-                    Toggle("Launch Airkeep at login", isOn: Binding(
-                        get: { SMAppService.mainApp.status == .enabled },
-                        set: { enable in
-                            do { if enable { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() } }
-                            catch { self.error = error.localizedDescription }
-                        }))
+                #if os(iOS)
+                if LiveMonitor.shared.currentActivity != nil {
+                    Text("Changing relay addresses ends your current Live Activity.").font(.caption).foregroundStyle(.secondary)
                 }
                 #endif
                 if let error { Text(error).foregroundStyle(.orange).font(.caption) }
             }
-            .formStyle(.grouped).navigationTitle("Connection")
+            .formStyle(.grouped).navigationTitle("Relay connection")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { if changed { discard = true } else { dismiss() } }.disabled(saving)
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(saving ? "Connecting…" : "Save & connect") {
                         Task {
@@ -48,11 +46,17 @@ struct ConnectionView: View {
                             defer { saving = false }
                             do {
                                 let url = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+                                let previous = RelayClient()
                                 _ = try await RelayClient(endpoint: url, token: token).snapshot()
                                 try TokenStore.save(token)
                                 SharedConfiguration.endpoint = url
                                 model.demo = false
+                                model.connectionChanged()
+                                #if os(iOS)
+                                if previous.endpoint != url { await LiveMonitor.shared.stopAll(relay: previous) }
+                                #endif
                                 await model.refresh(forceHistory: true)
+                                await model.alertRules.refresh()
                                 await NotificationManager.shared.refresh()
                                 dismiss()
                             } catch { self.error = error.localizedDescription }
@@ -61,6 +65,10 @@ struct ConnectionView: View {
                 }
             }
         }.preferredColorScheme(.dark).tint(AirkeepTheme.amber)
+        .interactiveDismissDisabled(changed || saving)
+        .confirmationDialog("Discard your connection changes?", isPresented: $discard, titleVisibility: .visible) {
+            Button("Discard changes", role: .destructive) { dismiss() }
+        }
         #if os(macOS)
         .frame(width: 480, height: 460)
         #endif

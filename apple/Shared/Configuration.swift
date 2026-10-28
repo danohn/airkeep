@@ -30,6 +30,19 @@ enum SharedConfiguration {
         defaults.set(id, forKey: "deviceID")
         return id
     }
+    static func cachedRules(endpoint: String) -> AlertRulesCache? {
+        guard let data = defaults.data(forKey: "alertRules.\(endpoint)") else { return nil }
+        return try? JSONDecoder().decode(AlertRulesCache.self, from: data)
+    }
+    static func cacheRules(_ cache: AlertRulesCache, endpoint: String) {
+        if let data = try? JSONEncoder().encode(cache) { defaults.set(data, forKey: "alertRules.\(endpoint)") }
+    }
+    static func receiveAlertsIntent(endpoint: String) -> Bool? {
+        defaults.object(forKey: "receiveAlerts.\(endpoint)") as? Bool
+    }
+    static func saveReceiveAlertsIntent(_ enabled: Bool, endpoint: String) {
+        defaults.set(enabled, forKey: "receiveAlerts.\(endpoint)")
+    }
     static var cached: Reading? {
         get {
             guard let data = defaults.data(forKey: "cachedReading") else { return nil }

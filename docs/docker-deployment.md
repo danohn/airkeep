@@ -69,3 +69,7 @@ docker compose up -d --build
 Use the same `-f` options as your deployment when running maintenance commands. Docker restarts the relay after a failure. The health check reports API availability; printer connectivity and reading age are reported separately by the authenticated snapshot.
 
 The data volume preserves history, device registrations, Live Activities and alert settings across container updates. Use SQLite's online backup API, or stop the relay before copying the database and its sidecar files. Back up `private/` separately. `docker compose down` keeps the data volume; adding `--volumes` deletes it.
+
+## Upgrading to shared alerts
+
+Back up SQLite before starting version 0.2.0. The first start migrates the existing rule to Alert 1, preserves its evaluation state and enables subscriptions for existing device registrations. Deploy the relay before updating Apple clients. Older clients can still read telemetry and receive alerts, but their single-rule editor returns an update-required error. Keep the pre-upgrade database and image available for rollback; restoring only the old image will not undo the migration.

@@ -1,7 +1,7 @@
 name: airkeep
 services:
   airkeep:
-    image: airkeep-relay:${AIRKEEP_IMAGE_TAG:-0.1.1}
+    image: airkeep-relay:${AIRKEEP_IMAGE_TAG:-0.2.0}
     pull_policy: never
     build: .
     restart: unless-stopped

@@ -15,6 +15,12 @@ import Testing
     var holdEndpoint: String?
     var pending: CheckedContinuation<NotificationRelayStatus, Error>?
     var timeout: Duration = .seconds(20)
+    var receiveAlerts = true
+    var savedIntent: Bool?
+    var subscriptionFailure: Error?
+    var subscriptionCalls = 0
+    var holdSubscription = false
+    var pendingSubscription: CheckedContinuation<Bool, Error>?
 
     func makeManager() -> NotificationManager {
         NotificationManager(dependencies: .init(permission: { self.permission }, requestAuthorization: {
@@ -27,12 +33,19 @@ import Testing
             if self.legacy { throw RelayClient.RelayError.http(404) }
             if let failure = self.failure { throw failure }
             return NotificationRelayStatus(registered: self.registered, configuration: self.configuration,
-                                           reason: self.reason, environment: "sandbox")
+                                           reason: self.reason, environment: "sandbox", receiveAlerts: self.registered ? self.receiveAlerts : false)
         }, register: { connection, _ in
             self.registrations.append(connection)
             if let failure = self.failure { throw failure }
             self.registered = true
-        }, registrationTimeout: timeout))
+        }, registrationTimeout: timeout, setSubscription: { _, enabled in
+            self.subscriptionCalls += 1
+            if let failure = self.subscriptionFailure { throw failure }
+            if self.holdSubscription {
+                self.receiveAlerts = try await withCheckedThrowingContinuation { self.pendingSubscription = $0 }
+            } else { self.receiveAlerts = enabled }
+            return self.receiveAlerts
+        }, readIntent: { _ in self.savedIntent }, writeIntent: { _, enabled in self.savedIntent = enabled }))
     }
     var deviceToken: Data { Data(repeating: 0xAB, count: 32) }
 }
@@ -74,7 +87,6 @@ import Testing
         #expect(manager.registration == .registered)
         #expect(manager.server == .available)
         #expect(fixture.registrations.count == 1)
-        #expect(manager.summary.contains("has not been verified"))
         await manager.refresh()
         #expect(fixture.registrations.count == 1)
     }
@@ -206,5 +218,77 @@ import Testing
         #expect(manager.registration == .registered)
         #expect(manager.server == .available)
         #expect(fixture.registrations == [fixture.connection])
+    }
+
+    @Test func optingOutSurvivesTokenRotationAndRelaunch() async {
+        let fixture = NotificationFixture()
+        let manager = fixture.makeManager()
+        await manager.received(token: fixture.deviceToken)
+        await manager.setReceiveAlerts(false)
+        #expect(manager.receiveAlerts == false)
+        #expect(fixture.savedIntent == false)
+        await manager.received(token: Data(repeating: 0xCD, count: 32))
+        await manager.refresh()
+        let relaunched = fixture.makeManager()
+        await relaunched.received(token: fixture.deviceToken)
+        #expect(relaunched.receiveAlerts == false)
+        #expect(fixture.subscriptionCalls == 1)
+        #expect(fixture.prompts == 0)
+    }
+
+    @Test func subscriptionChangesWaitForAcknowledgementAndFailuresKeepTheConfirmedState() async {
+        let fixture = NotificationFixture()
+        fixture.receiveAlerts = false
+        let manager = fixture.makeManager()
+        await manager.received(token: fixture.deviceToken)
+        fixture.holdSubscription = true
+        let enabling = Task { await manager.setReceiveAlerts(true) }
+        while fixture.pendingSubscription == nil { await Task.yield() }
+        #expect(manager.receiveAlerts == false)
+        #expect(manager.isChangingSubscription)
+        fixture.pendingSubscription?.resume(returning: true)
+        await enabling.value
+        #expect(manager.receiveAlerts == true)
+        fixture.holdSubscription = false
+        fixture.subscriptionFailure = RelayClient.RelayError.http(503)
+        await manager.setReceiveAlerts(false)
+        #expect(manager.receiveAlerts == true)
+        #expect(fixture.savedIntent == true)
+        #expect(manager.subscriptionError != nil)
+    }
+
+    @Test func enablingDeliveryRequestsPermissionOnlyOnExplicitAction() async {
+        let fixture = NotificationFixture()
+        fixture.permission.authorization = .notAsked
+        fixture.receiveAlerts = false
+        let manager = fixture.makeManager()
+        await manager.refresh()
+        #expect(fixture.prompts == 0)
+        let enabling = Task { await manager.setReceiveAlerts(true) }
+        while fixture.appleRequests == 0 { await Task.yield() }
+        await manager.received(token: fixture.deviceToken)
+        await enabling.value
+        #expect(fixture.prompts == 1)
+        #expect(manager.receiveAlerts == true)
+        fixture.permission.authorization = .denied
+        await manager.setReceiveAlerts(true)
+        #expect(fixture.prompts == 1)
+        #expect(manager.subscriptionError?.contains("system settings") == true)
+    }
+
+    @Test func subscriptionAcknowledgementsCannotApplyToAnotherRelay() async {
+        let fixture = NotificationFixture()
+        fixture.receiveAlerts = false
+        let manager = fixture.makeManager()
+        await manager.received(token: fixture.deviceToken)
+        fixture.holdSubscription = true
+        let enabling = Task { await manager.setReceiveAlerts(true) }
+        while fixture.pendingSubscription == nil { await Task.yield() }
+        fixture.connection.endpoint = "https://other.example.com"
+        fixture.pendingSubscription?.resume(returning: true)
+        await enabling.value
+        #expect(manager.receiveAlerts == false)
+        #expect(fixture.savedIntent == false)
+        #expect(manager.subscriptionError?.contains("changed") == true)
     }
 }

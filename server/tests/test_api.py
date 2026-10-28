@@ -16,7 +16,7 @@ def test_auth_snapshot_history_and_rule(tmp_path):
         app.state.store.save_reading(Reading(amsID='0',humidity=24,temperature=31.6,rawIndex=3,observedAt=time.time()))
         assert client.get('/v1/snapshot').json()['readings'][0]['humidity']==24
         assert len(client.get('/v1/history').json())==1
-        assert client.put('/v1/alerts',json={'enabled':True,'threshold':30,'holdSeconds':300,'hysteresis':3}).status_code==200
+        assert client.put('/v1/alerts',json={'enabled':True,'threshold':30,'holdSeconds':300,'hysteresis':3}).status_code==409
         assert client.put('/v1/alerts',json={'threshold':5,'hysteresis':6}).status_code==422
         assert client.post('/v1/activities',json={'id':'test','token':'a'*64,'expiresAt':time.time()+86400}).status_code==422
 
@@ -75,7 +75,7 @@ async def test_outbox_retries_without_repeating_alert(tmp_path):
     settings=Settings(api_token=TOKEN,db_path=tmp_path/'test.db',mqtt_enabled=False,apns_team_id='T',apns_key_id='K',apns_key_path='not-read',_env_file=None)
     store=Store(settings.db_path)
     store.set_rule(AlertRule(enabled=True,holdSeconds=0))
-    store.execute('INSERT INTO devices VALUES(?,?,?,?)',('one','a'*64,'com.example.app','sandbox'))
+    store.execute('INSERT INTO devices(id,token,topic,environment) VALUES(?,?,?,?)',('one','a'*64,'com.example.app','sandbox'))
     store.save_reading(Reading(amsID='0',humidity=35,temperature=31.6,rawIndex=2,observedAt=1000))
     push=Push()
     await tick(store,settings,push,1000)

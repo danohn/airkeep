@@ -3,13 +3,27 @@ import SwiftUI
 struct DashboardView: View {
     @Bindable var model: MonitorModel
     @Environment(\.scenePhase) private var scenePhase
+    #if os(macOS)
+    @Environment(\.openSettings) private var openSettings
+    #endif
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 HStack {
                     AirkeepWordmark()
                     Spacer()
-                    AirkeepActionButton(kind: .settings) { model.presentedSheet = .connection }
+                    Button { Task { await model.refresh(forceHistory: true) } } label: { Image(systemName: "arrow.clockwise") }
+                        .buttonStyle(AirkeepActionStyle(iconOnly: true))
+                        .disabled(model.refreshing).accessibilityLabel("Refresh readings")
+                    AirkeepActionButton(kind: .settings) {
+                        #if os(macOS)
+                        openSettings()
+                        NSApplication.shared.activate()
+                        #else
+                        model.settingsSection = nil
+                        model.showSettings = true
+                        #endif
+                    }
                 }
                 HStack(spacing: 8) {
                     Text("P2S / \(model.reading?.amsName ?? "AMS")").font(.subheadline.weight(.medium))
@@ -52,34 +66,24 @@ struct DashboardView: View {
                     Spacer()
                     Text("Temperature").font(.caption).foregroundStyle(AirkeepTheme.secondary)
                 }
-                Divider().overlay(.white.opacity(0.1))
-                HStack {
-                    AirkeepActionButton(kind: .humidityAlerts) { model.presentedSheet = .alerts }
-                    Spacer()
-                    Button { Task { await model.refresh(forceHistory: true) } } label: { Image(systemName: "arrow.clockwise") }
-                        .buttonStyle(AirkeepActionStyle(iconOnly: true))
-                        .disabled(model.refreshing).accessibilityLabel("Refresh readings")
-                }
                 #if os(iOS)
                 if let activity = LiveMonitor.shared.currentActivity {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("Live Activity · \(activity.attributes.amsName)", systemImage: "waveform.path")
-                        Text("Ends \(activity.attributes.endsAt, format: .dateTime.hour().minute())")
-                            .font(.caption).foregroundStyle(AirkeepTheme.secondary)
-                        Button("End Live Activity", role: .destructive) { Task { await LiveMonitor.shared.stopAll() } }
-                            .buttonStyle(.glass)
-                    }
-                } else {
                     Button {
-                        Task {
-                            do { try await LiveMonitor.shared.start(model.reading, demo: model.demo,
-                                                                   staleAfter: model.snapshot?.staleAfter ?? 90) }
-                            catch { model.error = error.localizedDescription }
-                        }
-                    } label: { Label("Start Live Activity", systemImage: "waveform.path") }
-                        .buttonStyle(.glass).disabled(model.reading == nil || model.demo || model.isStale)
-                    Text("Show humidity on your Lock Screen and Dynamic Island for up to eight hours.")
-                        .font(.caption).foregroundStyle(AirkeepTheme.secondary)
+                        model.settingsSection = .liveActivities
+                        model.showSettings = true
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Label("Live Activity · \(activity.attributes.amsName)", systemImage: "waveform.path")
+                                Text("Ends \(activity.attributes.endsAt, format: .dateTime.hour().minute())")
+                                    .font(.caption).foregroundStyle(AirkeepTheme.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                        }.padding(16).background(AirkeepTheme.ivory.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Open Live Activity settings")
                 }
                 #endif
                 if let error = model.error {
@@ -108,17 +112,12 @@ struct DashboardView: View {
         .tint(AirkeepTheme.amber).preferredColorScheme(.dark)
         .task {
             model.start()
-            if !model.demo { await NotificationManager.shared.refresh() }
+            if !model.demo { await NotificationManager.shared.refresh(); await model.alertRules.refresh() }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active && !model.demo { Task { await NotificationManager.shared.refresh() } }
+            if phase == .active && !model.demo { Task { await NotificationManager.shared.refresh(); await model.alertRules.refresh() } }
         }
-        .sheet(item: $model.presentedSheet) { sheet in
-            switch sheet {
-            case .connection: ConnectionView(model: model)
-            case .alerts: AlertsView(model: model)
-            }
-        }
+        .sheet(isPresented: $model.showSettings) { SettingsView(model: model) }
         #if os(macOS)
         .frame(minWidth: 390, idealWidth: 430, minHeight: 680)
         #endif

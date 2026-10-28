@@ -27,7 +27,7 @@ struct AirkeepActionButton: View {
 
         var title: String {
             switch self {
-            case .settings: "Connection settings"
+            case .settings: "Settings"
             case .humidityAlerts: "Humidity alerts"
             }
         }
