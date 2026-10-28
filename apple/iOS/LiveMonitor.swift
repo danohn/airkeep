@@ -4,31 +4,59 @@ import Observation
 
 @MainActor @Observable final class LiveMonitor {
     static let shared = LiveMonitor()
-    // Match the relay's relevance score. During device testing, the default
-    // score of zero left an active session missing from Dynamic Island.
     private let relevanceScore = 50.0
+    private let authorization = ActivityAuthorizationInfo()
+    let updateRegistration = ActivityUpdateRegistration()
     var activities: [Activity<MonitorAttributes>] = Activity<MonitorAttributes>.activities
-    private var tokenTasks: [String: Task<Void, Never>] = [:]
+    var activitiesAllowed = ActivityAuthorizationInfo().areActivitiesEnabled
+    var frequentUpdatesAllowed = ActivityAuthorizationInfo().frequentPushesEnabled
+    var isStarting = false
+    @ObservationIgnored private var authorizationTask: Task<Void, Never>?
+    @ObservationIgnored private var frequentTask: Task<Void, Never>?
+    @ObservationIgnored private var tokenTask: Task<Void, Never>?
+    @ObservationIgnored private var stateTask: Task<Void, Never>?
+    @ObservationIgnored private var observedID: String?
+
     var currentActivity: Activity<MonitorAttributes>? {
         activities.first {
             ($0.activityState == .active || $0.activityState == .stale) && $0.attributes.endsAt > .now
         }
     }
-    func state(_ reading: Reading?, now: Date, staleAfter: TimeInterval) -> MonitorAttributes.ContentState {
-        .init(humidity: reading?.humidity, temperature: reading?.temperature,
-              observedAt: reading?.observedAt ?? 0,
-              connected: !(reading?.isStale(after: staleAfter, now: now) ?? true))
+    var requestsFrequentUpdates: Bool { Bundle.main.object(forInfoDictionaryKey: "NSSupportsLiveActivitiesFrequentUpdates") as? Bool == true }
+
+    func observeAuthorization() {
+        activitiesAllowed = authorization.areActivitiesEnabled
+        frequentUpdatesAllowed = authorization.frequentPushesEnabled
+        guard authorizationTask == nil else { return }
+        authorizationTask = Task { [weak self] in
+            guard let self else { return }
+            for await allowed in self.authorization.activityEnablementUpdates {
+                self.activitiesAllowed = allowed
+                self.activities = Activity<MonitorAttributes>.activities
+            }
+        }
+        if requestsFrequentUpdates {
+            frequentTask = Task { [weak self] in
+                guard let self else { return }
+                for await allowed in self.authorization.frequentPushEnablementUpdates { self.frequentUpdatesAllowed = allowed }
+            }
+        }
     }
     private func content(_ reading: Reading?, endsAt: Date, staleAfter: TimeInterval) -> ActivityContent<MonitorAttributes.ContentState> {
         let now = Date.now
-        return ActivityContent(state: state(reading, now: now, staleAfter: staleAfter),
+        let state = MonitorAttributes.ContentState(humidity: reading?.humidity, temperature: reading?.temperature,
+            observedAt: reading?.observedAt ?? 0, connected: !(reading?.isStale(after: staleAfter, now: now) ?? true))
+        return ActivityContent(state: state,
             staleDate: LiveActivityTiming.staleDate(for: reading, now: now, endsAt: endsAt, sensorStaleAfter: staleAfter),
             relevanceScore: relevanceScore)
     }
     func start(_ reading: Reading?, demo: Bool, staleAfter: TimeInterval = 90) async throws {
-        guard let reading, !demo, !reading.isStale(after: staleAfter), ActivityAuthorizationInfo().areActivitiesEnabled else {
-            throw LiveError.unavailable
-        }
+        guard !isStarting else { return }
+        observeAuthorization()
+        guard let reading, !demo, !reading.isStale(after: staleAfter), activitiesAllowed,
+              NotificationManager.shared.server == .available else { throw LiveError.unavailable }
+        isStarting = true
+        defer { isStarting = false }
         await stopAll()
         let end = Date.now.addingTimeInterval(LiveActivityTiming.duration)
         let activity = try Activity.request(attributes: MonitorAttributes(amsName: reading.amsName, amsID: reading.amsID, endsAt: end),
@@ -37,45 +65,60 @@ import Observation
         observe(activity)
     }
     private func observe(_ activity: Activity<MonitorAttributes>) {
-        guard tokenTasks[activity.id] == nil else { return }
-        tokenTasks[activity.id] = Task {
+        guard observedID != activity.id else { updateRegistration.reconcile(); return }
+        tokenTask?.cancel(); stateTask?.cancel(); updateRegistration.stop()
+        observedID = activity.id
+        tokenTask = Task { [weak self] in
+            guard let self else { return }
+            if let token = activity.pushToken { self.register(activity, token: token) }
             for await token in activity.pushTokenUpdates {
-                let value = token.map { String(format: "%02x", $0) }.joined()
-                // Retry transient relay errors until this session expires or the task is cancelled.
-                while !Task.isCancelled && Date.now < activity.attributes.endsAt {
-                    do {
-                        try await RelayClient().registerActivity(id: activity.id, token: value, amsID: activity.attributes.amsID,
-                            expiresAt: activity.attributes.endsAt.timeIntervalSince1970)
-                        break
-                    } catch { try? await Task.sleep(for: .seconds(15)) }
+                guard !Task.isCancelled && self.observedID == activity.id else { return }
+                self.register(activity, token: token)
+            }
+        }
+        stateTask = Task { [weak self] in
+            for await state in activity.activityStateUpdates {
+                guard let self, !Task.isCancelled else { return }
+                self.activities = Activity<MonitorAttributes>.activities
+                if state == .ended || state == .dismissed {
+                    self.tokenTask?.cancel()
+                    self.updateRegistration.stop()
+                    self.observedID = nil
+                    return
                 }
             }
         }
     }
-    func update(_ reading: Reading?, staleAfter: TimeInterval = 90) async {
+    private func register(_ activity: Activity<MonitorAttributes>, token: Data) {
+        updateRegistration.submit(.init(id: activity.id, token: token.map { String(format: "%02x", $0) }.joined(),
+                                        amsID: activity.attributes.amsID, expiresAt: activity.attributes.endsAt))
+    }
+    func update(_ readings: [Reading], staleAfter: TimeInterval = 90) async {
+        observeAuthorization()
         activities = Activity<MonitorAttributes>.activities
         for activity in activities {
             if Date.now >= activity.attributes.endsAt {
                 await activity.end(nil, dismissalPolicy: .immediate)
             } else {
                 observe(activity)
-                if activity.attributes.amsID == reading?.amsID {
-                    await activity.update(content(reading, endsAt: activity.attributes.endsAt, staleAfter: staleAfter))
-                }
+                let reading = readings.first { $0.amsID == activity.attributes.amsID }
+                await activity.update(content(reading, endsAt: activity.attributes.endsAt, staleAfter: staleAfter))
             }
         }
+        activities = Activity<MonitorAttributes>.activities
     }
-    func stopAll() async {
-        for activity in Activity<MonitorAttributes>.activities {
-            tokenTasks[activity.id]?.cancel()
-            tokenTasks[activity.id] = nil
-            await activity.end(nil, dismissalPolicy: .immediate)
-            _ = try? await RelayClient().request("v1/activities/\(activity.id)", method: "DELETE")
+    func stopAll(relay: RelayClient = RelayClient()) async {
+        tokenTask?.cancel(); stateTask?.cancel(); observedID = nil
+        updateRegistration.stop()
+        let ending = Activity<MonitorAttributes>.activities
+        for activity in ending { await activity.end(nil, dismissalPolicy: .immediate) }
+        activities = Activity<MonitorAttributes>.activities
+        for activity in ending {
+            _ = try? await relay.request("v1/activities/\(activity.id)", method: "DELETE")
         }
-        activities = []
     }
     enum LiveError: LocalizedError {
         case unavailable
-        var errorDescription: String? { "Live Activities need a fresh reading and permission in system settings." }
+        var errorDescription: String? { "Live Activities need permission, a fresh reading, and configured relay push credentials." }
     }
 }

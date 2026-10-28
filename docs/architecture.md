@@ -22,12 +22,32 @@ The ESP32 polls every five seconds with the relay bearer token. After NTP synchr
 
 Every client depends on the relay for fresh readings. If the Docker host stops, clients keep cached data and show its age, while relay-generated notifications stop. Turning off the ESP32 leaves collection, history, alerts and Apple clients running.
 
-The relay stores one rule for a selected AMS and registrations for multiple Apple devices. Each alert transition creates a delivery job for every device, with independent retries. A rotated push token replaces the old registration under the same installation ID. Each Live Activity has its own ID and token. Token rotation doesn't extend its expiry.
+The relay stores named rules and their evaluation state independently. Each alert transition creates a delivery job for every subscribed Apple device, with independent retries. Disabling or deleting a rule clears its queued deliveries without sending a recovery. Opting out on one device clears only that device's humidity jobs and leaves Live Activities running. A rotated push token replaces the old registration under the same installation ID. Each Live Activity has its own ID and token. Token rotation doesn't extend its expiry.
 
 SQLite keeps samples at 30-second intervals for seven days and updates the latest sample on each valid AMS report. History queries are limited to 168 hours and 3,000 points. Missing fields in a delta report leave the last known value intact. Clients retain original sample timestamps. The dashboard and alerts judge sensor freshness from that timestamp. Live Activities also allow for their five-minute background update interval: a fresh reading remains current for six minutes after confirmation, while a reading already past the sensor freshness limit is marked out of date immediately. Live Activity freshness never extends beyond the session's end.
 
-The current service is single-user. Its shared bearer token allows reading telemetry, editing the rule and registering devices. To revoke access, rotate that token and update every client. Separate users and scoped device credentials would need additional access controls.
+The current service is single-user. Its shared bearer token allows reading telemetry, editing shared rules and registering devices. To revoke access, rotate that token and update every client. Separate users and scoped device credentials would need additional access controls.
 
 APNs requests use ES256 tokens over HTTP/2, with separate sandbox and production registrations and Mac/iOS topics. ActivityKit state uses numeric Unix timestamps to avoid the different epoch in Swift's default Date encoding. Notifications contain the AMS identifier, humidity and threshold.
 
 The app and relay both set Live Activity relevance to 50 when creating or updating a session. During device testing, a session with the default score of zero was missing from Dynamic Island. An update with score 50 restored it immediately. Both update paths keep that value so a later push can't reset it to zero. Relevance affects ActivityKit presentation and is separate from APNs delivery priority, which is 5 for background updates.
+
+Rule editors use authenticated `/v2/alerts` endpoints and revision-based `If-Match` checks. A stale revision returns HTTP 412. Clients cache the collection for offline viewing, keep drafts separate and never queue changes. The compact `/v1/snapshot` retains the legacy single-rule projection for the ESP32; full rules are fetched separately. Legacy alert writes return HTTP 409 with `client_update_required`. Existing single-rule databases migrate to Alert 1 with their evaluation state intact.
+
+Device upserts and subscription changes use `/v2/devices/{id}`. Existing registrations migrate to subscribed; new registrations default to off. Token rotation preserves the stored subscription. Device permission, relay subscription and Live Activity update registration are separate states.
+
+## Shared alert API
+
+Every endpoint requires the relay bearer token. Rule responses include `id`, `name`, `revision`, `enabled`, `amsID`, `threshold`, `holdSeconds`, `hysteresis` and the current `active` state.
+
+| Method | Endpoint | Behaviour |
+|---|---|---|
+| GET | `/v2/alerts` | List all rules and current active states |
+| POST | `/v2/alerts` | Create a rule; omitted names use the first unused Alert N |
+| GET | `/v2/alerts/{id}` | Read one rule with a revision ETag |
+| PUT | `/v2/alerts/{id}` | Update with `If-Match: "<revision>"` |
+| DELETE | `/v2/alerts/{id}` | Delete with `If-Match: "<revision>"` |
+| PUT | `/v2/devices/{id}` | Upsert a token, platform and environment; `initialReceiveAlerts` applies only to new records |
+| PATCH | `/v2/devices/{id}` | Set `receiveAlerts` and return the confirmed subscription |
+
+Updates and deletions return 428 without `If-Match`, 412 for a stale revision and 404 if the rule was removed. Renaming preserves the timer and active state. Condition changes reset only that rule. The apps refresh on activation, when opening Settings and every five seconds while Settings is visible. A conflicting editor keeps its draft and offers Reload latest.

@@ -9,10 +9,24 @@ import UIKit
 
 @MainActor @Observable final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     enum Authorization: Equatable { case checking, notAsked, denied, allowed, quiet }
+    enum DeliverySetting: Equatable {
+        case enabled, disabled, unsupported
+        init(_ value: UNNotificationSetting) {
+            switch value {
+            case .enabled: self = .enabled
+            case .disabled: self = .disabled
+            default: self = .unsupported
+            }
+        }
+        var title: String { self == .enabled ? "On" : self == .disabled ? "Off" : "Not supported" }
+    }
     struct Permission: Equatable {
         var authorization: Authorization
         var banners = false
         var sounds = false
+        var lockScreen: DeliverySetting = .unsupported
+        var notificationCenter: DeliverySetting = .unsupported
+        var badges: DeliverySetting = .unsupported
         var title: String {
             switch authorization {
             case .checking: "Checking…"
@@ -54,9 +68,9 @@ import UIKit
             switch self {
             case .unchecked: "Connect to your relay to check its push setup."
             case .checking: "Checking the relay for this app and push environment."
-            case .available: "The relay has a readable signing key for this app's push environment. Apple authorization and notification delivery have not been verified."
+            case .available: "Apple push credentials are configured for this app."
             case .needsSetup(let message), .unavailable(let message): message
-            case .updateRequired: "This relay doesn't support notification status checks yet. Update the relay to check its push setup."
+            case .updateRequired: "Update your relay to check Apple push setup."
             }
         }
     }
@@ -73,6 +87,9 @@ import UIKit
         var status: @MainActor (Connection) async throws -> NotificationRelayStatus
         var register: @MainActor (Connection, String) async throws -> Void
         var registrationTimeout: Duration = .seconds(20)
+        var setSubscription: @MainActor (Connection, Bool) async throws -> Bool = { _, _ in throw RelayClient.RelayError.configuration }
+        var readIntent: @MainActor (Connection) -> Bool? = { _ in nil }
+        var writeIntent: @MainActor (Connection, Bool) -> Void = { _, _ in }
 
         static var live: Self {
             .init(permission: {
@@ -90,7 +107,10 @@ import UIKit
                 }
                 return Permission(authorization: authorization,
                                   banners: settings.alertSetting == .enabled,
-                                  sounds: settings.soundSetting == .enabled)
+                                  sounds: settings.soundSetting == .enabled,
+                                  lockScreen: .init(settings.lockScreenSetting),
+                                  notificationCenter: .init(settings.notificationCenterSetting),
+                                  badges: .init(settings.badgeSetting))
             }, requestAuthorization: {
                 _ = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
             }, registerWithApple: {
@@ -105,7 +125,10 @@ import UIKit
                 try await RelayClient(endpoint: connection.endpoint, token: connection.token).notificationStatus()
             }, register: { connection, token in
                 try await RelayClient(endpoint: connection.endpoint, token: connection.token).registerDevice(token)
-            })
+            }, setSubscription: { connection, enabled in
+                try await RelayClient(endpoint: connection.endpoint, token: connection.token).setReceiveAlerts(enabled)
+            }, readIntent: { SharedConfiguration.receiveAlertsIntent(endpoint: $0.endpoint) },
+               writeIntent: { SharedConfiguration.saveReceiveAlertsIntent($1, endpoint: $0.endpoint) })
         }
     }
 
@@ -120,6 +143,10 @@ import UIKit
     var isRefreshing = false
     var isRequestingPermission = false
     var permissionError: String?
+    var receiveAlerts: Bool?
+    var supportsSubscription = false
+    var isChangingSubscription = false
+    var subscriptionError: String?
     @ObservationIgnored private let dependencies: Dependencies
     @ObservationIgnored private var token: String?
     @ObservationIgnored private var confirmedConnection: Connection?
@@ -143,6 +170,13 @@ import UIKit
         if case .failed(let message) = registration { return message }
         return nil
     }
+    var canChangeSubscription: Bool {
+        guard supportsSubscription && !isChangingSubscription && !isRefreshing && dependencies.connection().isConfigured else { return false }
+        switch server {
+        case .available, .needsSetup: return true
+        default: return false
+        }
+    }
     var summary: String {
         switch permission.authorization {
         case .checking: return "Checking notification permission."
@@ -150,9 +184,10 @@ import UIKit
         case .denied: return "Allow Airkeep notifications in Settings to receive alerts on this device."
         case .allowed, .quiet: break
         }
+        if receiveAlerts == false { return "Humidity alerts are paused on this device." }
         guard registration == .registered else { return "This device still needs a confirmed relay registration." }
-        guard server == .available else { return "Device registration and server push setup are separate checks. See server details below." }
-        return "Permission and registration are in place. Notification delivery has not been verified."
+        guard server == .available else { return "Check Apple push setup in Settings → Relay." }
+        return "This device is registered with your relay."
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
@@ -181,6 +216,8 @@ import UIKit
             registration = .unchecked
             confirmedConnection = nil
             confirmedToken = nil
+            receiveAlerts = dependencies.readIntent(connection)
+            supportsSubscription = false
         }
         server = .checking
         let task = Task { [weak self] in
@@ -216,6 +253,11 @@ import UIKit
             catch RelayClient.RelayError.http(404) { status = nil }
             guard isCurrent(connection, id: id) else { return }
             applyServer(status)
+            supportsSubscription = status?.receiveAlerts != nil
+            if let enabled = status?.receiveAlerts {
+                receiveAlerts = enabled
+                if status?.registered == true { dependencies.writeIntent(connection, enabled) }
+            }
             if status?.reason == "topic_mismatch" {
                 registration = .failed("The relay's push topic doesn't match this app. Correct the relay configuration before retrying.")
                 return
@@ -241,6 +283,10 @@ import UIKit
                         registration = .failed("The relay didn't retain this device's registration. Try registering again.")
                         return
                     }
+                    if let enabled = status?.receiveAlerts {
+                        receiveAlerts = enabled
+                        dependencies.writeIntent(connection, enabled)
+                    }
                 }
                 confirmedConnection = connection
                 confirmedToken = token
@@ -256,7 +302,7 @@ import UIKit
         guard let status else { server = .updateRequired; return }
         switch status.configuration {
         case .available: server = .available
-        case .missing: server = .needsSetup("The relay has no push signing credentials for this app's environment.")
+        case .missing: server = .needsSetup("Add Apple push credentials to your relay for this app.")
         case .invalid:
             let message: String
             switch status.reason {
@@ -297,6 +343,56 @@ import UIKit
             appleTimeout = nil
         }
         await refresh(forceRegistration: true)
+    }
+    func setReceiveAlerts(_ enabled: Bool) async {
+        guard !isChangingSubscription else { return }
+        let connection = dependencies.connection()
+        isChangingSubscription = true
+        subscriptionError = nil
+        defer { isChangingSubscription = false }
+        do {
+            if enabled {
+                let current = await dependencies.permission()
+                if current.authorization == .notAsked { try await dependencies.requestAuthorization() }
+                let updated = await dependencies.permission()
+                permission = updated
+                guard updated.allowsNotifications else {
+                    subscriptionError = "Allow Airkeep notifications in system settings before enabling alerts here."
+                    return
+                }
+            }
+            await refresh(forceRegistration: enabled)
+            let refreshDeadline = ContinuousClock.now.advanced(by: dependencies.registrationTimeout)
+            while isRefreshing && ContinuousClock.now < refreshDeadline {
+                guard connection == dependencies.connection() else { throw RelayClient.RelayError.connectionChanged }
+                try await Task.sleep(for: .milliseconds(20))
+            }
+            guard connection == dependencies.connection() else { throw RelayClient.RelayError.connectionChanged }
+            guard supportsSubscription else {
+                subscriptionError = "Update your relay to control this device's alert subscription."
+                return
+            }
+            if enabled {
+                let deadline = ContinuousClock.now.advanced(by: dependencies.registrationTimeout)
+                while registration != .registered && ContinuousClock.now < deadline {
+                    guard connection == dependencies.connection() else { throw RelayClient.RelayError.connectionChanged }
+                    if registrationError != nil { break }
+                    try await Task.sleep(for: .milliseconds(50))
+                }
+                guard registration == .registered else {
+                    subscriptionError = registrationError ?? "Registration is still pending. Retry registration before enabling alerts."
+                    return
+                }
+            }
+            let confirmed = try await dependencies.setSubscription(connection, enabled)
+            guard connection == dependencies.connection() else { throw RelayClient.RelayError.connectionChanged }
+            guard confirmed == enabled else { throw RelayClient.RelayError.transport }
+            dependencies.writeIntent(connection, confirmed)
+            receiveAlerts = confirmed
+            await refresh()
+        } catch {
+            subscriptionError = "The relay hasn't confirmed this change. \(error.localizedDescription)"
+        }
     }
     func openSettings() {
         #if os(macOS)

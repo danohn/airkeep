@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 import math
 import time
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 LIVE_ACTIVITY_DURATION_SECONDS = 8 * 3600
 LIVE_ACTIVITY_UPDATE_SECONDS = 300
@@ -65,6 +65,15 @@ class AlertRule(BaseModel):
         if self.hysteresis >= self.threshold:
             raise ValueError("Hysteresis must be smaller than the threshold")
         return self
+
+
+class NamedAlertInput(AlertRule):
+    name: str = Field(default="", max_length=80)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def trim_name(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 @dataclass

@@ -35,7 +35,7 @@ open apple/Airkeep.xcodeproj
 
 Set your team and bundle prefix in `Local.xcconfig`, then select `Airkeep-iOS` or `Airkeep-macOS`. [Apple setup](docs/apple-setup.md) covers the App Group, Keychain and push entitlements, device signing, and project regeneration with XcodeGen.
 
-In the app's Connection settings, enter the relay's HTTPS URL and bearer token. The token is stored in Keychain and shared with the widgets. For a UI preview without a relay, launch with `--demo`.
+In Settings → Relay, enter the relay's HTTPS URL and bearer token. The token is stored in Keychain and shared with the widgets. For a UI preview without a relay, launch with `--demo`.
 
 ## Build the desk display
 
@@ -54,11 +54,11 @@ Wi-Fi credentials and the relay token are stored in ignored local configuration 
 
 ## Alerts and monitoring
 
-Alerts start disabled. In Humidity alerts, choose a threshold, hold duration and reset margin, enable notifications, then save the rule. The relay sends a high-humidity alert once the threshold has been sustained and a recovery alert after humidity falls below the reset point.
+In Settings → Humidity alerts, create named rules for each AMS with their own threshold, hold duration and reset margin. New rules start disabled. Rules sync through the relay across your Apple devices. Cached rules remain readable offline. Each rule sends an alert once its threshold has been sustained and a recovery alert after humidity falls below the reset point. Choose Receive alerts on this device in Settings → Notifications separately on each device.
 
 Remote alerts and background Live Activity updates need an Apple Developer Program account and your own APNs signing keys. Follow [push setup](docs/push-setup.md). Readings, history and widgets work without APNs.
 
-Choose Start Live Activity in the iPhone app to show humidity on the Lock Screen and in Dynamic Island on supported iPhones for up to eight hours. The app shows when the session ends. Widget refreshes follow the system's schedule, and push updates can be delayed. Cached readings retain their original timestamps so their age stays visible.
+Choose Start Live Activity in Settings → Live Activities on iPhone to show humidity on the Lock Screen and in Dynamic Island on supported iPhones for up to eight hours. The app shows when the session ends. Widget refreshes follow the system's schedule, and push updates can be delayed. Cached readings retain their original timestamps so their age stays visible.
 
 ## Development
 

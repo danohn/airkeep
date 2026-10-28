@@ -1,6 +1,6 @@
 [project]
 name = "airkeep-relay"
-version = "0.1.1"
+version = "0.2.0"
 description = "Local Bambu MQTT telemetry, history, humidity alerts and Apple push relay"
 requires-python = ">=3.14"
 dependencies = ["fastapi>=0.120,<1", "uvicorn>=0.38,<1", "paho-mqtt>=2.1,<3", "httpx[http2]>=0.28,<1", "pyjwt[crypto]>=2.10,<3", "pydantic-settings>=2.11,<3"]

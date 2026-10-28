@@ -25,7 +25,7 @@ xcrun simctl install booted \
 xcrun simctl launch --terminate-running-process booted YOUR_CONFIGURED_BUNDLE_ID
 ```
 
-Connect to the same relay as the Mac in Connection settings, or use the private Debug provisioning hook described in [Apple setup](apple-setup.md). Keep credentials out of command arguments, logs and checked-in files. Wait for a fresh reading and history before capturing:
+Connect to the same relay as the Mac in Settings → Relay, or use the private Debug provisioning hook described in [Apple setup](apple-setup.md). Keep credentials out of command arguments, logs and checked-in files. Wait for a fresh reading and history before capturing:
 
 ```sh
 xcrun simctl io booted screenshot --type=png docs/screenshots/ios-simulator.png

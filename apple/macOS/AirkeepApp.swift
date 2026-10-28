@@ -12,7 +12,7 @@ import AppKit
         } label: {
             Label(model.reading.map { "\($0.humidityText)%\(model.isStale && !model.demo ? " ·" : "")" } ?? "—%", systemImage: "humidity")
         }.menuBarExtraStyle(.window)
-        Settings { ConnectionView(model: model) }
+        Settings { SettingsView(model: model) }
     }
 }
 

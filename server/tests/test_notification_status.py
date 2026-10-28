@@ -32,7 +32,7 @@ def test_status_requires_auth_and_checks_registration_environment_and_topic(tmp_
         assert status(client).status_code == 401
         client.headers["Authorization"] = "Bearer " + TOKEN
         result = status(client).json()
-        assert result == dict(registered=False, configuration="missing", reason="credentials_missing", environment="sandbox")
+        assert result == dict(registered=False, configuration="missing", reason="credentials_missing", environment="sandbox", receiveAlerts=False)
         registration = dict(id="mac-one", token="a" * 64, platform="mac", environment="sandbox")
         assert client.post("/v1/devices", json=registration).status_code == 200
         assert status(client).json()["registered"] is True

@@ -3,12 +3,13 @@ import SwiftUI
 struct MenuBarView: View {
     @Bindable var model: MonitorModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 AirkeepWordmark(size: 22)
                 Spacer()
-                AirkeepActionButton(kind: .settings) { openDashboard(showing: .connection) }
+                AirkeepActionButton(kind: .settings) { openSettings(); NSApplication.shared.activate() }
             }
             HStack {
                 Text("P2S / \(model.reading?.amsName ?? "AMS")").font(.caption).foregroundStyle(.secondary)
@@ -24,7 +25,6 @@ struct MenuBarView: View {
                 Text("Updated \(reading.date, style: .relative) ago").font(.caption).foregroundStyle(.secondary)
             }
             if let error = model.error { Text(error).font(.caption).foregroundStyle(.orange) }
-            AirkeepActionButton(kind: .humidityAlerts) { openDashboard(showing: .alerts) }
             Button("Open Airkeep") { openDashboard() }
                 .buttonStyle(.glass).frame(maxWidth: .infinity)
             HStack {
@@ -37,9 +37,8 @@ struct MenuBarView: View {
             .task { model.start() }
     }
 
-    private func openDashboard(showing sheet: MonitorModel.Sheet? = nil) {
+    private func openDashboard() {
         openWindow(id: "dashboard")
         NSApplication.shared.activate()
-        if let sheet { model.presentedSheet = sheet }
     }
 }

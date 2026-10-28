@@ -3,9 +3,25 @@ import Observation
 import WidgetKit
 
 @MainActor @Observable final class MonitorModel {
-    enum Sheet: String, Identifiable {
-        case connection, alerts
+    enum SettingsSection: String, CaseIterable, Identifiable {
+        case alerts, notifications, liveActivities, relay
         var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .alerts: "Humidity alerts"
+            case .notifications: "Notifications"
+            case .liveActivities: "Live Activities"
+            case .relay: "Relay"
+            }
+        }
+        var symbol: String {
+            switch self {
+            case .alerts: "bell"
+            case .notifications: "app.badge"
+            case .liveActivities: "waveform.path"
+            case .relay: "network"
+            }
+        }
     }
 
     var reading: Reading?
@@ -15,7 +31,12 @@ import WidgetKit
     var refreshing = false
     var hours = 1
     var selectedAMS = SharedConfiguration.amsID
-    var presentedSheet: Sheet?
+    var showSettings = false
+    var settingsSection: SettingsSection?
+    var settingsVisible = false
+    var relayReachable = false
+    var relayCheckedAt: Date?
+    let alertRules = AlertRulesModel()
     var demo = ProcessInfo.processInfo.arguments.contains("--demo")
     private var task: Task<Void, Never>?
     private var lastHistory = Date.distantPast
@@ -41,15 +62,22 @@ import WidgetKit
         guard !refreshing else { return }
         refreshing = true
         defer { refreshing = false }
+        var snapshotReceived = false
+        let client = RelayClient()
         do {
-            let client = RelayClient()
             let data = try await client.snapshot()
+            guard client.endpoint == SharedConfiguration.endpoint && client.token == TokenStore.read() else { return }
+            snapshotReceived = true
+            relayReachable = true
+            relayCheckedAt = .now
             snapshot = data
             reading = data.readings.first { $0.amsID == selectedAMS }
             SharedConfiguration.cached = reading
             SharedConfiguration.amsID = selectedAMS
             if forceHistory || Date.now.timeIntervalSince(lastHistory) > 30 {
-                history = try await client.history(amsID: selectedAMS, hours: hours)
+                let loaded = try await client.history(amsID: selectedAMS, hours: hours)
+                guard client.endpoint == SharedConfiguration.endpoint && client.token == TokenStore.read() else { return }
+                history = loaded
                 lastHistory = .now
             }
             error = nil
@@ -58,12 +86,17 @@ import WidgetKit
                 lastWidget = .now
             }
             #if os(iOS)
-            await LiveMonitor.shared.update(reading, staleAfter: data.staleAfter)
+            await LiveMonitor.shared.update(data.readings, staleAfter: data.staleAfter)
             #endif
-        } catch { self.error = error.localizedDescription }
+        } catch {
+            guard client.endpoint == SharedConfiguration.endpoint && client.token == TokenStore.read() else { return }
+            if !snapshotReceived { relayReachable = false; relayCheckedAt = .now }
+            self.error = error.localizedDescription
+        }
     }
-    func saveRule(_ rule: AlertRule) async throws {
-        try await RelayClient().saveRule(rule)
-        await refresh()
+    func connectionChanged() {
+        snapshot = nil; reading = nil; history = []; error = nil
+        relayReachable = false; relayCheckedAt = nil
+        lastHistory = .distantPast; lastWidget = .distantPast
     }
 }
