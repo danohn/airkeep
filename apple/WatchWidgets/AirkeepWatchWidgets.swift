@@ -1,13 +1,6 @@
 import SwiftUI
 import WidgetKit
 
-struct WatchHumidityEntry: TimelineEntry {
-    var date: Date
-    var reading: Reading?
-    var staleAfter = 90.0
-    var preview = false
-}
-
 struct WatchHumidityProvider: AppIntentTimelineProvider {
     func recommendations() -> [AppIntentRecommendation<WatchAMSIntent>] {
         let state = try? WatchStorage.live.read()
@@ -22,14 +15,16 @@ struct WatchHumidityProvider: AppIntentTimelineProvider {
         .init(date: .now, reading: Reading(amsID: "0", humidity: 19, temperature: 24.4, observedAt: Date.now.timeIntervalSince1970), preview: true)
     }
     func snapshot(for configuration: WatchAMSIntent, in context: Context) async -> WatchHumidityEntry {
-        if context.isPreview { return placeholder(in: context) }
+        if context.isPreview {
+            var entry = placeholder(in: context)
+            entry.amsID = configuration.ams?.id ?? entry.amsID
+            entry.reading?.amsID = entry.amsID
+            return entry
+        }
         return cached(configuration)
     }
     private func cached(_ configuration: WatchAMSIntent) -> WatchHumidityEntry {
-        guard let state = try? WatchStorage.live.read(), let endpoint = state.endpoint,
-              let cached = state.snapshot[endpoint] else { return .init(date: .now) }
-        let ams = configuration.ams?.id ?? state.selectedAMS
-        return .init(date: .now, reading: cached.snapshot.readings.first { $0.amsID == ams }, staleAfter: cached.snapshot.staleAfter)
+        WatchHumidityEntry.cached(amsID: configuration.ams?.id, state: try? WatchStorage.live.read())
     }
     func timeline(for configuration: WatchAMSIntent, in context: Context) async -> Timeline<WatchHumidityEntry> {
         await WatchWidgetSetup.reconcile()
@@ -42,7 +37,7 @@ struct WatchHumidityProvider: AppIntentTimelineProvider {
         var entries = [entry]
         if let reading = entry.reading {
             let staleAt = reading.date.addingTimeInterval(entry.staleAfter + 1)
-            if staleAt > entry.date { entries.append(.init(date: staleAt, reading: reading, staleAfter: entry.staleAfter)) }
+            if staleAt > entry.date { entries.append(.init(date: staleAt, amsID: entry.amsID, reading: reading, staleAfter: entry.staleAfter)) }
         }
         return Timeline(entries: entries, policy: .after(Date.now.addingTimeInterval(15 * 60)))
     }
@@ -82,7 +77,7 @@ struct WatchHumidityWidgetView: View {
             default:
                 VStack(alignment: .leading, spacing: 3) {
                     HStack {
-                        Text(entry.reading?.amsName ?? "Airkeep").font(.caption.weight(.medium))
+                        Text(entry.amsName).font(.caption.weight(.medium))
                         Spacer()
                         if let temperature = entry.reading?.temperature {
                             Text("\(temperature.formatted(.number.precision(.fractionLength(1))))°C").font(.caption2)
@@ -99,16 +94,10 @@ struct WatchHumidityWidgetView: View {
         }
         .foregroundStyle(stale ? .secondary : .primary)
         .containerBackground(for: .widget) { AirkeepTheme.background }
-        .widgetURL(widgetURL)
+        .widgetURL(entry.widgetURL)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(entry.reading?.amsName ?? "Airkeep") humidity")
+        .accessibilityLabel("\(entry.amsName) humidity")
         .accessibilityValue(entry.reading.map { "\($0.humidityText) percent, updated \($0.date.formatted(.relative(presentation: .named)))" } ?? "Set up Airkeep on iPhone")
-    }
-    private var widgetURL: URL? {
-        var components = URLComponents()
-        components.scheme = "airkeep"; components.host = "watch"
-        components.queryItems = [URLQueryItem(name: "ams", value: entry.reading?.amsID ?? "0")]
-        return components.url
     }
 }
 

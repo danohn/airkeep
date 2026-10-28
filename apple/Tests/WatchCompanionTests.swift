@@ -29,6 +29,18 @@ private func widgetStatus(_ request: WidgetRegistrationRequest) -> WidgetRegistr
 }
 
 @Suite struct WatchStorageTests {
+    @Test func configuredWidgetAMSRemainsInTheDeepLinkWithoutACachedReading() throws {
+        var state = WatchStorage.State()
+        state.selectedAMS = "0"
+        for cache in [state, nil] {
+            let entry = WatchHumidityEntry.cached(amsID: "1", state: cache)
+            #expect(entry.reading == nil)
+            #expect(entry.amsName == "AMS 2")
+            let url = try #require(entry.widgetURL)
+            #expect(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first?.value == "1")
+        }
+    }
+
     @Test func phoneHistoryRepliesKeepSpikesAndOriginalTimestampsWithinASmallPacket() throws {
         var readings = (0..<3000).map { Reading(amsID: "0", humidity: 20, observedAt: Double($0)) }
         readings[1500].humidity = 90; readings[1501].humidity = 5

@@ -1,6 +1,29 @@
 import AppIntents
 import WidgetKit
 
+struct WatchHumidityEntry: TimelineEntry {
+    var date: Date
+    var amsID = "0"
+    var reading: Reading?
+    var staleAfter = 90.0
+    var preview = false
+    var amsName: String { "AMS \((Int(amsID) ?? 0) + 1)" }
+    var widgetURL: URL? {
+        var components = URLComponents()
+        components.scheme = "airkeep"; components.host = "watch"
+        components.queryItems = [URLQueryItem(name: "ams", value: amsID)]
+        return components.url
+    }
+    static func cached(amsID: String?, state: WatchStorage.State?, now: Date = .now) -> Self {
+        let selected = amsID ?? state?.selectedAMS ?? "0"
+        guard let state, let endpoint = state.endpoint, let cached = state.snapshot[endpoint] else {
+            return .init(date: now, amsID: selected)
+        }
+        return .init(date: now, amsID: selected,
+            reading: cached.snapshot.readings.first { $0.amsID == selected }, staleAfter: cached.snapshot.staleAfter)
+    }
+}
+
 struct WatchAMSEntity: AppEntity, Sendable {
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "AMS")
     static let defaultQuery = WatchAMSQuery()
