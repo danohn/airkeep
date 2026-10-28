@@ -5,11 +5,12 @@ flowchart LR
     P[P2S MQTT · TLS 8883] --> R[Always-on Airkeep relay]
     B[Browser dashboard] --> F[Nginx · static frontend and HTTPS]
     F -->|API requests| R
-    R -->|Authenticated HTTPS · 5 second polling| E[ESP32-S3 · LVGL]
+    E[ESP32-S3 · LVGL] -->|HTTPS · 5 second polling| F
     R --> D[(SQLite · 7 days history)]
     R --> A[Alert engine · hold + hysteresis]
-    R -->|Authenticated HTTPS snapshots| M[SwiftUI iOS/macOS app]
-    R -->|Scheduled HTTPS snapshots| W[WidgetKit]
+    M[SwiftUI iOS/macOS app] -->|HTTPS snapshots| F
+    C[Watch app] -->|HTTPS snapshots| F
+    W[WidgetKit] -->|Scheduled HTTPS snapshots| F
     A --> N[Apple Push Notification service]
     R -->|Time-bounded updates| N
     N --> I[iPhone/Mac notification]
