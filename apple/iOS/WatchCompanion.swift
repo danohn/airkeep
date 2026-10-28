@@ -79,10 +79,11 @@ import WatchConnectivity
         do {
             try session.updateApplicationContext(["configuration": JSONEncoder().encode(pending)])
             if session.isReachable {
-                session.sendMessage(["configuration": try JSONEncoder().encode(pending)], replyHandler: { reply in
+                // WCSession invokes reply blocks on its own queue.
+                session.sendMessage(["configuration": try JSONEncoder().encode(pending)], replyHandler: { @Sendable [weak self] reply in
                     guard let data = reply["receipt"] as? Data else { return }
-                    Task { @MainActor in self.receiveReceipt(data) }
-                }, errorHandler: { _ in /* Application context remains available for background delivery. */ })
+                    Task { @MainActor in self?.receiveReceipt(data) }
+                }, errorHandler: { @Sendable _ in /* Application context remains available for background delivery. */ })
             }
         } catch { self.error = "Couldn't send setup to Apple Watch. Tap Retry." }
     }
