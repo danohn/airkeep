@@ -3,6 +3,11 @@ import Observation
 import WidgetKit
 
 @MainActor @Observable final class MonitorModel {
+    enum Sheet: String, Identifiable {
+        case connection, alerts
+        var id: String { rawValue }
+    }
+
     var reading: Reading?
     var history: [Reading] = []
     var snapshot: Snapshot?
@@ -10,8 +15,7 @@ import WidgetKit
     var refreshing = false
     var hours = 1
     var selectedAMS = SharedConfiguration.amsID
-    var showSettings = false
-    var showAlerts = false
+    var presentedSheet: Sheet?
     var demo = ProcessInfo.processInfo.arguments.contains("--demo")
     private var task: Task<Void, Never>?
     private var lastHistory = Date.distantPast
