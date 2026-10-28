@@ -1295,6 +1295,12 @@ function Admin({ page }: { page: Page }) {
             )}
           />
           <p className="muted small">
+            Oldest AMS reading:{" "}
+            {typeof overview.readingAgeSeconds === "number"
+              ? age(Date.now() / 1000 - overview.readingAgeSeconds)
+              : "Unknown"}
+          </p>
+          <p className="muted small">
             Relay {String(overview.version)} · Alert history started{" "}
             {when(Number(overview.timelineStartedAt))}
           </p>

@@ -65,6 +65,21 @@ async function openAdmin() {
   await screen.findByRole("heading", { name: "Storage" });
 }
 describe("Admin navigation", () => {
+  it.each([
+    { seconds: 600, label: "10 min. ago" },
+    { seconds: null, label: "Unknown" },
+  ])(
+    "shows the oldest AMS reading age as $label",
+    async ({ seconds, label }) => {
+      request.mockImplementation(async (path) =>
+        path === "/v2/admin/overview"
+          ? ({ ...overview, readingAgeSeconds: seconds } as never)
+          : (reply(path) as never),
+      );
+      await openAdmin();
+      expect(screen.getByText(`Oldest AMS reading: ${label}`)).toBeTruthy();
+    },
+  );
   it("changes between every loaded page without rendering another page’s payload", async () => {
     await openAdmin();
     for (const [label, heading] of [
