@@ -75,7 +75,9 @@ struct AirkeepActionStyle: ButtonStyle {
             .overlay(Capsule().strokeBorder(AirkeepTheme.ivory.opacity(configuration.isPressed || hovered ? 0.28 : 0.16)))
             .contentShape(Capsule())
             .opacity(isEnabled ? 1 : 0.4)
+            #if !os(watchOS)
             .onHover { hovered = $0 }
+            #endif
     }
 }
 

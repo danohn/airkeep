@@ -86,6 +86,7 @@ import WidgetKit
                 lastWidget = .now
             }
             #if os(iOS)
+            WatchCompanion.shared.share(data)
             await LiveMonitor.shared.update(data.readings, staleAfter: data.staleAfter)
             #endif
         } catch {

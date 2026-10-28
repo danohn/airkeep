@@ -9,6 +9,7 @@ import UserNotifications
         WindowGroup {
             DashboardView(model: model)
                 .onOpenURL { _ in Task { await model.refresh(forceHistory: true) } }
+                .task { WatchCompanion.shared.activate() }
                 #if DEBUG
                 .task {
                     await configureDevelopmentConnection()

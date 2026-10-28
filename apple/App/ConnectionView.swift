@@ -54,6 +54,7 @@ struct ConnectionView: View {
                                 model.connectionChanged()
                                 #if os(iOS)
                                 if previous.endpoint != url { await LiveMonitor.shared.stopAll(relay: previous) }
+                                WatchCompanion.shared.connectionChanged()
                                 #endif
                                 await model.refresh(forceHistory: true)
                                 await model.alertRules.refresh()
