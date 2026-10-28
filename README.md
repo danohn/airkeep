@@ -37,6 +37,10 @@ Set your team and bundle prefix in `Local.xcconfig`, then select `Airkeep-iOS` o
 
 In Settings → Relay, enter the relay's HTTPS URL and bearer token. The token is stored in Keychain and shared with the widgets. For a UI preview without a relay, launch with `--demo`.
 
+## Web dashboard
+
+Open the relay's HTTPS address to view readings, seven-day history and shared humidity alerts in a browser. Switch to Admin for registered devices, Watch widgets, Live Activities and Apple push diagnostics. [Web dashboard setup](docs/web-dashboard.md) covers the owner password and browser access.
+
 ## Build the desk display
 
 The firmware targets **Waveshare ESP32-S3-Touch-AMOLED-1.8 V2**, with a CO5300 panel and CST820 touch controller. It uses LVGL and an existing ESP-IDF v5.5.x installation. The build helper searches for an installed SDK.
@@ -62,7 +66,7 @@ Choose Start Live Activity in Settings → Live Activities on iPhone to show hum
 
 ## Development
 
-The relay lives in `server/`, the SwiftUI apps and widgets in `apple/`, and the ESP-IDF/LVGL display code in `firmware/`. To run the relay directly for development, install [uv](https://docs.astral.sh/uv/) and configure `server/.env`:
+The relay lives in `server/`, the SwiftUI apps and widgets in `apple/`, the browser app in `web/`, and the ESP-IDF/LVGL display code in `firmware/`. To run the relay directly for development, install [uv](https://docs.astral.sh/uv/) and configure `server/.env`:
 
 ```sh
 cd server
@@ -74,7 +78,7 @@ uv run uvicorn app:create_app --factory --host 127.0.0.1 --port 8787
 
 This listens on loopback. The iPhone simulator can use `http://localhost:8787`. Other devices need the HTTPS route described in the deployment guide.
 
-From the repository root, run relay and notification-state tests and unsigned Apple builds with:
+From the repository root, with Node 22.12 or later installed, run relay, browser and Apple tests and unsigned Apple builds with:
 
 ```sh
 scripts/check.sh
