@@ -6,10 +6,15 @@ struct MenuBarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Airkeep").font(.title3.weight(.semibold)); Spacer()
+                AirkeepWordmark(size: 22)
+                Spacer()
+                AirkeepActionButton(kind: .settings) { openDashboard(showing: .connection) }
+            }
+            HStack {
+                Text("P2S / \(model.reading?.amsName ?? "AMS")").font(.caption).foregroundStyle(.secondary)
+                Spacer()
                 Text(model.demo ? "Preview" : model.isStale ? "Stale" : "Connected").font(.caption).foregroundStyle(.secondary)
             }
-            Text("P2S / \(model.reading?.amsName ?? "AMS")").font(.caption).foregroundStyle(.secondary)
             HumidityValue(reading: model.reading, size: 66, stale: model.isStale && !model.demo)
             Divider()
             if let temp = model.reading?.temperature {
@@ -19,7 +24,8 @@ struct MenuBarView: View {
                 Text("Updated \(reading.date, style: .relative) ago").font(.caption).foregroundStyle(.secondary)
             }
             if let error = model.error { Text(error).font(.caption).foregroundStyle(.orange) }
-            Button("Open Airkeep") { openWindow(id: "dashboard"); NSApplication.shared.activate() }
+            AirkeepActionButton(kind: .humidityAlerts) { openDashboard(showing: .alerts) }
+            Button("Open Airkeep") { openDashboard() }
                 .buttonStyle(.glass).frame(maxWidth: .infinity)
             HStack {
                 Button("Refresh") { Task { await model.refresh(forceHistory: true) } }
@@ -29,5 +35,11 @@ struct MenuBarView: View {
         }.padding(20).frame(width: 280).background(AirkeepTheme.background)
             .foregroundStyle(AirkeepTheme.ivory).tint(AirkeepTheme.amber).preferredColorScheme(.dark)
             .task { model.start() }
+    }
+
+    private func openDashboard(showing sheet: MonitorModel.Sheet? = nil) {
+        openWindow(id: "dashboard")
+        NSApplication.shared.activate()
+        if let sheet { model.presentedSheet = sheet }
     }
 }

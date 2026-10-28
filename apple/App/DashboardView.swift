@@ -7,10 +7,9 @@ struct DashboardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 HStack {
-                    Text("Airkeep").font(.system(size: 34, weight: .medium, design: .serif))
+                    AirkeepWordmark()
                     Spacer()
-                    Button { model.showSettings = true } label: { Image(systemName: "gearshape") }
-                        .buttonStyle(.glass).accessibilityLabel("Connection settings")
+                    AirkeepActionButton(kind: .settings) { model.presentedSheet = .connection }
                 }
                 HStack(spacing: 8) {
                     Text("P2S / \(model.reading?.amsName ?? "AMS")").font(.subheadline.weight(.medium))
@@ -31,9 +30,15 @@ struct DashboardView: View {
                 HStack {
                     Text("Last \(model.hours == 1 ? "hour" : "\(model.hours) hours")").font(.caption).foregroundStyle(AirkeepTheme.secondary)
                     Spacer()
-                    Picker("History range", selection: $model.hours) {
-                        Text("1h").tag(1); Text("6h").tag(6); Text("24h").tag(24)
-                    }.pickerStyle(.segmented).labelsHidden().frame(maxWidth: 150)
+                    Group {
+                        #if os(iOS)
+                        AirkeepHistoryRangeControl(selection: $model.hours).frame(height: 32)
+                        #else
+                        Picker("History range", selection: $model.hours) {
+                            Text("1h").tag(1); Text("6h").tag(6); Text("24h").tag(24)
+                        }.pickerStyle(.segmented).labelsHidden()
+                        #endif
+                    }.frame(maxWidth: 150)
                         .onChange(of: model.hours) { Task { await model.refresh(forceHistory: true) } }
                 }
                 HumidityChart(readings: model.history).frame(height: 175)
@@ -49,11 +54,12 @@ struct DashboardView: View {
                 }
                 Divider().overlay(.white.opacity(0.1))
                 HStack {
-                    Button { model.showAlerts = true } label: { Label("Humidity alerts", systemImage: "bell") }
+                    AirkeepActionButton(kind: .humidityAlerts) { model.presentedSheet = .alerts }
                     Spacer()
                     Button { Task { await model.refresh(forceHistory: true) } } label: { Image(systemName: "arrow.clockwise") }
+                        .buttonStyle(AirkeepActionStyle(iconOnly: true))
                         .disabled(model.refreshing).accessibilityLabel("Refresh readings")
-                }.buttonStyle(.glass)
+                }
                 #if os(iOS)
                 if let activity = LiveMonitor.shared.currentActivity {
                     VStack(alignment: .leading, spacing: 8) {
@@ -107,8 +113,12 @@ struct DashboardView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active && !model.demo { Task { await NotificationManager.shared.refresh() } }
         }
-        .sheet(isPresented: $model.showSettings) { ConnectionView(model: model) }
-        .sheet(isPresented: $model.showAlerts) { AlertsView(model: model) }
+        .sheet(item: $model.presentedSheet) { sheet in
+            switch sheet {
+            case .connection: ConnectionView(model: model)
+            case .alerts: AlertsView(model: model)
+            }
+        }
         #if os(macOS)
         .frame(minWidth: 390, idealWidth: 430, minHeight: 680)
         #endif
