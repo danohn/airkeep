@@ -29,6 +29,26 @@ private func widgetStatus(_ request: WidgetRegistrationRequest) -> WidgetRegistr
 }
 
 @Suite struct WatchStorageTests {
+    @Test func widgetRecommendationsAcceptDynamicAMSNames() {
+        // WidgetKit traps when an interpolated LocalizedStringKey reaches this initializer.
+        #expect(WatchWidgetSetup.recommendations(amsIDs: ["1", "0", "1"]).count == 2)
+    }
+
+    @Test func recommendationsChangeOnlyWhenAcceptedSnapshotChangesAMSSet() throws {
+        let fixture = WatchStorageFixture(); defer { fixture.cleanup() }
+        let store = fixture.store
+        var snapshot = Snapshot(serverTime: 100, staleAfter: 90, printerConnected: true,
+            pushConfigured: true, readings: [.init(amsID: "0", humidity: 19, observedAt: 100)],
+            alertRule: .init(), alertActive: false)
+        #expect(try store.cache(snapshot, endpoint: fixture.connection.endpoint))
+        snapshot.serverTime = 101
+        #expect(try !store.cache(snapshot, endpoint: fixture.connection.endpoint))
+        snapshot.readings.append(.init(amsID: "1", humidity: 21, observedAt: 101))
+        #expect(try store.cache(snapshot, endpoint: fixture.connection.endpoint))
+        snapshot.serverTime = 99; snapshot.readings = []
+        #expect(try !store.cache(snapshot, endpoint: fixture.connection.endpoint))
+    }
+
     @Test func configuredWidgetAMSRemainsInTheDeepLinkWithoutACachedReading() throws {
         var state = WatchStorage.State()
         state.selectedAMS = "0"

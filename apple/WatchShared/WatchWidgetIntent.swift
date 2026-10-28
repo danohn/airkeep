@@ -1,4 +1,5 @@
 import AppIntents
+import SwiftUI
 import WidgetKit
 
 struct WatchHumidityEntry: TimelineEntry {
@@ -51,6 +52,14 @@ struct WatchAMSIntent: WidgetConfigurationIntent {
 
 enum WatchWidgetSetup {
     static let kind = "AirkeepWatchHumidity"
+    static func recommendations(amsIDs: [String]) -> [AppIntentRecommendation<WatchAMSIntent>] {
+        Array(Set(amsIDs)).sorted().map { identifier in
+            let intent = WatchAMSIntent()
+            intent.ams = WatchAMSEntity(id: identifier)
+            let name = "AMS \((Int(identifier) ?? 0) + 1)"
+            return AppIntentRecommendation(intent: intent, description: Text(verbatim: name))
+        }
+    }
     static var bundleID: String {
         Bundle.main.object(forInfoDictionaryKey: "AirkeepWatchAppBundleID") as? String ?? "io.airkeep.watch"
     }

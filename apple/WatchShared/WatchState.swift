@@ -3,6 +3,9 @@ import CryptoKit
 import Security
 import Darwin
 import LocalAuthentication
+#if os(watchOS)
+import WidgetKit
+#endif
 
 // WatchConnectivity's Objective-C reply blocks predate Sendable annotations.
 // Wrap the callback when moving it to the main actor; its payload is encoded Data.
@@ -282,11 +285,17 @@ final class WatchStorage: @unchecked Sendable {
         }
     }
     func selectAMS(_ amsID: String) throws { try transaction { $0.selectedAMS = amsID } }
-    func cache(_ snapshot: Snapshot, endpoint: String) throws {
-        try transaction { state in
-            if let previous = state.snapshot[endpoint], previous.snapshot.serverTime > snapshot.serverTime { return }
+    @discardableResult func cache(_ snapshot: Snapshot, endpoint: String) throws -> Bool {
+        let changed = try transaction { state in
+            if let previous = state.snapshot[endpoint], previous.snapshot.serverTime > snapshot.serverTime { return false }
+            let previousIDs = Set(state.snapshot[endpoint]?.snapshot.readings.map(\.amsID) ?? [])
             state.snapshot[endpoint] = .init(snapshot: snapshot, fetchedAt: .now)
+            return previousIDs != Set(snapshot.readings.map(\.amsID))
         }
+        #if os(watchOS)
+        if changed { WidgetCenter.shared.invalidateConfigurationRecommendations() }
+        #endif
+        return changed
     }
     func cache(rules: [ManagedAlertRule], endpoint: String) throws {
         try transaction { $0.rules[endpoint] = .init(rules: rules, syncedAt: .now) }

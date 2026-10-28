@@ -5,11 +5,7 @@ struct WatchHumidityProvider: AppIntentTimelineProvider {
     func recommendations() -> [AppIntentRecommendation<WatchAMSIntent>] {
         let state = try? WatchStorage.live.read()
         let identifiers = state?.endpoint.flatMap { state?.snapshot[$0]?.snapshot.readings.map(\.amsID) } ?? [state?.selectedAMS ?? "0"]
-        return Array(Set(identifiers)).sorted().map { identifier in
-            let intent = WatchAMSIntent()
-            intent.ams = WatchAMSEntity(id: identifier)
-            return AppIntentRecommendation(intent: intent, description: "AMS \((Int(identifier) ?? 0) + 1)")
-        }
+        return WatchWidgetSetup.recommendations(amsIDs: identifiers)
     }
     func placeholder(in context: Context) -> WatchHumidityEntry {
         .init(date: .now, reading: Reading(amsID: "0", humidity: 19, temperature: 24.4, observedAt: Date.now.timeIntervalSince1970), preview: true)
@@ -64,6 +60,15 @@ struct WatchHumidityWidgetView: View {
     var body: some View {
         Group {
             switch family {
+            case .accessoryCorner:
+                Text("\(value)%")
+                    .font(.system(.title3, design: .rounded, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(stale ? .secondary : accent)
+                    .widgetAccentable()
+                    .widgetLabel {
+                        Text("\(entry.amsName) · RH")
+                    }
             case .accessoryInline:
                 if let reading = entry.reading {
                     Text("\(value)% · \(Text(reading.date, style: .relative)) ago")
@@ -108,7 +113,7 @@ struct WatchHumidityWidget: Widget {
         }
         .configurationDisplayName("AMS humidity")
         .description("Humidity and temperature at a glance.")
-        .supportedFamilies([.accessoryCircular, .accessoryInline, .accessoryRectangular])
+        .supportedFamilies([.accessoryCircular, .accessoryCorner, .accessoryInline, .accessoryRectangular])
         .pushHandler(WatchHumidityPushHandler.self)
     }
 }
