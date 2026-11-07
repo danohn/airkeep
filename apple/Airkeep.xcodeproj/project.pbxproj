@@ -70,6 +70,7 @@
 		A218239772F11B95BE8F9D02 /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D023DF191CDF108295056FBE /* RelayClient.swift */; };
 		A4BE94AD48DD60EE7E916D52 /* MonitorAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD62B603226DF5B13DCA4C4 /* MonitorAttributes.swift */; };
 		A70BEECFA2A696A1BE6E38AB /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC6B8778F752D0D723E8BD3 /* ConnectionView.swift */; };
+		AA50C809423631370CE16A5B /* ChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FFF9C4333814393241E70DD /* ChartView.swift */; };
 		ACCED2D96A3600D5F3398F71 /* WatchState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50832CB4F4F2814A275B53FC /* WatchState.swift */; };
 		AF2245DBB26349BEC9F6DDFD /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1DB4886A3FDF55872BBD78 /* Models.swift */; };
 		B4165ABEC5D04BFFAD985136 /* LiveActivityTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D319A487EBF679137A93D2 /* LiveActivityTiming.swift */; };
@@ -701,6 +702,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				612333A0C672C6B50DEB5C5A /* AirkeepWatchApp.swift in Sources */,
+				AA50C809423631370CE16A5B /* ChartView.swift in Sources */,
 				7EC8FCC0F83707A9BFAE6E79 /* Configuration.swift in Sources */,
 				54B5DED6E56EDD93C00A67C2 /* Models.swift in Sources */,
 				A218239772F11B95BE8F9D02 /* RelayClient.swift in Sources */,

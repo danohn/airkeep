@@ -55,7 +55,7 @@ struct DashboardView: View {
                     }.frame(maxWidth: 150)
                         .onChange(of: model.hours) { Task { await model.refresh(forceHistory: true) } }
                 }
-                HumidityChart(readings: model.history).frame(height: 175)
+                HumidityChart(readings: model.history).frame(height: 215)
                 Divider().overlay(.white.opacity(0.1))
                 HStack(spacing: 16) {
                     Image(systemName: "thermometer.medium").font(.title2).foregroundStyle(AirkeepTheme.secondary)

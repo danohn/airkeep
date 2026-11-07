@@ -352,8 +352,13 @@ main {
   font-size: 15px;
   padding: 9px 20px;
 }
+.history-range {
+  margin: 0;
+  color: #a2a39d;
+  font-size: 13px;
+}
 .chart {
-  height: 285px;
+  height: 310px;
   margin-left: -15px;
 }
 .expanded .chart {
@@ -783,7 +788,7 @@ tbody tr:hover {
     font-size: 280px;
   }
   .chart {
-    height: 320px;
+    height: 345px;
   }
 }
 @media (max-width: 1100px) {
@@ -1014,7 +1019,7 @@ tbody tr:hover {
     font-size: 13px;
   }
   .chart {
-    height: 245px;
+    height: 260px;
     margin-left: -15px;
     font-size: 11px;
   }
@@ -1141,7 +1146,7 @@ tbody tr:hover {
     padding-bottom: 18px;
   }
   .history:not(.expanded) .chart {
-    height: 230px;
+    height: 245px;
   }
   .history:not(.expanded) .section-heading {
     margin-bottom: 20px;
@@ -1155,7 +1160,7 @@ tbody tr:hover {
     font-size: 260px;
   }
   .history:not(.expanded) .chart {
-    height: 285px;
+    height: 310px;
   }
 }
 @media (max-width: 760px) {

@@ -1,5 +1,4 @@
 import SwiftUI
-import Charts
 import WidgetKit
 
 struct WatchDashboardView: View {
@@ -130,14 +129,7 @@ struct WatchHistoryView: View {
                     Text(model.historyRefreshing ? "Loading history…" : "History appears as readings arrive.").font(.caption).foregroundStyle(.secondary)
                         .frame(minHeight: 100)
                 } else {
-                    Chart(model.history) { reading in
-                        LineMark(x: .value("Time", reading.date), y: .value("Humidity", reading.humidity))
-                            .foregroundStyle(AirkeepTheme.amber)
-                    }
-                    .chartYScale(domain: 0...100).chartYAxis { AxisMarks(values: [0, 50, 100]) }
-                    .chartXAxis { AxisMarks(values: .automatic(desiredCount: 3)) }
-                    .frame(height: 105)
-                    .accessibilityLabel("\(model.hours)-hour relative humidity history")
+                    HumidityChart(readings: model.history).frame(height: 128)
                 }
                 if let error = model.historyError { Text(error).font(.caption2).foregroundStyle(.orange) }
                 Button("Refresh") { Task { await model.refreshHistory(force: true) } }.disabled(model.historyRefreshing || model.demo)

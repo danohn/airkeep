@@ -13,7 +13,7 @@
 
 LV_FONT_DECLARE(airkeep_digits_128);
 static QueueHandle_t readings, statuses;
-static lv_obj_t *value, *temperature, *status, *bar, *chart, *details, *detail_text, *age, *brightness_text;
+static lv_obj_t *value, *temperature, *status, *bar, *chart, *chart_range, *details, *detail_text, *age, *brightness_text;
 static lv_chart_series_t *series;
 static airkeep_reading_t current;
 static bool has_reading;
@@ -78,7 +78,14 @@ static void timer(lv_timer_t *timer)
             if (history_count<120) history_count++;
             int low=100, high=0;
             for (int i=0;i<history_count;i++) { if(history[i]<low) low=history[i]; if(history[i]>high) high=history[i]; }
-            lv_chart_set_range(chart,LV_CHART_AXIS_PRIMARY_Y,low>5?low-5:0,high<95?high+5:100);
+            double padding = fmax(2, (10 - (high - low)) / 2.0);
+            int lower = fmin(90, fmax(0, floor(low - padding)));
+            int upper = fmax(10, fmin(100, ceil(high + padding)));
+            lv_chart_set_range(chart,LV_CHART_AXIS_PRIMARY_Y,lower,upper);
+            if (low == high) snprintf(text,sizeof(text),"Range %d%% RH",low);
+            else snprintf(text,sizeof(text),"Range %d-%d%% RH",low,high);
+            lv_label_set_text(chart_range,text);
+            lv_obj_align(chart_range,LV_ALIGN_TOP_RIGHT,-20,242);
             lv_chart_set_next_value(chart,series,current.humidity);
             chart_at=current.sampled_us;
         }
@@ -121,12 +128,13 @@ void airkeep_ui_start(void)
     label(screen,"100",318,204,&lv_font_montserrat_14,muted);
     divider(screen,229);
     label(screen,"Last hour",20,242,&lv_font_montserrat_14,ivory);
-    chart=lv_chart_create(screen); lv_obj_set_pos(chart,20,271); lv_obj_set_size(chart,328,48);
+    chart_range=label(screen,"",20,242,&lv_font_montserrat_14,muted);
+    chart=lv_chart_create(screen); lv_obj_set_pos(chart,20,266); lv_obj_set_size(chart,328,55);
     lv_obj_set_style_bg_opa(chart,LV_OPA_TRANSP,0); lv_obj_set_style_border_width(chart,0,0);
     lv_obj_set_style_pad_all(chart,0,0); lv_chart_set_div_line_count(chart,0,0);
     lv_chart_set_range(chart,LV_CHART_AXIS_PRIMARY_Y,0,100); lv_chart_set_point_count(chart,120);
     lv_obj_set_style_size(chart,0,0,LV_PART_INDICATOR);
-    lv_obj_set_style_line_width(chart,2,LV_PART_ITEMS);
+    lv_obj_set_style_line_width(chart,1,LV_PART_ITEMS);
     series=lv_chart_add_series(chart,lv_color_hex(amber),LV_CHART_AXIS_PRIMARY_Y);
     lv_chart_set_all_value(chart,series,LV_CHART_POINT_NONE);
     divider(screen,328);

@@ -497,12 +497,29 @@ function HistoryChart({
     data?.series.flatMap((s, i) =>
       s.points.map((p) => ({ ...p, [`segment${i}`]: p.humidityMean })),
     ) || [];
-  const upper = Math.max(
-    60,
-    ...points.map((p) => Math.ceil(p.humidityMax / 20) * 20),
+  const low = points.length ? Math.min(...points.map((p) => p.humidityMin)) : 0;
+  const high = points.length ? Math.max(...points.map((p) => p.humidityMax)) : 0;
+  const padding = Math.max(2, (10 - (high - low)) / 2);
+  const span = high - low + 2 * padding;
+  const step = [2, 5, 10, 20].find((value) => span <= value * 6) ?? 20;
+  const lower = Math.min(
+    90, Math.max(0, Math.floor((low - padding) / step) * step),
   );
+  const upper = Math.max(
+    10, Math.min(100, Math.ceil((high + padding) / step) * step),
+  );
+  const ticks = Array.from(
+    { length: Math.floor((upper - lower) / step) + 1 },
+    (_, index) => lower + index * step,
+  );
+  const formatHumidity = new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 1,
+  });
+  const observedRange = low === high
+    ? formatHumidity.format(low)
+    : `${formatHumidity.format(low)}–${formatHumidity.format(high)}`;
   const historySummary = points.length
-    ? `${amsName(ams)} humidity over the past ${hours === 168 ? "seven days" : `${hours} ${hours === 1 ? "hour" : "hours"}`}. Minimum ${Math.min(...points.map((p) => p.humidityMin)).toFixed(1)} percent, maximum ${Math.max(...points.map((p) => p.humidityMax)).toFixed(1)} percent. Latest source reading ${when(points[points.length - 1].lastObservedAt)}. ${data?.series.length && data.series.length > 1 ? "Gaps indicate interruptions in readings." : ""}`
+    ? `${amsName(ams)} humidity over the past ${hours === 168 ? "seven days" : `${hours} ${hours === 1 ? "hour" : "hours"}`}. Minimum ${formatHumidity.format(low)} percent, maximum ${formatHumidity.format(high)} percent. Latest source reading ${when(points[points.length - 1].lastObservedAt)}. ${data?.series.length && data.series.length > 1 ? "Gaps indicate interruptions in readings." : ""}`
     : "Humidity history is loading or empty.";
   return (
     <section className={"history " + (expanded ? "expanded" : "")}>
@@ -526,6 +543,9 @@ function HistoryChart({
         </div>
       </div>
       {error && <p className="error">{error}</p>}
+      {points.length > 0 && (
+        <p className="history-range">Range · {observedRange}% RH</p>
+      )}
       <p className="sr-only" id={summaryID} aria-live="polite">
         {historySummary}
       </p>
@@ -541,7 +561,7 @@ function HistoryChart({
               data={points}
               margin={{ top: 12, right: 10, left: 0, bottom: 8 }}
             >
-              <CartesianGrid stroke="#30312f" strokeDasharray="3 3" />
+              <CartesianGrid stroke="#30312f" vertical={false} />
               <XAxis
                 type="number"
                 dataKey="lastObservedAt"
@@ -559,8 +579,8 @@ function HistoryChart({
                 tickLine={false}
               />
               <YAxis
-                domain={[0, upper]}
-                ticks={[0, 20, 40, 60, 80, 100].filter((v) => v <= upper)}
+                domain={[lower, upper]}
+                ticks={ticks}
                 width={45}
                 tickLine={false}
                 axisLine={false}
@@ -589,7 +609,7 @@ function HistoryChart({
                   type="linear"
                   dataKey={`segment${i}`}
                   stroke="#ffb82e"
-                  strokeWidth={2}
+                  strokeWidth={1.5}
                   dot={false}
                   isAnimationActive={false}
                   connectNulls={false}
