@@ -6,11 +6,12 @@ import AppKit
     @State private var model = MonitorModel()
     var body: some Scene {
         Window("Airkeep", id: "dashboard") { DashboardView(model: model) }
-            .defaultSize(width: 430, height: 790)
+            .defaultSize(width: 1_200, height: 1_000)
         MenuBarExtra {
             MenuBarView(model: model)
         } label: {
-            Label(model.reading.map { "\($0.humidityText)%\(model.isStale && !model.demo ? " ·" : "")" } ?? "—%", systemImage: "humidity")
+            Label(model.reading.map { "\($0.humidityText)% RH\(model.isStale && !model.demo ? " ·" : "")" } ?? "—% RH", systemImage: "humidity")
+                .labelStyle(.titleAndIcon)
         }.menuBarExtraStyle(.window)
         Settings { SettingsView(model: model) }
     }
