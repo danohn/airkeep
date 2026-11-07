@@ -5,7 +5,7 @@ import AppKit
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @State private var model = MonitorModel()
     var body: some Scene {
-        WindowGroup("Airkeep", id: "dashboard") { DashboardView(model: model) }
+        Window("Airkeep", id: "dashboard") { DashboardView(model: model) }
             .defaultSize(width: 430, height: 790)
         MenuBarExtra {
             MenuBarView(model: model)
