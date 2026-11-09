@@ -4,6 +4,7 @@ export type Account = {
   role: "admin" | "member";
   disabled?: boolean;
   temporary_until?: number | null;
+  local_password?: boolean;
 };
 
 type Tokens = { access_token: string; refresh_token: string; grant_id: string };

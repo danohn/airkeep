@@ -1,30 +1,70 @@
 import { useEffect, useState } from "react";
 import { api, setOAuth } from "./api";
 import { dashboardAuthorization, type Account } from "./auth";
+import { OIDCSettings } from "./OIDCSettings";
 
-export function AccountLogin({ native = false, configured = true, error = "" }: {
-  native?: boolean; configured?: boolean; error?: string;
+export async function beginDashboardSignIn() {
+  const fields = await dashboardAuthorization();
+  const result = await api<{ transaction: string }>("/auth/authorize", {
+    method: "POST", body: JSON.stringify(fields),
+  });
+  return result.transaction;
+}
+
+export async function startOIDC(transaction: string, invitation?: string) {
+  const result = await api<{ redirect: string }>("/auth/oidc/start", {
+    method: "POST", body: JSON.stringify({ transaction, invitation }),
+  });
+  const destination = new URL(result.redirect);
+  if (destination.protocol !== "https:") throw new Error("Invalid sign-in destination.");
+  location.assign(destination.href);
+}
+
+export function AccountLogin({ native = false, invite = false, configured = true, error = "", oidcLabel }: {
+  native?: boolean; invite?: boolean; configured?: boolean; error?: string; oidcLabel?: string;
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [transaction, setTransaction] = useState(() => native ? new URLSearchParams(location.search).get("transaction") ?? "" : "");
   const [change, setChange] = useState(false);
-  const [message, setMessage] = useState("");
+  const [invitation] = useState(() => invite ? location.hash.slice(1) : "");
+  const [provider, setProvider] = useState("");
+  const [message, setMessage] = useState(() => new URLSearchParams(location.search).get("sso_error") ?? "");
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (native && location.search) history.replaceState(null, "", "/connect"); }, [native]);
+  useEffect(() => {
+    if (native || invite || new URLSearchParams(location.search).has("sso_error")) {
+      history.replaceState(null, "", location.pathname);
+    }
+    if (!native && !invite) return;
+    let active = true;
+    api<{ oidc_label?: string }>("/auth/session").then((status) => {
+      if (active) setProvider(status.oidc_label ?? "");
+    }).catch(() => { if (active) setMessage("Could not check single sign-on availability."); });
+    return () => { active = false; };
+  }, [native, invite]);
+  async function authorization() {
+    setOAuth(true);
+    if (transaction) return transaction;
+    if (native) throw new Error("Start sign-in again from the Airkeep app.");
+    return beginDashboardSignIn();
+  }
+  async function signInWithOIDC() {
+    setBusy(true);
+    setMessage("");
+    try {
+      await startOIDC(await authorization(), invite ? invitation : undefined);
+    } catch (e) {
+      setMessage((e as Error).message);
+      setBusy(false);
+    }
+  }
   return <div className="login"><form onSubmit={async (event) => {
     event.preventDefault();
     setBusy(true);
     setMessage("");
     try {
-      setOAuth(true);
-      let id = transaction;
-      if (!id) {
-        if (native) throw new Error("Start sign-in again from the Airkeep app.");
-        const fields = await dashboardAuthorization();
-        id = (await api<{ transaction: string }>("/auth/authorize", { method: "POST", body: JSON.stringify(fields) })).transaction;
-      }
+      const id = await authorization();
       const result = await api<{ passwordChangeRequired?: boolean; redirect?: string }>("/auth/credentials", {
         method: "POST", body: JSON.stringify({ transaction: id, username, password, ...(change ? { new_password: newPassword } : {}) }),
       });
@@ -46,9 +86,9 @@ export function AccountLogin({ native = false, configured = true, error = "" }: 
     }
   }}>
     <img src="/brand/mark.svg" alt="" />
-    <h1>{native ? "Connect to Airkeep" : "Airkeep"}</h1>
-    <p>{change ? "Choose your own password." : "Sign in to your relay."}</p>
-    {configured ? <>
+    <h1>{invite ? "Airkeep invitation" : native ? "Connect to Airkeep" : "Airkeep"}</h1>
+    <p>{invite ? "Use single sign-on to accept your invitation." : change ? "Choose your own password." : "Sign in to your relay."}</p>
+    {invite ? <a href="/">Go to Airkeep sign-in</a> : configured ? <>
       <label htmlFor="username">Username</label>
       <input id="username" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
       <label htmlFor="password">{change ? "Temporary password" : "Password"}</label>
@@ -59,6 +99,11 @@ export function AccountLogin({ native = false, configured = true, error = "" }: 
       </>}
       <button className="primary" disabled={busy}>{change ? "Save password and sign in" : "Sign in"}</button>
     </> : <div className="notice">Set up an administrator on your relay to get started.</div>}
+    {(oidcLabel || provider) && !change && (!invite || invitation) &&
+      <button type="button" disabled={busy} onClick={() => void signInWithOIDC()}>
+        Sign in with {oidcLabel || provider}
+      </button>}
+    {invite && !invitation && <p>Open the original invitation link to try again.</p>}
     {(message || error) && <p className="error" role="alert">{message || error}</p>}
   </form></div>;
 }
@@ -68,7 +113,9 @@ const clientLabels: Record<string, string> = {
   dashboard: "Web dashboard", "apple-ios": "iPhone or iPad", "apple-mac": "Mac", watch: "Apple Watch",
 };
 
-export function AccountSettings({ admin, signedOut }: { admin: boolean; signedOut: () => void }) {
+export function AccountSettings({ admin, signedOut, oidcLabel, localPassword = true }: {
+  admin: boolean; signedOut: () => void; oidcLabel?: string; localPassword?: boolean;
+}) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [username, setUsername] = useState("");
@@ -95,7 +142,7 @@ export function AccountSettings({ admin, signedOut }: { admin: boolean; signedOu
     return () => { active = false; };
   }, [admin]);
   return <section className="account-settings">
-    <h2>{admin ? "Accounts" : "Change password"}</h2>
+    <h2>{admin ? "Accounts" : localPassword ? "Change password" : "My account"}</h2>
     {admin ? <>
       <form onSubmit={(e) => {
         e.preventDefault();
@@ -127,14 +174,15 @@ export function AccountSettings({ admin, signedOut }: { admin: boolean; signedOu
           });
           await load();
         })}>{account.role === "admin" ? "Make member" : "Make admin"}</button>{" "}
-        <button disabled={busy} onClick={() => void run(async () => {
+        {account.local_password !== false && <button disabled={busy} onClick={() => void run(async () => {
           const result = await api<{ temporaryPassword: string }>("/v2/admin/accounts/" + account.id + "/reset", { method: "POST" });
           setTemporary(result.temporaryPassword);
-        })}>Reset password</button>
+        })}>Reset password</button>}
       </p>)}
       {temporary && <p role="status">Temporary password (expires in 24 hours) <code>{temporary}</code></p>}
+      {oidcLabel && <OIDCSettings accounts={accounts} />}
     </> : <>
-    <form onSubmit={(e) => {
+    {localPassword && <form onSubmit={(e) => {
       e.preventDefault();
       void run(async () => {
         await api("/auth/password", { method: "POST", body: JSON.stringify({ password, new_password: replacement }) });
@@ -146,7 +194,7 @@ export function AccountSettings({ admin, signedOut }: { admin: boolean; signedOu
       <label htmlFor="next-account-password">New password</label>
       <input id="next-account-password" type="password" autoComplete="new-password" minLength={12} value={replacement} onChange={(e) => setReplacement(e.target.value)} required />
       <button className="primary" disabled={busy}>Save password</button>
-    </form>
+    </form>}
     <h2>Connected apps</h2>
     {connections.map((connection) => <p key={connection.id}>
       {clientLabels[connection.client] ?? connection.client}{connection.current ? " · This tab" : ""}{" "}

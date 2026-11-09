@@ -35,7 +35,7 @@ import type {
   Rule,
   Snapshot,
 } from "./api";
-import { AccountLogin, AccountSettings } from "./AccountAuth";
+import { AccountLogin, AccountSettings, beginDashboardSignIn, startOIDC } from "./AccountAuth";
 import { clearTokens, finishDashboardAuthorization, type Account } from "./auth";
 import "@fontsource/quicksand/latin-700.css";
 import "./style.css";
@@ -51,7 +51,7 @@ type Page =
   | "queue"
   | "accounts"
   | "password";
-type Session = { authenticated: boolean; configured: boolean; csrf?: string; mode?: "oauth"; account?: Account };
+type Session = { authenticated: boolean; configured: boolean; csrf?: string; mode?: "oauth"; account?: Account; oidc_label?: string };
 type RecordRow = Record<string, unknown>;
 const userPages = [
   ["overview", "Overview", House],
@@ -83,7 +83,7 @@ export function App() {
   const [tick, setTick] = useState(Date.now() / 1000);
   const [sessionError, setSessionError] = useState("");
   const loggedOut = () => {
-    setSession((current) => ({ authenticated: false, configured: true, mode: current?.mode }));
+    setSession((current) => ({ authenticated: false, configured: true, mode: current?.mode, oidc_label: current?.oidc_label }));
     clearTokens();
     setMode("user");
     setPage("overview");
@@ -99,12 +99,16 @@ export function App() {
     api<Session>("/auth/session")
       .then(async (initial) => {
         if (!mounted) return;
+        const launchSSO = location.pathname === "/login/sso";
+        if (launchSSO) history.replaceState(null, "", "/");
         let next = initial;
         if (initial.mode === "oauth") {
           setOAuth(true);
           if (mounted) setSession(initial);
           if (initial.configured && await finishDashboardAuthorization()) {
             next = { ...initial, authenticated: true, account: await api<Account>("/auth/me") };
+          } else if (mounted && launchSSO && initial.configured && initial.oidc_label) {
+            await startOIDC(await beginDashboardSignIn());
           }
         } else {
           setOAuth(false);
@@ -209,7 +213,7 @@ export function App() {
   const adminPage = adminPages.some(([key]) => key === page);
   const effectivePage = !canAdmin && (adminPage || page === "accounts") ? "overview" : page;
   if (!session?.authenticated && oauth)
-    return <AccountLogin configured={session.configured} error={sessionError} />;
+    return <AccountLogin configured={session.configured} error={sessionError} oidcLabel={session.oidc_label} />;
   if (!session?.authenticated)
     return (
       <Login
@@ -347,7 +351,8 @@ export function App() {
           </p>
         )}
         {oauth && (effectivePage === "password" || effectivePage === "accounts") ? (
-          <AccountSettings key={effectivePage} admin={effectivePage === "accounts"} signedOut={loggedOut} />
+          <AccountSettings key={effectivePage} admin={effectivePage === "accounts"} signedOut={loggedOut}
+            oidcLabel={session.oidc_label} localPassword={session.account?.local_password} />
         ) : effectiveMode === "user" ? (
           <>
             {effectivePage === "overview" && (

@@ -5,6 +5,7 @@ import { App } from "./App";
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {location.pathname === "/connect" ? <AccountLogin native /> : <App />}
+    {location.pathname === "/connect" ? <AccountLogin native /> :
+      location.pathname === "/invite" ? <AccountLogin invite /> : <App />}
   </React.StrictMode>,
 );

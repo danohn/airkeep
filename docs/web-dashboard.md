@@ -10,6 +10,31 @@ For Docker, follow the [account setup instructions](docker-deployment.md#account
 
 The dashboard stays signed in across reloads in the same tab for up to eight hours. Sign in again when opening another tab. Use **My account** to update your password or sign out a connected app. An administrator can reset your password and give you a temporary password that expires after 24 hours.
 
+### Optional single sign-on
+
+Airkeep supports one OpenID Connect provider for the dashboard and Apple apps. Set up a local administrator first, then create a confidential OIDC client with authorization code and S256 PKCE enabled. Register the exact HTTPS redirect URI, including the port if you use one. For example, use `https://airkeep.example.com/auth/oidc/callback`.
+
+In Authentik, create an application with an OAuth2/OIDC provider. Choose the per-application issuer and an asymmetric signing key such as an RSA certificate. Enable **Include claims in id_token** and assign Authentik’s `profile` scope mapping to include usernames and groups. Use an application policy to choose who may sign in. [Authentik OAuth2/OIDC setup](https://docs.goauthentik.io/add-secure-apps/providers/oauth2/) · [Scope mappings](https://docs.goauthentik.io/add-secure-apps/providers/property-mappings/)
+
+Set the application’s **Launch URL** to `https://airkeep.example.com/login/sso` to start single sign-on from the Authentik tile. Authentik can reuse an existing browser session, subject to its consent and MFA policies. Users need an Airkeep account linked to their SSO identity, or automatic account creation must be enabled.
+
+Add the provider settings to the relay’s private `.env` and recreate the relay.
+
+```dotenv
+AIRKEEP_OIDC_ISSUER=https://auth.example.com/application/o/airkeep/
+AIRKEEP_OIDC_CLIENT_ID=your-client-id
+AIRKEEP_OIDC_CLIENT_SECRET=your-client-secret
+AIRKEEP_OIDC_LABEL=Authentik
+```
+
+Copy the issuer exactly as advertised by the provider, including any trailing slash. Airkeep requests `openid` and `profile` when available. If your provider needs additional scopes, set `AIRKEEP_OIDC_SCOPES` to a space-separated list. The relay must be able to reach the provider’s discovery, token, and signing key endpoints over trusted HTTPS.
+
+In **Admin → Accounts → SSO**, leave automatic creation off to invite users individually, or turn it on to let eligible users create an account on their first sign-in. New accounts start as members. To grant the initial admin role based on provider groups, set the ID token claim name and enter the exact group names. Airkeep checks this mapping at account creation. Manage later role changes in Airkeep.
+
+Create an invitation for a new account or for an existing account you want to link. Share the private link with the intended user. It expires after 24 hours and the first eligible SSO identity to redeem it gets the account. Users redeem the link in a browser and can then sign in on their Apple devices. For existing users, have them redeem the invitation before trying regular SSO sign-in so Airkeep can keep their existing alerts and devices together.
+
+Local sign-in remains available. Disable an account in Airkeep to revoke its sessions immediately. If you remove someone’s provider access, their existing Airkeep sessions can continue until they expire or are revoked in Airkeep.
+
 ## History and past alerts
 
 Seven-day charts use five-minute buckets, with the average shown on the line and the minimum and maximum in its tooltip. Shorter ranges use the stored reading resolution. Chart gaps follow interruptions in sensor readings, and the latest source timestamp is retained for each bucket.

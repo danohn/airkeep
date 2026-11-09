@@ -1,12 +1,12 @@
 from pathlib import Path
 from typing import Literal
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from urllib.parse import urlsplit
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="AIRKEEP_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="AIRKEEP_", env_file=".env", extra="ignore", hide_input_in_errors=True)
     printer_ip: str = ""
     printer_serial: str = ""
     printer_code: str = ""
@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     web_origin: str = ""
     allow_http_loopback: bool = False
     web_secure_cookies: bool = True
+    oidc_issuer: str = ""
+    oidc_client_id: str = ""
+    oidc_client_secret: SecretStr = SecretStr("")
+    oidc_label: str = Field(default="Single sign-on", min_length=1, max_length=60)
+    oidc_scopes: str = ""
 
     @model_validator(mode='after')
     def browser_settings(self):
@@ -51,6 +56,13 @@ class Settings(BaseSettings):
             raise ValueError('Set a signing key of at least 32 bytes and the dashboard origin.')
         if self.web_password_hash and not self.web_password_hash.startswith('$argon2id$'):
             raise ValueError('AIRKEEP_WEB_PASSWORD_HASH must be an Argon2id hash from setup_web.py')
+        credentials = (self.oidc_issuer, self.oidc_client_id, self.oidc_client_secret.get_secret_value())
+        if any(credentials):
+            issuer = urlsplit(self.oidc_issuer)
+            if (not all(credentials) or not self.jwt_signing_key or not self.web_origin.startswith('https://')
+                    or issuer.scheme != 'https' or not issuer.hostname or issuer.username is not None
+                    or issuer.query or issuer.fragment or '?' in self.oidc_issuer or '#' in self.oidc_issuer):
+                raise ValueError('OIDC needs an HTTPS issuer and Airkeep origin, a client ID, a client secret, and a signing key.')
         return self
 
     @property
