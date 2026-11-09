@@ -74,7 +74,13 @@ int main(int argc,char **argv)
     }
     if (argc>1 && !strcmp(argv[1],"--test-touch")) {
         lv_refr_now(NULL);
-        lv_obj_t *details=lv_obj_get_child(lv_screen_active(),-1);
+        lv_obj_t *screen = lv_screen_active();
+        lv_obj_t *details = NULL;
+        for (uint32_t i = 0; i < lv_obj_get_child_count(screen); i++) {
+            lv_obj_t *child = lv_obj_get_child(screen, i);
+            if (has_label(child, "Connection details")) details = child;
+        }
+        assert(details);
         lv_indev_t *input=lv_indev_create();
         lv_indev_set_type(input,LV_INDEV_TYPE_POINTER);
         lv_indev_set_read_cb(input,read_pointer);
@@ -87,6 +93,23 @@ int main(int argc,char **argv)
         tap(input,232,447);
         assert(lv_obj_is_hidden(details));
         puts("LVGL touch: bottom-edge Details/Back and brightness slider passed");
+        return 0;
+    }
+    if (argc > 1 && !strcmp(argv[1], "--test-pairing")) {
+        airkeep_ui_pairing(AIRKEEP_UNPAIRED, "Pair this display", NULL, NULL, NULL);
+        lv_tick_inc(1000); lv_timer_handler();
+        lv_indev_t *input = lv_indev_create();
+        lv_indev_set_type(input, LV_INDEV_TYPE_POINTER);
+        lv_indev_set_read_cb(input, read_pointer);
+        lv_indev_set_display(input, lv_display_get_default());
+        tap(input, 232, 447);
+        assert(airkeep_ui_action() == AIRKEEP_PAIR);
+        airkeep_ui_pairing(AIRKEEP_PAIRING, "Scan or visit the link", "ABCD-EFGH",
+            "https://airkeep.example.com/device", "https://airkeep.example.com/device#user_code=ABCD-EFGH");
+        lv_tick_inc(1000); lv_timer_handler();
+        assert(has_label(lv_screen_active(), "ABCD-EFGH"));
+        tap(input, 232, 430);
+        assert(airkeep_ui_action() == AIRKEEP_CANCEL);
         return 0;
     }
     airkeep_ui_status("Sample data");

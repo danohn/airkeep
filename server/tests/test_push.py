@@ -13,7 +13,7 @@ async def test_environment_key_separation_and_activity_headers(tmp_path):
         path=tmp_path/(name+'.p8')
         path.write_bytes(key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()))
         paths.append(path)
-    settings=Settings(api_token='x'*40,apns_team_id='TESTTEAM',apns_key_id='DEVKEY',apns_key_path=str(paths[0]),
+    settings=Settings(apns_team_id='TESTTEAM',apns_key_id='DEVKEY',apns_key_path=str(paths[0]),
         apns_key_environment='sandbox',apns_production_key_id='PRODKEY',apns_production_key_path=str(paths[1]),_env_file=None)
     requests=[]
     def receive(request):
@@ -35,7 +35,7 @@ async def test_environment_key_separation_and_activity_headers(tmp_path):
 
 
 def test_sandbox_only_key_is_not_used_for_production():
-    settings=Settings(api_token='x'*40,apns_team_id='T',apns_key_id='D',apns_key_path='/fake',apns_key_environment='sandbox',_env_file=None)
+    settings=Settings(apns_team_id='T',apns_key_id='D',apns_key_path='/fake',apns_key_environment='sandbox',_env_file=None)
     assert settings.apns_ready
     assert settings.apns_credentials('sandbox')==('D','/fake')
     assert settings.apns_credentials('production') is None
@@ -45,7 +45,7 @@ async def test_widget_headers_structured_failures_and_retry_after(tmp_path):
     key=ec.generate_private_key(ec.SECP256R1())
     path=tmp_path/'watch.p8'
     path.write_bytes(key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()))
-    settings=Settings(api_token='x'*40,apns_team_id='TEAM',watch_apns_key_id='WATCH',watch_apns_key_path=str(path),_env_file=None)
+    settings=Settings(apns_team_id='TEAM',watch_apns_key_id='WATCH',watch_apns_key_path=str(path),_env_file=None)
     requests=[]
     def receive(request):
         requests.append(request)

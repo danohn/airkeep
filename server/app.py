@@ -3,7 +3,6 @@ from contextlib import asynccontextmanager, contextmanager
 import json
 import logging
 import re
-import secrets
 import time
 from typing import Literal
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
@@ -145,29 +144,27 @@ def create_app(settings: Settings | None = None):
     security = HTTPBearer(auto_error=False)
     browser = BrowserAuth(store,settings)
 
-    def legacy_token(credentials):
-        return credentials is not None and secrets.compare_digest(credentials.credentials.encode(),settings.api_token.encode())
-
-    def principal(credentials: HTTPAuthorizationCredentials | None = Depends(security)):
+    def connection(credentials: HTTPAuthorizationCredentials | None = Depends(security)):
         if not oauth or credentials is None:
-            raise HTTPException(401,'Sign in to Airkeep.')
+            raise HTTPException(401, 'Sign in to Airkeep.')
         return oauth.authenticate(credentials.credentials)
 
-    def authorize(credentials: HTTPAuthorizationCredentials | None = Depends(security)):
-        if oauth:
-            return principal(credentials)
-        if not legacy_token(credentials):
-            raise HTTPException(401,'Invalid bearer token')
+    def principal(credentials: HTTPAuthorizationCredentials | None = Depends(security)):
+        identity = connection(credentials)
+        if identity.client == 'esp32':
+            raise HTTPException(403, 'This display connection is limited to live readings.')
+        return identity
 
     def authorize_user(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)):
         if credentials is not None or oauth:
-            return authorize(credentials)
+            return principal(credentials)
         browser.require(request)
 
     def snapshot_access(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)):
-        if oauth and legacy_token(credentials):
-            return None
-        return authorize_user(request,credentials)
+        if oauth:
+            identity = connection(credentials)
+            return None if identity.client == 'esp32' else identity
+        return authorize_user(request, credentials)
 
     def admin(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)):
         if not oauth:
@@ -182,12 +179,12 @@ def create_app(settings: Settings | None = None):
             raise HTTPException(403,'Manage alerts in the dashboard or Airkeep app.')
         return identity
 
-    def native(identity=Depends(authorize)):
+    def native(identity=Depends(principal)):
         if identity and identity.client not in ('apple-ios','apple-mac'):
             raise HTTPException(403,'An Apple app connection is required.')
         return identity
 
-    def watch(identity=Depends(authorize)):
+    def watch(identity=Depends(principal)):
         if identity and identity.client != 'watch':
             raise HTTPException(403,'An Apple Watch connection is required.')
         return identity
@@ -220,7 +217,7 @@ def create_app(settings: Settings | None = None):
 
     install_web(app,store,settings,browser,authorize_user,collector,admin,oauth)
     if oauth:
-        install_accounts(app,oauth,principal,admin)
+        install_accounts(app,oauth,principal,admin,connection)
         if settings.oidc_issuer:
             install_oidc(app, oauth, settings, admin)
 
@@ -268,7 +265,7 @@ def create_app(settings: Settings | None = None):
     def alerts(identity=Depends(authorize_user)):
         return next(iter(store.rules(identity.user)),AlertRule()) if identity else store.rule()
 
-    @app.put("/v1/alerts",dependencies=[Depends(authorize)])
+    @app.put("/v1/alerts",dependencies=[Depends(principal)])
     def set_alerts(rule: AlertRule):
         raise HTTPException(409,{'code':'client_update_required','message':'Update Airkeep to manage named alert rules.'})
 

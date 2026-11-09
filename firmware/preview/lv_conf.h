@@ -10,3 +10,4 @@
 #define LV_USE_SYSMON 0
 #define LV_BUILD_EXAMPLES 0
 #define LV_BUILD_DEMOS 0
+#define LV_USE_QRCODE 1

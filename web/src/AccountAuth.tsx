@@ -34,7 +34,7 @@ export function AccountLogin({ native = false, invite = false, configured = true
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (native || invite || new URLSearchParams(location.search).has("sso_error")) {
-      history.replaceState(null, "", location.pathname);
+      history.replaceState(null, "", location.pathname + (location.pathname === "/device" ? location.hash : ""));
     }
     if (!native && !invite) return;
     let active = true;
@@ -108,9 +108,9 @@ export function AccountLogin({ native = false, invite = false, configured = true
   </form></div>;
 }
 
-type Connection = { id: string; client: string; expires: number; current: boolean };
+type Connection = { id: string; client: string; expires: number; current: boolean; display_suffix?: string };
 const clientLabels: Record<string, string> = {
-  dashboard: "Web dashboard", "apple-ios": "iPhone or iPad", "apple-mac": "Mac", watch: "Apple Watch",
+  dashboard: "Web dashboard", "apple-ios": "iPhone or iPad", "apple-mac": "Mac", watch: "Apple Watch", esp32: "ESP32 display",
 };
 
 export function AccountSettings({ admin, signedOut, oidcLabel, localPassword = true }: {
@@ -197,7 +197,7 @@ export function AccountSettings({ admin, signedOut, oidcLabel, localPassword = t
     </form>}
     <h2>Connected apps</h2>
     {connections.map((connection) => <p key={connection.id}>
-      {clientLabels[connection.client] ?? connection.client}{connection.current ? " · This tab" : ""}{" "}
+      {clientLabels[connection.client] ?? connection.client}{connection.display_suffix ? " · " + connection.display_suffix : ""}{connection.current ? " · This tab" : ""}{" "}
       <button disabled={busy} onClick={() => void run(async () => {
         await api("/auth/grants/" + connection.id, { method: "DELETE" });
         if (connection.current) signedOut();

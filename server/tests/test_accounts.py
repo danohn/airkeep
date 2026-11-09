@@ -64,9 +64,24 @@ def login(client, username, password, **kwargs):
     return response.json()
 
 
+def account_app(settings):
+    settings = settings.model_copy(update={'jwt_signing_key': 'x' * 64, 'web_origin': ORIGIN})
+    store = Store(settings.db_path)
+    try:
+        bootstrap(store, 'Owner', PASSWORD.hash(OWNER_PASSWORD))
+    finally:
+        store.close()
+    return create_app(settings)
+
+
+def account_headers(client, app='dashboard', installation=None):
+    client.headers['Origin'] = ORIGIN
+    return bearer(login(client, 'Owner', OWNER_PASSWORD, app=app, installation=installation)['access_token'])
+
+
 @pytest.fixture
 def relay(tmp_path):
-    settings = Settings(db_path=tmp_path/'relay.sqlite3', api_token=ESP, jwt_signing_key='x'*64,
+    settings = Settings(db_path=tmp_path/'relay.sqlite3', jwt_signing_key='x'*64,
                         mqtt_enabled=False, web_origin=ORIGIN, _env_file=None)
     store = Store(settings.db_path)
     store.set_rule(AlertRule(enabled=True, threshold=29, holdSeconds=0))
@@ -84,7 +99,7 @@ def relay(tmp_path):
         yield client, app.state.store, old_rule, backup_path
 
 
-def test_bootstrap_is_reversible_and_esp_can_only_read_telemetry(relay):
+def test_bootstrap_is_reversible_and_rejects_the_old_shared_token(relay):
     client, store, old_rule, backup_path = relay
     rollback = Store(backup_path)
     assert rollback.rules() == [old_rule]
@@ -94,8 +109,7 @@ def test_bootstrap_is_reversible_and_esp_can_only_read_telemetry(relay):
     assert client.get('/auth/session').json()['mode'] == 'oauth'
     assert client.post('/auth/login',json={'password':OWNER_PASSWORD}).status_code == 404
     snapshot = client.get('/v1/snapshot',headers=bearer(ESP))
-    assert snapshot.status_code == 200 and len(snapshot.content) < 16384
-    assert 'alertRule' not in snapshot.json()
+    assert snapshot.status_code == 401
     assert client.get('/v2/alerts',headers=bearer(ESP)).status_code == 401
     assert client.get('/v1/history',headers=bearer(ESP)).status_code == 401
     admin = bearer(login(client,'owner',OWNER_PASSWORD)['access_token'])
@@ -213,7 +227,7 @@ def test_concurrent_refresh_detects_replay_and_bootstrap_cannot_repeat(relay):
     from accounts import OAuth
     client, store, _, _ = relay
     tokens = login(client,'Owner',OWNER_PASSWORD)
-    settings = Settings(api_token=ESP,jwt_signing_key='x'*64,web_origin=ORIGIN,mqtt_enabled=False,_env_file=None)
+    settings = Settings(jwt_signing_key='x'*64,web_origin=ORIGIN,mqtt_enabled=False,_env_file=None)
     oauth = OAuth(store,settings)
     form = dict(client_id='dashboard',grant_type='refresh_token',refresh_token=tokens['refresh_token'])
     with ThreadPoolExecutor(max_workers=2) as pool:

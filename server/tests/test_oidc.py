@@ -17,7 +17,7 @@ from accounts import NATIVE_CALLBACK, PASSWORD, bootstrap
 from app import create_app
 from config import Settings
 from storage import Store
-from test_accounts import ORIGIN, ESP, OWNER_PASSWORD, STATE, VERIFIER, begin, bearer, login
+from test_accounts import ORIGIN, OWNER_PASSWORD, STATE, VERIFIER, begin, bearer, login
 
 ISSUER = 'https://identity.example.test/oidc/'
 CALLBACK = ORIGIN + '/auth/oidc/callback'
@@ -78,7 +78,7 @@ class Provider:
 
 @pytest.fixture
 def sso(tmp_path, monkeypatch):
-    settings = Settings(db_path=tmp_path/'oidc.sqlite3', api_token=ESP, jwt_signing_key='k'*64,
+    settings = Settings(db_path=tmp_path/'oidc.sqlite3', jwt_signing_key='k'*64,
                         mqtt_enabled=False, web_origin=ORIGIN, oidc_issuer=ISSUER,
                         oidc_client_id=CLIENT_ID, oidc_client_secret=SECRET, oidc_scopes='custom',
                         oidc_label='Test identity', _env_file=None)
@@ -223,3 +223,22 @@ def test_state_replay_and_native_local_fallback(sso):
     provider.unavailable = True
     transaction, _ = begin(client)
     assert client.post('/auth/oidc/start', json={'transaction': transaction}).status_code == 502
+
+
+def test_oidc_dashboard_session_can_approve_display(sso):
+    from device_flow import GRANT
+    client, store, provider, admin = sso
+    assert client.put(POLICY, headers=admin, json={'automatic_creation': True}).status_code == 200
+    callback = request_provider(client, provider, subject='display-owner')
+    member = bearer(exchange(client, client.get(callback, follow_redirects=False))['access_token'])
+    display = client.post('/auth/device/code', data={'client_id': 'esp32', 'installation_id': 'c' * 32}).json()
+    assert client.post('/auth/device/decision', headers=member,
+                       json={'user_code': display['user_code'], 'approve': True}).status_code == 204
+    store.execute('UPDATE oauth_device_requests SET next_poll=0')
+    result = client.post('/auth/token', data={'client_id': 'esp32', 'grant_type': GRANT,
+                                             'device_code': display['device_code']})
+    assert result.status_code == 200
+    tokens = result.json()
+    path = '/auth/grants/' + tokens['grant_id']
+    assert client.delete(path, headers=admin).status_code == 404
+    assert client.delete(path, headers=member).status_code == 204

@@ -87,7 +87,7 @@ For this loopback setup only, set `AIRKEEP_WEB_ORIGIN=http://127.0.0.1:4173` and
 
 ## Relay interfaces
 
-Account access JWTs authorize API requests. Alert and event endpoints return only the signed-in user's data. The legacy ESP32 credential can read the compact telemetry snapshot. Device and activity registration writes require a native app grant, and Watch widget registrations require a paired Watch grant.
+Account access JWTs authorize API requests. Alert and event endpoints return only the signed-in user's data. A paired ESP32 can read the compact telemetry snapshot and revoke its own connection. Device and activity registration writes require a native app grant, and Watch widget registrations require a paired Watch grant.
 
 | Endpoint | Purpose |
 | --- | --- |
@@ -95,6 +95,8 @@ Account access JWTs authorize API requests. Alert and event endpoints return onl
 | `GET/POST /auth/authorize` | Start a PKCE authorization request |
 | `POST /auth/credentials` | Verify username and password and complete first-sign-in password change |
 | `POST /auth/token` | Exchange a code or rotate a refresh token |
+| `POST /auth/device/code` | Start ESP32 pairing |
+| `POST /auth/device/verify` and `POST /auth/device/decision` | Review a pairing code and approve or deny it from a signed-in dashboard |
 | `GET /auth/me` | Current account identity and role |
 | `POST /auth/revoke` | Revoke the current grant and paired Watch grant |
 | `GET/DELETE /auth/grants[/{id}]` | List or revoke the user's connections |

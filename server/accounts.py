@@ -7,12 +7,12 @@ import secrets
 import time
 import threading
 from typing import Annotated, Literal
-from urllib.parse import parse_qs, urlencode
+from urllib.parse import urlencode
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 from fastapi import Depends, HTTPException, Query, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 import jwt
 from pydantic import BaseModel, Field
 
@@ -332,8 +332,11 @@ class OAuth:
             db.execute('DELETE FROM oauth_grants WHERE expires<=? OR revoked=1',(now,))
 
 
-def install_accounts(app, oauth, principal, admin):
+def install_accounts(app, oauth, principal, admin, connection):
+    from device_flow import GRANT, form_data, install_device_flow, oauth_error
+
     store = oauth.store
+    devices = install_device_flow(app, oauth, principal)
 
     @app.get('/auth/authorize')
     def authorize_redirect(body: Annotated[Authorization, Query()]):
@@ -353,22 +356,15 @@ def install_accounts(app, oauth, principal, admin):
     @app.post('/auth/token')
     async def token(request: Request):
         from starlette.concurrency import run_in_threadpool
-        body = bytearray()
-        async for chunk in request.stream():
-            body.extend(chunk)
-            if len(body) > 4096:
-                return JSONResponse({'error':'invalid_request'},status_code=400)
-        try:
-            form = parse_qs(body.decode(),strict_parsing=True,max_num_fields=8)
-        except (UnicodeError, ValueError):
-            return JSONResponse({'error':'invalid_request'},status_code=400)
-        if any(len(values) != 1 for values in form.values()) or not request.headers.get('content-type','').startswith('application/x-www-form-urlencoded'):
-            return JSONResponse({'error':'invalid_request'},status_code=400)
-        data = {key:values[0] for key,values in form.items()}
+        data = await form_data(request)
+        if data is None:
+            return oauth_error('invalid_request')
         if data.get('client_id') == 'dashboard' or 'origin' in request.headers:
             oauth.same_origin(request)
-        result = await run_in_threadpool(oauth.exchange,data)
-        return result if result else JSONResponse({'error':'invalid_grant'},status_code=400)
+        if data.get('grant_type') == GRANT:
+            return await run_in_threadpool(devices.exchange, data)
+        result = await run_in_threadpool(oauth.exchange, data)
+        return result if result else oauth_error('invalid_grant')
 
     @app.get('/auth/me')
     def me(identity: Principal = Depends(principal)):
@@ -376,7 +372,7 @@ def install_accounts(app, oauth, principal, admin):
         return account_details(row)
 
     @app.post('/auth/revoke', status_code=204)
-    def revoke(identity: Principal = Depends(principal)):
+    def revoke(identity: Principal = Depends(connection)):
         with store.lock, store.db:
             store.db.execute('BEGIN IMMEDIATE')
             revoke_grant(store,identity.grant)
@@ -386,7 +382,7 @@ def install_accounts(app, oauth, principal, admin):
         if identity.client != 'dashboard':
             raise HTTPException(403,'Manage connections in the dashboard.')
         now = time.time()
-        rows = store.rows("""SELECT id,client,expires FROM oauth_grants
+        rows = store.rows("""SELECT id,client,expires,CASE WHEN client='esp32' THEN substr(installation,-4) END AS display_suffix FROM oauth_grants
             WHERE user=? AND revoked=0 AND expires>? AND idle_until>?
             ORDER BY client,id""",(identity.user,now,now))
         return [{**dict(row),'current':row['id']==identity.grant} for row in rows]

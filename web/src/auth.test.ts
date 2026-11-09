@@ -57,3 +57,31 @@ describe("cookie-free renewal", () => {
     auth.clearTokens();
   });
 });
+
+describe("display pairing sign-in return", () => {
+  afterEach(() => history.replaceState(null, "", "/"));
+
+  it("restores the QR code after the dashboard callback", async () => {
+    history.replaceState(null, "", "/device#user_code=ABCD-EFGH");
+    const auth = await import("./auth");
+    const authorization = await auth.dashboardAuthorization();
+    history.replaceState(null, "", "/auth/callback?code=example&state=" + authorization.state);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      access_token: "access", refresh_token: "refresh", grant_id: "display-owner",
+    }))));
+    expect(await auth.finishDashboardAuthorization()).toBe(true);
+    expect(location.pathname).toBe("/device");
+    expect(auth.devicePairingCode()).toBe("ABCD-EFGH");
+    auth.clearTokens();
+  });
+
+  it("preserves manual entry on return from an OIDC error", async () => {
+    history.replaceState(null, "", "/device");
+    const auth = await import("./auth");
+    await auth.dashboardAuthorization();
+    history.replaceState(null, "", "/?sso_error=Denied");
+    auth.restoreDevicePairingAfterSSOError();
+    expect(location.pathname + location.search).toBe("/device?sso_error=Denied");
+    expect(auth.devicePairingCode()).toBe("");
+  });
+});
