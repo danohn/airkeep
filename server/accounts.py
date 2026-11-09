@@ -11,12 +11,13 @@ from urllib.parse import urlencode
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
-from fastapi import Depends, HTTPException, Query, Request
-from fastapi.responses import RedirectResponse
+from fastapi import Depends, HTTPException, Query, Request, Response
+from fastapi.responses import JSONResponse, RedirectResponse
 import jwt
 from pydantic import BaseModel, Field
 
 DAY = 86400
+BROWSER_SESSION_SECONDS = 8 * 3600
 NATIVE_CALLBACK = 'io.airkeep.oauth:/callback'
 PASSWORD = PasswordHasher()
 USERNAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.-]{2,63}$')
@@ -164,6 +165,8 @@ class OAuth:
         self.store = store
         self.origin = settings.web_origin.rstrip('/')
         self.key = settings.jwt_signing_key
+        self.secure_cookie = settings.web_secure_cookies and self.origin.startswith('https://')
+        self.cookie_name = '__Host-airkeep_session' if self.secure_cookie else 'airkeep_account_session'
         schema(store)
         self.dummy_hash = PASSWORD.hash(random_token())
 
@@ -176,19 +179,37 @@ class OAuth:
             (grant_id, now, now, now, now))
         return rows[0] if rows else None
 
-    def authenticate(self, token):
+    def authenticate(self, token, *, browser=False):
         try:
             claims = jwt.decode(token, self.key, algorithms=['HS256'], issuer=self.origin,
-                                audience='airkeep-api',
+                                audience='airkeep-web' if browser else 'airkeep-api',
                                 options={'require': ['sub','sid','exp','iat','iss','aud','jti','client_id']})
             if jwt.get_unverified_header(token).get('typ') != 'at+jwt' or not isinstance(claims['sid'], str):
                 raise jwt.InvalidTokenError()
             row = self.active(claims['sid'])
-            if row and row['user'] == claims['sub'] and row['client'] == claims['client_id']:
+            if (row and (row['client'] == 'dashboard') == browser
+                    and row['user'] == claims['sub'] and row['client'] == claims['client_id']):
                 return Principal(row['user'],row['role'],row['client'],row['id'],row['installation'])
         except (jwt.InvalidTokenError, TypeError, ValueError):
             pass
         raise HTTPException(401, 'Sign in to Airkeep.', headers={'WWW-Authenticate':'Bearer'})
+
+    def browser_session(self, request):
+        token = request.cookies.get(self.cookie_name, '')
+        if not token:
+            raise HTTPException(401, 'Sign in to Airkeep.')
+        identity = self.authenticate(token, browser=True)
+        if request.method not in ('GET', 'HEAD', 'OPTIONS'):
+            self.same_origin(request)
+        return identity
+
+    def set_browser_cookie(self, response, token):
+        response.set_cookie(self.cookie_name, token, max_age=BROWSER_SESSION_SECONDS,
+                            httponly=True, secure=self.secure_cookie, samesite='strict', path='/')
+
+    def clear_browser_cookie(self, response):
+        response.delete_cookie(self.cookie_name, httponly=True, secure=self.secure_cookie,
+                               samesite='strict', path='/')
 
     def same_origin(self, request):
         if request.headers.get('origin') != self.origin:
@@ -268,7 +289,7 @@ class OAuth:
     def grant(self, user, client, installation, parent=None):
         now = time.time()
         identifier = random_token()
-        expires = now + (8*3600 if client == 'dashboard' else 90*DAY)
+        expires = now + (BROWSER_SESSION_SECONDS if client == 'dashboard' else 90*DAY)
         if parent:
             expires = min(expires, parent['expires'])
         if installation:
@@ -282,10 +303,15 @@ class OAuth:
 
     def tokens(self, row):
         now = int(time.time())
-        lifetime = min(600, int(row['expires'])-now, int(row['idle_until'])-now)
-        token = jwt.encode({'iss':self.origin,'aud':'airkeep-api','sub':row['user'],'sid':row['id'],
+        browser = row['client'] == 'dashboard'
+        lifetime = min(int(row['expires'])-now, int(row['idle_until'])-now)
+        if not browser:
+            lifetime = min(600, lifetime)
+        token = jwt.encode({'iss':self.origin,'aud':'airkeep-web' if browser else 'airkeep-api','sub':row['user'],'sid':row['id'],
                             'client_id':row['client'],'jti':random_token(),'iat':now,'exp':now+lifetime},
                            self.key,algorithm='HS256',headers={'typ':'at+jwt'})
+        if browser:
+            return {'access_token': token}
         refresh = random_token()
         self.store.db.execute('INSERT INTO oauth_refresh(hash,grant_id) VALUES(?,?)',(digest(refresh),row['id']))
         return {'access_token':token,'refresh_token':refresh,'token_type':'Bearer','expires_in':lifetime,
@@ -311,7 +337,7 @@ class OAuth:
             if kind == 'refresh_token':
                 item = db.execute('SELECT * FROM oauth_refresh WHERE hash=?',(digest(data.get('refresh_token','')),)).fetchone()
                 row = self.active(item['grant_id']) if item else None
-                if not row or row['client'] != client:
+                if not row or row['client'] != client or client == 'dashboard':
                     return None
                 if item['spent']:
                     revoke_grant(self.store,row['id'])
@@ -364,6 +390,10 @@ def install_accounts(app, oauth, principal, admin, connection):
         if data.get('grant_type') == GRANT:
             return await run_in_threadpool(devices.exchange, data)
         result = await run_in_threadpool(oauth.exchange, data)
+        if result and data.get('client_id') == 'dashboard':
+            response = JSONResponse({'authenticated': True})
+            oauth.set_browser_cookie(response, result['access_token'])
+            return response
         return result if result else oauth_error('invalid_grant')
 
     @app.get('/auth/me')
@@ -372,10 +402,12 @@ def install_accounts(app, oauth, principal, admin, connection):
         return account_details(row)
 
     @app.post('/auth/revoke', status_code=204)
-    def revoke(identity: Principal = Depends(connection)):
+    def revoke(response: Response, identity: Principal = Depends(connection)):
         with store.lock, store.db:
             store.db.execute('BEGIN IMMEDIATE')
             revoke_grant(store,identity.grant)
+        if identity.client == 'dashboard':
+            oauth.clear_browser_cookie(response)
 
     @app.get('/auth/grants')
     def grants(identity: Principal = Depends(principal)):
@@ -421,7 +453,7 @@ def install_accounts(app, oauth, principal, admin, connection):
                 revoke_grant(store,row['id'])
 
     @app.post('/auth/password', status_code=204)
-    def password(body: PasswordChange, request: Request, identity: Principal = Depends(principal)):
+    def password(body: PasswordChange, request: Request, response: Response, identity: Principal = Depends(principal)):
         if identity.client != 'dashboard':
             raise HTTPException(403,'Change your password in the dashboard.')
         oauth.rate_limit(request,identity.user)
@@ -436,6 +468,7 @@ def install_accounts(app, oauth, principal, admin, connection):
             if not changed.rowcount:
                 raise HTTPException(409,'Your account changed. Sign in again.')
             revoke_user(store,identity.user)
+        oauth.clear_browser_cookie(response)
 
     def public_accounts():
         return [account_details(row) for row in store.rows(

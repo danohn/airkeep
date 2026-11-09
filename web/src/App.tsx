@@ -26,7 +26,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { api, ApiError, setCsrf, setOAuth, amsName, when, age } from "./api";
+import { api, ApiError, setCsrf, amsName, when, age } from "./api";
 import type {
   AlertEvent,
   EventPage,
@@ -36,7 +36,7 @@ import type {
   Snapshot,
 } from "./api";
 import { AccountLogin, AccountSettings, beginDashboardSignIn, startOIDC } from "./AccountAuth";
-import { clearTokens, finishDashboardAuthorization, type Account } from "./auth";
+import { clearLegacyBrowserCredentials, finishDashboardAuthorization, type Account } from "./auth";
 import { DevicePairing } from "./DevicePairing";
 import "@fontsource/quicksand/latin-700.css";
 import "./style.css";
@@ -85,7 +85,6 @@ export function App() {
   const [sessionError, setSessionError] = useState("");
   const loggedOut = () => {
     setSession((current) => ({ authenticated: false, configured: true, mode: current?.mode, oidc_label: current?.oidc_label }));
-    clearTokens();
     setMode("user");
     setPage("overview");
     if (location.pathname !== "/device") history.replaceState(null, "", "/");
@@ -97,6 +96,7 @@ export function App() {
   };
   useEffect(() => {
     let mounted = true;
+    clearLegacyBrowserCredentials();
     api<Session>("/auth/session")
       .then(async (initial) => {
         if (!mounted) return;
@@ -104,17 +104,11 @@ export function App() {
         if (launchSSO) history.replaceState(null, "", "/");
         let next = initial;
         if (initial.mode === "oauth") {
-          setOAuth(true);
           if (mounted) setSession(initial);
           if (initial.configured && await finishDashboardAuthorization()) {
-            next = { ...initial, authenticated: true, account: await api<Account>("/auth/me") };
-          } else if (mounted && launchSSO && initial.configured && initial.oidc_label) {
+            next = await api<Session>("/auth/session");
+          } else if (mounted && launchSSO && initial.configured && initial.oidc_label && !initial.authenticated) {
             await startOIDC(await beginDashboardSignIn());
-          }
-        } else {
-          setOAuth(false);
-          if (!initial.authenticated && initial.configured) {
-            next = await api<Session>("/auth/session", { credentials: "same-origin" });
           }
         }
         if (mounted) {

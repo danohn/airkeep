@@ -97,43 +97,46 @@ with httpx.Client(base_url=origin, verify=context) as client:
     assert 'set-cookie' not in login.headers and not client.cookies
     callback = parse_qs(urlsplit(login.json()['redirect']).query)
     assert callback['state'] == [authorization['state']]
-    tokens = client.post('/auth/token',data=dict(client_id='dashboard',grant_type='authorization_code',
-                          redirect_uri=authorization['redirect_uri'],code_verifier=verifier,code=callback['code'][0])).json()
-    headers = {'Authorization':'Bearer '+tokens['access_token']}
+    session = client.post('/auth/token',data=dict(client_id='dashboard',grant_type='authorization_code',
+                          redirect_uri=authorization['redirect_uri'],code_verifier=verifier,code=callback['code'][0]))
+    assert session.status_code == 200 and session.json() == {'authenticated': True}
+    assert 'httponly' in session.headers['set-cookie'].lower()
+    assert client.get('/auth/session').json()['authenticated']
     assert client.get('/device').status_code == 200
     pair = client.post('/auth/device/code', data={'client_id':'esp32','installation_id':'a'*32}).json()
-    decision = client.post('/auth/device/decision', headers=headers,
+    decision = client.post('/auth/device/decision',
                            json={'user_code':pair['user_code'],'approve':True})
     assert decision.status_code == 204, decision.text
     time.sleep(pair['interval'])
     display = client.post('/auth/token', data={'client_id':'esp32','device_code':pair['device_code'],
                          'grant_type':'urn:ietf:params:oauth:grant-type:device_code'})
-    assert display.status_code == 200, display.text
+    assert display.status_code == 200 and 'set-cookie' not in display.headers, display.text
     display_headers = {'Authorization': 'Bearer ' + display.json()['access_token']}
     snapshot = client.get('/v1/snapshot', headers=display_headers)
     assert snapshot.status_code == 200 and len(snapshot.content) < 16384
     assert snapshot.headers['cache-control'] == 'no-store'
     assert 'alertRule' not in snapshot.json()
     assert client.get('/v2/alerts', headers=display_headers).status_code == 403
-    assert client.get('/auth/me',headers=headers).status_code == 200
-    assert client.get('/v2/history?hours=169',headers=headers).status_code == 422
-    assert client.get('/v2/admin/overview',headers=headers).status_code == 200
-    assert client.post('/v2/admin/devices',headers=headers).status_code == 405
-    assert client.post('/v2/alerts',json={'name':'Container smoke'}).status_code == 401
-    created = client.post('/v2/alerts', json={'name':'Container smoke'}, headers=headers)
+    assert client.get('/auth/me').status_code == 200
+    assert client.get('/v2/history?hours=169').status_code == 422
+    assert client.get('/v2/admin/overview').status_code == 200
+    assert client.post('/v2/admin/devices').status_code == 405
+    assert client.post('/v2/alerts',json={'name':'Container smoke'},
+                       headers={'Origin':'https://other.example.com'}).status_code == 403
+    created = client.post('/v2/alerts', json={'name':'Container smoke'})
     assert created.status_code in (200,201), created.text
     rule = created.json()
     path = '/v2/alerts/'+rule['id']
-    saved = client.put(path, json={**rule,'name':'Renamed'}, headers={**headers,'If-Match':str(rule['revision'])})
+    saved = client.put(path, json={**rule,'name':'Renamed'}, headers={'If-Match':str(rule['revision'])})
     assert saved.status_code == 200, saved.text
-    assert client.put(path, json=rule, headers={**headers,'If-Match':str(rule['revision'])}).status_code == 412
-    assert client.post('/auth/revoke',headers=headers).status_code == 204
-    assert client.get('/auth/me',headers=headers).status_code == 401
+    assert client.put(path, json=rule, headers={'If-Match':str(rule['revision'])}).status_code == 412
+    assert client.post('/auth/revoke').status_code == 204
+    assert client.get('/auth/me').status_code == 401
     assert not client.cookies
 with httpx.Client(base_url='http://airkeep-relay:8787') as backend:
     for path in ['/', '/index.html', '/assets/main.js', '/brand/mark.svg']:
         assert backend.get(path).status_code == 404
-print('HTTPS, static assets, scoped display OAuth, cookie-free OAuth, revocation and rule conflicts passed.')
+print('HTTPS, static assets, scoped display OAuth, HttpOnly browser sessions, revocation and rule conflicts passed.')
 '''.replace('VALUES', repr((password, origin)))
         try:
             subprocess.run(compose + ['up', '-d', '--wait', '--wait-timeout', '90'], check=True)

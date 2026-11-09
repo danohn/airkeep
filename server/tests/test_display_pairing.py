@@ -23,7 +23,7 @@ def ready(store):
 
 def test_pairing_grant_is_single_use_and_scoped(relay):
     client, store, *_ = relay
-    owner = bearer(login(client, 'Owner', OWNER_PASSWORD)['access_token'])
+    owner = login(client, 'Owner', OWNER_PASSWORD)
     pair = start(client)
     assert pair['verification_uri'] == ORIGIN + '/device'
     assert parse_qs(urlsplit(pair['verification_uri_complete']).fragment)['user_code'] == [pair['user_code']]
@@ -64,7 +64,7 @@ def test_pairing_grant_is_single_use_and_scoped(relay):
 
 def test_pairing_denial_expiry_and_guess_limits(relay):
     client, store, *_ = relay
-    owner = bearer(login(client, 'Owner', OWNER_PASSWORD)['access_token'])
+    owner = login(client, 'Owner', OWNER_PASSWORD)
     pair = start(client)
     assert client.post('/auth/device/decision', headers=owner,
                        json={'user_code': pair['user_code'], 'approve': False}).status_code == 204
@@ -83,7 +83,7 @@ def test_display_lifetimes_and_self_revocation(relay):
     import time
     from accounts import DAY
     client, store, *_ = relay
-    owner = bearer(login(client, 'Owner', OWNER_PASSWORD)['access_token'])
+    owner = login(client, 'Owner', OWNER_PASSWORD)
     pair = start(client)
     assert client.post('/auth/device/decision', json={'user_code': pair['user_code'], 'approve': True},
                        headers=owner).status_code == 204

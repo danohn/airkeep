@@ -144,32 +144,36 @@ def create_app(settings: Settings | None = None):
     security = HTTPBearer(auto_error=False)
     browser = BrowserAuth(store,settings)
 
-    def connection(credentials: HTTPAuthorizationCredentials | None = Depends(security)):
-        if not oauth or credentials is None:
+    def connection(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)):
+        if not oauth:
             raise HTTPException(401, 'Sign in to Airkeep.')
-        return oauth.authenticate(credentials.credentials)
+        if 'authorization' in request.headers:
+            if credentials is None:
+                raise HTTPException(401, 'Sign in to Airkeep.')
+            return oauth.authenticate(credentials.credentials)
+        return oauth.browser_session(request)
 
-    def principal(credentials: HTTPAuthorizationCredentials | None = Depends(security)):
-        identity = connection(credentials)
+    def principal(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)):
+        identity = connection(request, credentials)
         if identity.client == 'esp32':
             raise HTTPException(403, 'This display connection is limited to live readings.')
         return identity
 
     def authorize_user(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)):
         if credentials is not None or oauth:
-            return principal(credentials)
+            return principal(request, credentials)
         browser.require(request)
 
     def snapshot_access(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)):
         if oauth:
-            identity = connection(credentials)
+            identity = connection(request, credentials)
             return None if identity.client == 'esp32' else identity
         return authorize_user(request, credentials)
 
     def admin(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)):
         if not oauth:
             return browser.require(request)
-        identity = principal(credentials)
+        identity = principal(request, credentials)
         if identity.role != 'admin' or identity.client != 'dashboard':
             raise HTTPException(403,'Administrator access required.')
         return identity

@@ -1,5 +1,3 @@
-import { accessToken, refresh } from "./auth";
-
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -9,26 +7,22 @@ export class ApiError extends Error {
   }
 }
 let csrf = "";
-let oauth = false;
-export function setOAuth(value: boolean) { oauth = value; }
 let sessionGeneration = 0;
 export function setCsrf(value: string) {
   sessionGeneration++;
   csrf = value;
 }
-export async function api<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
+export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const requestGeneration = sessionGeneration;
-  const bearer = accessToken();
   let response: Response;
   try {
     response = await fetch(path, {
       ...init,
-      credentials: oauth || (path === "/auth/session" && !init.credentials) ? "omit" : "same-origin",
+      credentials: "same-origin",
       cache: "no-store",
       headers: {
         "Content-Type": "application/json",
-        ...(oauth && bearer ? { Authorization: "Bearer " + bearer } : {}),
-        ...(!oauth && csrf ? { "X-Airkeep-CSRF": csrf } : {}),
+        ...(csrf ? { "X-Airkeep-CSRF": csrf } : {}),
         ...init.headers,
       },
     });
@@ -37,10 +31,6 @@ export async function api<T>(path: string, init: RequestInit = {}, retry = true)
       0,
       "Could not reach your relay. Reconnect and try again.",
     );
-  }
-  if (response.status === 401 && oauth && bearer && retry && path !== "/auth/credentials" && path !== "/auth/password") {
-    if (accessToken() !== bearer && !accessToken()) throw new ApiError(401, "Your session has ended.");
-    if (accessToken() !== bearer || await refresh()) return api<T>(path, init, false);
   }
   if (!response.ok) {
     const detail = await response.json().catch(() => ({}));
@@ -57,7 +47,6 @@ export async function api<T>(path: string, init: RequestInit = {}, retry = true)
     if (
       response.status === 401 &&
       !["/auth/login", "/auth/credentials", "/auth/password"].includes(path) &&
-      (!oauth || Boolean(bearer)) &&
       requestGeneration === sessionGeneration
     )
       window.dispatchEvent(new Event("airkeep:session-ended"));
