@@ -36,14 +36,36 @@ import WatchConnectivity
         do {
             let endpoint = SharedConfiguration.endpoint
             let token = TokenStore.read()
-            _ = try await RelayClient(endpoint: endpoint, token: token).snapshot()
+            let client = RelayClient(endpoint: endpoint, token: token)
+            let linkID = UUID().uuidString
+            let watchToken: String
+            if token.hasPrefix("oauth:") {
+                let body = try JSONEncoder().encode(["installation_id": linkID])
+                let data = try await client.request("auth/watch", method: "POST", body: body)
+                watchToken = "oauth-pair:" + data.base64EncodedString()
+            } else {
+                _ = try await client.snapshot()
+                watchToken = token
+            }
             guard attempt == connectionAttempt, endpoint == SharedConfiguration.endpoint, token == TokenStore.read() else { return }
-            let connection = WatchConnection(endpoint: endpoint, token: token, linkID: UUID().uuidString)
+            let connection = WatchConnection(endpoint: endpoint, token: watchToken, linkID: linkID)
             guard connection.isConfigured else { throw RelayClient.RelayError.configuration }
             try queue(connection: connection, amsID: amsID)
         } catch { if attempt == connectionAttempt { self.error = error.localizedDescription } }
     }
     func disconnect() {
+        connectionAttempt = UUID()
+        let relay = RelayClient()
+        Task {
+            do {
+                if relay.token.hasPrefix("oauth:") {
+                    _ = try await relay.request("auth/watch", method: "DELETE")
+                }
+                try queue(connection: nil, amsID: SharedConfiguration.amsID)
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+    func clearConnection() {
         connectionAttempt = UUID()
         do { try queue(connection: nil, amsID: SharedConfiguration.amsID) }
         catch { self.error = error.localizedDescription }

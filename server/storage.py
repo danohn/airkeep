@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import json
 from pathlib import Path
 import sqlite3
@@ -34,6 +35,7 @@ class Store:
             self.db.commit()
         self._migrate_alerts()
         self._migrate_dashboard()
+        self.migrate_ownership()
 
     def _migrate_alerts(self):
         with self.lock:
@@ -51,7 +53,7 @@ class Store:
                     rule = self.db.execute("SELECT json FROM config WHERE id='rule'").fetchone()
                     state = self.db.execute("SELECT json FROM config WHERE id='alert'").fetchone()
                     identifier = str(uuid.uuid4())
-                    self.db.execute('INSERT INTO alert_rules VALUES(?,?,?,?,?,?)',
+                    self.db.execute('INSERT INTO alert_rules(id,name,revision,json,state,created) VALUES(?,?,?,?,?,?)',
                         (identifier,'Alert 1',1,rule[0] if rule else AlertRule().model_dump_json(),
                          state[0] if state else json.dumps(vars(AlertState())),time.time()))
                     self.db.execute("INSERT INTO config VALUES('primary_alert_id',?)",(json.dumps(identifier),))
@@ -85,9 +87,28 @@ class Store:
                 if name not in activity_columns:
                     self.db.execute(f'ALTER TABLE activities ADD COLUMN {name} REAL')
 
-    def execute(self, sql, params=()):
+    def migrate_ownership(self):
         with self.lock, self.db:
-            return self.db.execute(sql, params)
+            self.db.execute('BEGIN IMMEDIATE')
+            for table in ('alert_rules', 'alert_events'):
+                columns = {row[1] for row in self.db.execute(f'PRAGMA table_info({table})')}
+                if 'owner_id' not in columns:
+                    self.db.execute(f'ALTER TABLE {table} ADD COLUMN owner_id TEXT')
+            self.db.execute('CREATE INDEX IF NOT EXISTS alert_events_owner ON alert_events(owner_id,at DESC,id DESC)')
+
+    @contextmanager
+    def transaction(self):
+        with self.lock:
+            if self.db.in_transaction:
+                yield self.db
+            else:
+                with self.db:
+                    self.db.execute('BEGIN IMMEDIATE')
+                    yield self.db
+
+    def execute(self, sql, params=()):
+        with self.transaction() as db:
+            return db.execute(sql, params)
 
     def rows(self, sql, params=()):
         with self.lock:
@@ -131,35 +152,35 @@ class Store:
         return {**json.loads(row['json']),'id':row['id'],'name':row['name'],
                 'revision':row['revision'],'active':json.loads(row['state'])['active']}
 
-    def rules(self):
-        return [self._managed_rule(row) for row in self.rows('SELECT * FROM alert_rules ORDER BY created,id')]
+    def rules(self, owner=None):
+        return [self._managed_rule(row) for row in self.rows('SELECT * FROM alert_rules WHERE owner_id IS ? ORDER BY created,id',(owner,))]
 
-    def get_rule(self, identifier):
-        rows = self.rows('SELECT * FROM alert_rules WHERE id=?',(identifier,))
+    def get_rule(self, identifier, owner=None):
+        rows = self.rows('SELECT * FROM alert_rules WHERE id=? AND owner_id IS ?',(identifier,owner))
         if not rows:
             raise KeyError(identifier)
         return self._managed_rule(rows[0])
 
-    def create_rule(self, draft: NamedAlertInput):
+    def create_rule(self, draft: NamedAlertInput, owner=None):
         with self.lock, self.db:
             self.db.execute('BEGIN IMMEDIATE')
-            names = {r[0] for r in self.db.execute('SELECT name FROM alert_rules')}
+            names = {r[0] for r in self.db.execute('SELECT name FROM alert_rules WHERE owner_id IS ?',(owner,))}
             index = 1
             while f'Alert {index}' in names:
                 index += 1
             identifier = str(uuid.uuid4())
             rule = AlertRule.model_validate(draft.model_dump())
-            self.db.execute('INSERT INTO alert_rules VALUES(?,?,?,?,?,?)',
+            self.db.execute('INSERT INTO alert_rules(id,name,revision,json,state,created,owner_id) VALUES(?,?,?,?,?,?,?)',
                 (identifier,draft.name or f'Alert {index}',1,rule.model_dump_json(),
-                 json.dumps(vars(AlertState())),time.time()))
-            return self.get_rule(identifier)
+                 json.dumps(vars(AlertState())),time.time(),owner))
+            return self.get_rule(identifier,owner)
 
-    def update_rule(self, identifier, draft: NamedAlertInput, revision: int):
+    def update_rule(self, identifier, draft: NamedAlertInput, revision: int, owner=None):
         if not draft.name:
             raise ValueError('Enter an alert name')
         with self.lock, self.db:
             self.db.execute('BEGIN IMMEDIATE')
-            existing = self.get_rule(identifier)
+            existing = self.get_rule(identifier,owner)
             if existing['revision'] != revision:
                 raise RuleConflict()
             rule = AlertRule.model_validate(draft.model_dump())
@@ -170,23 +191,25 @@ class Store:
                 (draft.name,rule.model_dump_json(),state,identifier))
             if changed:
                 self.db.execute('DELETE FROM outbox WHERE rule_id=?',(identifier,))
-            return self.get_rule(identifier)
+            return self.get_rule(identifier,owner)
 
-    def delete_rule(self, identifier, revision: int):
+    def delete_rule(self, identifier, revision: int, owner=None):
         with self.lock, self.db:
             self.db.execute('BEGIN IMMEDIATE')
-            existing = self.get_rule(identifier)
+            existing = self.get_rule(identifier,owner)
             if existing['revision'] != revision:
                 raise RuleConflict()
             self.db.execute('DELETE FROM outbox WHERE rule_id=?',(identifier,))
             self.db.execute('DELETE FROM alert_rules WHERE id=?',(identifier,))
 
-    def evaluate_alerts(self, now: float, stale: int):
+    def evaluate_alerts(self, now: float, stale: int, multiuser=False):
         # CRUD, evaluation state, and queued events share the same transaction lock.
         with self.lock, self.db:
             self.db.execute('BEGIN IMMEDIATE')
             readings = {r.amsID:r for r in self.readings()}
-            for row in self.db.execute('SELECT * FROM alert_rules').fetchall():
+            query = ('SELECT r.* FROM alert_rules r JOIN accounts a ON a.id=r.owner_id WHERE a.disabled=0'
+                     if multiuser else 'SELECT * FROM alert_rules WHERE owner_id IS NULL')
+            for row in self.db.execute(query).fetchall():
                 rule = AlertRule.model_validate_json(row['json'])
                 state = AlertState(**json.loads(row['state']))
                 reading = readings.get(rule.amsID)
@@ -198,19 +221,25 @@ class Store:
                 event_data = {'id': event_id, 'occurredAt': now, 'type': event,
                               'ruleID': row['id'], 'name': row['name'], 'amsID': rule.amsID,
                               'condition': rule.model_dump(), 'reading': reading.model_dump()}
-                self.db.execute('INSERT INTO alert_events VALUES(?,?,?,?,?)',
-                                (event_id,now,row['id'],rule.amsID,json.dumps(event_data)))
+                self.db.execute('INSERT INTO alert_events(id,at,rule_id,ams,json,owner_id) VALUES(?,?,?,?,?,?)',
+                                (event_id,now,row['id'],rule.amsID,json.dumps(event_data),row['owner_id']))
                 title = f"{row['name']}: humidity {'above your limit' if event == 'high' else 'recovered'}"
                 ams = int(reading.amsID)+1 if reading.amsID.isdigit() else reading.amsID
                 body = f'AMS {ams}: {reading.humidity:g}% RH. Your limit is {rule.threshold:g}%.'
                 payload = json.dumps({'aps':{'alert':{'title':title,'body':body},'sound':'default',
                                              'thread-id':f'airkeep.ams.{rule.amsID}'},
                                       'amsID':rule.amsID,'ruleID':row['id']})
-                self.db.execute('''INSERT INTO outbox(device,json,next,created,rule_id)
-                    SELECT id,?,?,?,? FROM devices WHERE receive_alerts=1''',(payload,now,now,row['id']))
+                if multiuser:
+                    self.db.execute("""INSERT INTO outbox(device,json,next,created,rule_id)
+                        SELECT d.id,?,?,?,? FROM devices d JOIN registration_owners o
+                        ON o.kind='device' AND o.id=d.id WHERE d.receive_alerts=1 AND o.user=?""",
+                        (payload,now,now,row['id'],row['owner_id']))
+                else:
+                    self.db.execute("""INSERT INTO outbox(device,json,next,created,rule_id)
+                        SELECT id,?,?,?,? FROM devices WHERE receive_alerts=1""",(payload,now,now,row['id']))
 
     def upsert_device(self, identifier, token, topic, environment, initial_receive=False):
-        with self.lock, self.db:
+        with self.transaction():
             existing = self.db.execute('SELECT 1 FROM devices WHERE id=?',(identifier,)).fetchone()
             self.db.execute('''INSERT INTO devices(id,token,topic,environment,receive_alerts) VALUES(?,?,?,?,?)
                 ON CONFLICT(id) DO UPDATE SET token=excluded.token,topic=excluded.topic,environment=excluded.environment''',
@@ -222,8 +251,7 @@ class Store:
             return bool(self.db.execute('SELECT receive_alerts FROM devices WHERE id=?',(identifier,)).fetchone()[0])
 
     def set_subscription(self, identifier, enabled):
-        with self.lock, self.db:
-            self.db.execute('BEGIN IMMEDIATE')
+        with self.transaction():
             if self.db.execute('SELECT 1 FROM devices WHERE id=?',(identifier,)).fetchone() is None:
                 raise KeyError(identifier)
             self.db.execute('UPDATE devices SET receive_alerts=? WHERE id=?',(int(enabled),identifier))
@@ -232,7 +260,7 @@ class Store:
             return bool(enabled)
 
     def delete_device(self, identifier):
-        with self.lock, self.db:
+        with self.transaction():
             self.db.execute('DELETE FROM outbox WHERE device=?',(identifier,))
             self.db.execute('DELETE FROM devices WHERE id=?',(identifier,))
 

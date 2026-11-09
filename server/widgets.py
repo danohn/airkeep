@@ -48,8 +48,7 @@ def upsert_widget(store, identifier, registration, settings):
     data = registration.model_dump()
     data['token'] = data['token'].lower()
     now = time.time()
-    with store.lock, store.db:
-        store.db.execute('BEGIN IMMEDIATE')
+    with store.transaction():
         old = store.db.execute('SELECT * FROM widget_installations WHERE id=?', (identifier,)).fetchone()
         if old:
             same = (not old['deleted'] and old['token'] == data['token'] and old['environment'] == data['environment']
@@ -83,9 +82,11 @@ def display_fingerprint(row, readings, now, stale):
     return fingerprint(values)
 
 
-async def tick_widgets(store, settings, push, now, send_recorded):
+async def tick_widgets(store, settings, push, now, send_recorded, multiuser=False):
     readings = {r.amsID: r for r in store.readings()}
-    for row in store.rows("SELECT * FROM widget_installations WHERE deleted=0 AND ams_ids!='[]'"):
+    ownership = (" AND EXISTS (SELECT 1 FROM registration_owners o WHERE o.kind='widget' AND o.id=widget_installations.id)"
+                 if multiuser else "")
+    for row in store.rows("SELECT * FROM widget_installations WHERE deleted=0 AND ams_ids!='[]'" + ownership):
         if not settings.apns_credentials(row['environment'],row['bundle_id']):
             continue
         if row['last_status'] is not None and 400 <= row['last_status'] < 500 and row['last_status'] != 429:

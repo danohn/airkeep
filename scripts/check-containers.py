@@ -25,18 +25,21 @@ def main():
         root = Path(directory)
         certificates = root / 'tls'
         certificates.mkdir(mode=0o755)
+        certificates.chmod(0o755)
         subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1',
                         '-subj', '/CN=web', '-addext', 'subjectAltName=DNS:web',
                         '-keyout', str(certificates/'key.pem'), '-out', str(certificates/'fullchain.pem')],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         # This one-day test certificate has no access to a real deployment.
         (certificates/'key.pem').chmod(0o644)
+        (certificates/'fullchain.pem').chmod(0o644)
         services = {
             'airkeep': {
                 'image': args.relay_image, 'read_only': True, 'cap_drop': ['ALL'],
                 'security_opt': ['no-new-privileges:true'],
                 'environment': {'AIRKEEP_API_TOKEN': token, 'AIRKEEP_MQTT_ENABLED': 'false',
                                 'AIRKEEP_WEB_PASSWORD_HASH': PasswordHasher().hash(password),
+                                'AIRKEEP_JWT_SIGNING_KEY': secrets.token_hex(32),
                                 'AIRKEEP_WEB_ORIGIN': origin},
                 'tmpfs': ['/tmp', '/data:uid=10001,gid=10001,mode=0700'],
                 'volumes': [str(certificates/'fullchain.pem') + ':/test-ca.pem:ro'],
@@ -54,7 +57,8 @@ def main():
         compose_file.write_text(json.dumps({'services': services}).replace('$', '$$'))
         compose = ['docker', 'compose', '-p', project, '-f', str(compose_file)]
         probe = r'''
-import httpx, os, re, ssl
+import base64, hashlib, httpx, os, re, ssl
+from urllib.parse import parse_qs, urlsplit
 assert os.getuid() != 0
 token, password, origin = VALUES
 context = ssl.create_default_context(cafile='/test-ca.pem')
@@ -78,17 +82,30 @@ with httpx.Client(base_url='https://web:8443', verify=context) as client:
     snapshot = client.get('/v1/snapshot', headers={'Authorization': 'Bearer '+token})
     assert snapshot.status_code == 200 and len(snapshot.content) < 16384
     assert snapshot.headers['cache-control'] == 'no-store'
-    assert client.get('/v2/history?hours=169', headers={'Authorization': 'Bearer '+token}).status_code == 422
-    assert client.post('/auth/login', json={'password':password}, headers={'Origin':'https://other.example.com'}).status_code == 403
-    login = client.post('/auth/login', json={'password':password}, headers={'Origin':origin})
-    assert login.status_code == 200, login.text
-    cookie = login.headers['set-cookie'].lower()
-    assert 'secure' in cookie and 'httponly' in cookie and 'samesite=strict' in cookie
-    assert client.get('/auth/session').json()['authenticated']
-    assert client.get('/v2/admin/overview').status_code == 200
-    assert client.post('/v2/admin/devices').status_code == 405
-    assert client.post('/v2/alerts', json={'name':'Container smoke'}).status_code == 403
-    headers = {'Origin':origin, 'X-Airkeep-CSRF':login.json()['csrf']}
+    assert 'alertRule' not in snapshot.json()
+    assert client.get('/v2/alerts', headers={'Authorization':'Bearer '+token}).status_code == 401
+    client.headers['Origin'] = origin
+    verifier = 'v'*43
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip('=')
+    authorization = dict(client_id='dashboard',redirect_uri=origin+'/auth/callback',
+                         response_type='code',state='s'*43,code_challenge=challenge,code_challenge_method='S256')
+    assert client.get('/connect').status_code == 200
+    assert client.get('/auth/callback').status_code == 200
+    assert client.post('/auth/authorize',json=authorization,headers={'Origin':'https://other.example.com'}).status_code == 403
+    transaction = client.post('/auth/authorize',json=authorization).json()['transaction']
+    login = client.post('/auth/credentials',json={'transaction':transaction,'username':'owner','password':password})
+    assert login.status_code == 200,login.text
+    assert 'set-cookie' not in login.headers and not client.cookies
+    callback = parse_qs(urlsplit(login.json()['redirect']).query)
+    assert callback['state'] == [authorization['state']]
+    tokens = client.post('/auth/token',data=dict(client_id='dashboard',grant_type='authorization_code',
+                          redirect_uri=authorization['redirect_uri'],code_verifier=verifier,code=callback['code'][0])).json()
+    headers = {'Authorization':'Bearer '+tokens['access_token']}
+    assert client.get('/auth/me',headers=headers).status_code == 200
+    assert client.get('/v2/history?hours=169',headers=headers).status_code == 422
+    assert client.get('/v2/admin/overview',headers=headers).status_code == 200
+    assert client.post('/v2/admin/devices',headers=headers).status_code == 405
+    assert client.post('/v2/alerts',json={'name':'Container smoke'}).status_code == 401
     created = client.post('/v2/alerts', json={'name':'Container smoke'}, headers=headers)
     assert created.status_code in (200,201), created.text
     rule = created.json()
@@ -96,15 +113,17 @@ with httpx.Client(base_url='https://web:8443', verify=context) as client:
     saved = client.put(path, json={**rule,'name':'Renamed'}, headers={**headers,'If-Match':str(rule['revision'])})
     assert saved.status_code == 200, saved.text
     assert client.put(path, json=rule, headers={**headers,'If-Match':str(rule['revision'])}).status_code == 412
-    assert client.post('/auth/logout', headers=headers).status_code == 200
-    assert not client.get('/auth/session').json()['authenticated']
+    assert client.post('/auth/revoke',headers=headers).status_code == 204
+    assert client.get('/auth/me',headers=headers).status_code == 401
+    assert not client.cookies
 with httpx.Client(base_url='http://airkeep:8787') as backend:
     for path in ['/', '/index.html', '/assets/main.js', '/brand/mark.svg']:
         assert backend.get(path).status_code == 404
-print('HTTPS, static assets, native API, secure sessions, CSRF and revision conflicts passed.')
+print('HTTPS, static assets, telemetry compatibility, cookie-free OAuth, revocation and rule conflicts passed.')
 '''.replace('VALUES', repr((token, password, origin)))
         try:
             subprocess.run(compose + ['up', '-d', '--wait', '--wait-timeout', '90'], check=True)
+            subprocess.run(compose + ['exec', '-T', 'airkeep', 'python', 'manage_accounts.py', 'bootstrap', 'owner', '--import-owner-password'], check=True)
             subprocess.run(compose + ['exec', '-T', 'airkeep', 'python', '-'], input=probe, text=True, check=True)
             uid = subprocess.check_output(compose + ['exec', '-T', 'web', 'id', '-u'], text=True).strip()
             assert uid != '0'

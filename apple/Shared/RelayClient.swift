@@ -24,11 +24,12 @@ struct RelayClient: Sendable {
         var request = URLRequest(url: url, timeoutInterval: 10)
         request.httpMethod = method
         request.httpBody = body
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let bearer = token.hasPrefix("oauth:") ? try await RelayOAuth.access(endpoint: endpoint, marker: token) : token
+        request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let revision { request.setValue("\"\(revision)\"", forHTTPHeaderField: "If-Match") }
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await RelayOAuth.send(request)
         guard let http = response as? HTTPURLResponse else { throw RelayError.transport }
         return (data, http)
     }
@@ -90,11 +91,11 @@ struct RelayClient: Sendable {
         case configuration, transport, connectionChanged, offlineRules, http(Int)
         var errorDescription: String? {
             switch self {
-            case .configuration: "Add your relay URL and token in Settings → Relay."
+            case .configuration: "Add your relay URL and sign in from Settings → Relay."
             case .transport: "Could not read the relay response."
             case .connectionChanged: "The relay connection changed. Reload before making changes."
             case .offlineRules: "Connect to your relay before saving alert changes."
-            case .http(401): "The relay rejected this token. Check it in Settings → Relay."
+            case .http(401): "Sign in to your relay again from Settings → Relay."
             case .http(412): "This alert changed on another device. Reload it before making changes."
             case .http(404): "This item is no longer available, or the relay needs an update."
             case .http(409): "Update Airkeep to manage named alert rules."

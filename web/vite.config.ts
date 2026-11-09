@@ -14,7 +14,12 @@ export default defineConfig({
     proxy: {
       "/v1": "http://127.0.0.1:8789",
       "/v2": "http://127.0.0.1:8789",
-      "/auth": "http://127.0.0.1:8789",
+      "/auth": {
+        target: "http://127.0.0.1:8789",
+        bypass(request) {
+          if (request.url?.split("?")[0] === "/auth/callback") return "/index.html";
+        },
+      },
     },
   },
 });

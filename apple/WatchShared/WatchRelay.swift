@@ -59,7 +59,7 @@ actor WatchWidgetRegistration {
            let record = state.registrations[connection.endpoint], record.confirmed != nil,
            Date.now.timeIntervalSince(record.checkedAt ?? .distantPast) >= 60 {
             do {
-                let current = try await dependencies.status(connection, state.installationID)
+                let current = try await dependencies.status(connection, connection.widgetID(state.installationID))
                 if current.generation != record.request.generation {
                     try storage.fail(endpoint: connection.endpoint, request: record.request,
                         error: "Registration changed. Tap Retry to reconnect.", conflict: true)
@@ -79,7 +79,7 @@ actor WatchWidgetRegistration {
                 guard let connection = try? storage.connection(endpoint: endpoint) else { continue }
                 sent = true
                 do {
-                    let result = try await dependencies.send(connection, state.installationID, record.request)
+                    let result = try await dependencies.send(connection, connection.widgetID(state.installationID), record.request)
                     try storage.confirm(endpoint: endpoint, request: record.request, status: result)
                 } catch {
                     let widgetConflict = error as? WidgetRegistrationConflict
@@ -98,7 +98,7 @@ actor WatchWidgetRegistration {
     }
     func retry() async {
         guard let state = try? storage.read(), let connection = try? storage.connection() else { return }
-        let status = try? await dependencies.status(connection, state.installationID)
+        let status = try? await dependencies.status(connection, connection.widgetID(state.installationID))
         // Retry is an explicit user action; ordinary refreshes never advance a
         // conflicting request past a server-side deletion tombstone.
         try? storage.forceRegistration(after: status?.generation)

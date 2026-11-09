@@ -1,28 +1,14 @@
 # Web dashboard
 
-Nginx serves Airkeep's browser dashboard and proxies API requests to the Python backend at the same HTTPS address. User view shows readings, seven-day history, shared humidity rules and past alerts. Admin view shows registered Apple devices, Watch widgets, Live Activities, Apple push configuration, recent requests and pending notifications.
+Nginx serves Airkeep's browser dashboard and proxies API requests to the Python backend at the same HTTPS address. User view shows readings, seven-day history, personal humidity rules and past alerts. Admin view shows registered Apple devices, Watch widgets, Live Activities, Apple push configuration, recent requests and pending notifications.
 
-Both views belong to the relay's owner. Admin screens are for inspection. Manage a device's alert subscription in its Apple app.
+Each account has its own humidity rules, past alerts, and device subscriptions. Printer readings and humidity history are shared across the relay. Administrators can also inspect push diagnostics and manage accounts.
 
-## Set up browser access
+## Set up sign-in
 
-Create the owner password hash from the repository root:
+For Docker, follow the [account setup instructions](docker-deployment.md#accounts-and-sign-in). When running from source, set the signing key and origin in `server/.env` and run `uv run --directory server manage_accounts.py bootstrap owner`.
 
-```sh
-uv run --directory server setup_web.py
-```
-
-For an image-only deployment, run `docker compose run --rm --no-deps airkeep python setup_web.py` from the Compose directory instead.
-
-The command prompts for a password and confirmation. Copy the generated, single-quoted `AIRKEEP_WEB_PASSWORD_HASH` line into your ignored relay environment file, then set the browser origin:
-
-```dotenv
-AIRKEEP_WEB_ORIGIN=https://airkeep.example.com:8443
-```
-
-Keep the hash's single quotes when using Docker Compose so the dollar signs remain intact. The browser password is separate from the bearer token used by Apple clients and the ESP32. Browser access becomes available after restarting the relay with both settings configured.
-
-Sign in at the relay's HTTPS address. Sessions last eight hours. Sign out to end a session immediately. Changing the configured password hash invalidates existing sessions. The browser uses an HttpOnly cookie and sends a CSRF header for changes to shared rules.
+The dashboard stays signed in across reloads in the same tab for up to eight hours. Sign in again when opening another tab. Use **My account** to update your password or sign out a connected app. An administrator can reset your password and give you a temporary password that expires after 24 hours.
 
 ## History and past alerts
 
@@ -72,17 +58,25 @@ uv run --directory server uvicorn app:create_app --factory --host 127.0.0.1 --po
 npm run dev --prefix web -- --host 127.0.0.1 --port 4173 --strictPort
 ```
 
-For this loopback setup only, set `AIRKEEP_WEB_ORIGIN=http://127.0.0.1:4173` and `AIRKEEP_WEB_SECURE_COOKIES=false` in your ignored development environment. Production browser access uses HTTPS and secure cookies.
+For this loopback setup only, set `AIRKEEP_WEB_ORIGIN=http://127.0.0.1:4173` and `AIRKEEP_ALLOW_HTTP_LOOPBACK=true` in your ignored development environment. Production browser access uses HTTPS.
 
 ## Relay interfaces
 
-Existing bearer APIs remain compatible. Browser sessions can read telemetry, history and events, and manage `/v2/alerts` using the existing revision checks. Device, activity and widget registration writes require the native bearer credential.
+Account access JWTs authorize API requests. Alert and event endpoints return only the signed-in user's data. The legacy ESP32 credential can read the compact telemetry snapshot. Device and activity registration writes require a native app grant, and Watch widget registrations require a paired Watch grant.
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /auth/session` | Browser sign-in state and session CSRF token |
-| `POST /auth/login` | Owner password sign-in |
-| `POST /auth/logout` | End the current browser session |
+| `GET /auth/session` | Public account setup status |
+| `GET/POST /auth/authorize` | Start a PKCE authorization request |
+| `POST /auth/credentials` | Verify username and password and complete first-sign-in password change |
+| `POST /auth/token` | Exchange a code or rotate a refresh token |
+| `GET /auth/me` | Current account identity and role |
+| `POST /auth/revoke` | Revoke the current grant and paired Watch grant |
+| `GET/DELETE /auth/grants[/{id}]` | List or revoke the user's connections |
+| `POST /auth/password` | Change the current password and revoke grants |
+| `POST/DELETE /auth/watch` | Pair or disconnect a Watch from an iPhone grant |
+| `GET/POST/PATCH /v2/admin/accounts[/{id}]` | Account administration |
+| `POST /v2/admin/accounts/{id}/reset` | Issue a temporary password |
 | `GET /v2/history?ams=0&hours=168` | Bucketed history, preserving source timestamps and gaps |
 | `GET /v2/alert-events` | Newest-first timeline, with optional AMS/rule filter and cursor |
 | `GET /v2/admin/overview` | Relay status, storage counts and push configuration |

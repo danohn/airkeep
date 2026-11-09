@@ -23,8 +23,8 @@ The default identifiers are:
 2. Enable the matching shared Keychain access group, such as `$(AppIdentifierPrefix)io.airkeep.shared`, on all targets.
 3. Provision the push entitlements used by the iOS, Mac and Watch apps and the Watch widget extension. Set the relay's iOS, Mac and Watch topics to the corresponding app bundle IDs. [Watch widget push setup](web-dashboard.md#watch-widget-updates) covers its separate key configuration.
 4. Build and run with automatic signing on a device. An unsigned simulator build checks compilation and UI, but cannot verify device Keychain or APNs entitlements.
-5. In Settings → Relay, save the relay URL and token. Add a humidity widget through the system gallery and edit it to choose the AMS. The first AMS has ID `0`.
-6. In Settings → Notifications, enable Receive alerts on this device. In Settings → Humidity alerts, save and enable the shared rules you want. Debug builds register for sandbox APNs, and Release builds use production. The relay follows each registration's environment.
+5. In Settings → Relay, enter the relay URL and sign in with your username and password. Add a humidity widget through the system gallery and edit it to choose the AMS. The first AMS has ID `0`.
+6. In Settings → Notifications, enable Receive alerts on this device. In Settings → Humidity alerts, save and enable your rules. Debug builds register for sandbox APNs, and Release builds use production. The relay follows each registration's environment.
 7. In Settings → Live Activities on iPhone, choose Start Live Activity while a fresh reading is available. Check the eight-hour session's end time and End Live Activity action. A supporting iPhone can show the Dynamic Island views. Other supported iPhones use the Lock Screen.
 
 The apps target iOS, iPadOS, macOS and watchOS 26 or later. Build with Xcode 26 or later and the matching platform support. They use Swift 6, Observation, async/await, Swift Charts, App Intents and ActivityKit, with no third-party Swift dependencies. Widgets run as system extensions.
@@ -37,7 +37,7 @@ After saving a working relay connection on iPhone, open Settings → Relay → A
 
 Add Airkeep through the Watch's complication picker or Smart Stack, then choose an AMS. Complications support circular, corner, inline and rectangular slots; the rectangular widget also appears in Smart Stack. Tapping opens the selected AMS in the Watch app.
 
-The app refreshes readings every 15 seconds while active and pauses polling while inactive or ambient. History offers 1h, 6h and 24h ranges. Shared alerts are viewable on the Watch and editable on the other Apple apps or web dashboard.
+The app refreshes readings every 15 seconds while active and pauses polling while inactive or ambient. History offers 1h, 6h and 24h ranges. Your alerts are viewable on the Watch and editable on the other Apple apps or web dashboard.
 
 The Watch app tries direct relay HTTPS first, then asks a reachable iPhone for readings if needed. Widgets use direct HTTPS and cached fallback. Original reading timestamps survive both routes. Watch widget push registration is separate from humidity notification forwarding through iPhone; Apple controls timeline scheduling.
 
@@ -45,7 +45,7 @@ The Watch app tries direct relay HTTPS first, then asks a reachable iPhone for r
 
 Airkeep uses the data-protection Keychain through `kSecUseDataProtectionKeychain`. The signed access group controls token sharing between the app and widget. Background reads don't ask for interactive authentication.
 
-Earlier builds used the login Keychain, which could repeatedly prompt after a development binary changed. If upgrading from one of those builds, save the relay token again in Settings → Relay. It writes to the shared data-protection store and leaves the old item untouched. Simulator and unsigned builds cannot establish that device entitlement behavior works.
+The app and its widget coordinate refreshes through a lock in the shared app group and keep the rotating refresh credential in Keychain. Each connection has its own grant. Reconnect through Settings → Relay after the account migration, then pair the Watch again from the iPhone.
 
 ## Provision a development device
 

@@ -77,7 +77,7 @@ targets:
   Airkeep-watchOS:
     type: application
     platform: watchOS
-    sources: [Watch, WatchShared, App/ChartView.swift, Shared/Models.swift, Shared/Configuration.swift, Shared/RelayClient.swift, Shared/Theme.swift, AppIcon.icon]
+    sources: [Watch, WatchShared, App/ChartView.swift, Shared/Models.swift, Shared/Configuration.swift, Shared/RelayClient.swift, Shared/RelayOAuth.swift, Shared/Theme.swift, AppIcon.icon]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(AIRKEEP_BUNDLE_ID_PREFIX).watch
@@ -91,7 +91,7 @@ targets:
   AirkeepWidgets-watchOS:
     type: app-extension
     platform: watchOS
-    sources: [WatchWidgets, WatchShared, Shared/Models.swift, Shared/Configuration.swift, Shared/RelayClient.swift, Shared/Theme.swift]
+    sources: [WatchWidgets, WatchShared, Shared/Models.swift, Shared/Configuration.swift, Shared/RelayClient.swift, Shared/RelayOAuth.swift, Shared/Theme.swift]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(AIRKEEP_BUNDLE_ID_PREFIX).watch.widgets
@@ -112,6 +112,7 @@ targets:
       - Shared/LiveActivityTiming.swift
       - Shared/ActivityUpdateRegistration.swift
       - Shared/RelayClient.swift
+      - Shared/RelayOAuth.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(AIRKEEP_BUNDLE_ID_PREFIX).notification-tests

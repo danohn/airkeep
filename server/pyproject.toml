@@ -11,6 +11,7 @@ dependencies = [
     "pyjwt[crypto]>=2.10,<3",
     "pydantic-settings>=2.11,<3",
     "argon2-cffi>=25,<26",
+    "python-dotenv>=1.2.4,<2",
 ]
 
 [dependency-groups]

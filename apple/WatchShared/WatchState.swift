@@ -24,6 +24,7 @@ struct WatchConnection: Codable, Equatable, Sendable {
         return url.scheme == "https" && url.host != nil && url.user == nil && url.password == nil && !token.isEmpty
     }
     var client: RelayClient { RelayClient(endpoint: endpoint, token: token) }
+    func widgetID(_ legacy: String) -> String { token.hasPrefix("oauth:") ? linkID : legacy }
 }
 
 struct WatchConfigurationMessage: Codable, Sendable {
@@ -188,14 +189,36 @@ final class WatchStorage: @unchecked Sendable {
                 return WatchConfigurationReceipt(senderID: state.phoneSenderID ?? message.senderID,
                     revision: state.phoneRevision, connected: state.endpoint != nil, error: nil)
             }
-            if let connection = message.connection {
-                if let old = state.endpoint, old != connection.endpoint { suspend(endpoint: old, state: &state) }
+            if var connection = message.connection {
+                if connection.token.hasPrefix("oauth-pair:") {
+                    guard let data = Data(base64Encoded: String(connection.token.dropFirst("oauth-pair:".count))) else {
+                        throw RelayClient.RelayError.configuration
+                    }
+                    let tokens = try JSONDecoder().decode(RelayTokens.self, from: data)
+                    try RelayOAuth.save(tokens, endpoint: connection.endpoint, clientID: "watch")
+                    connection.token = RelayOAuth.marker(tokens.grant_id)
+                }
+                if let old = state.endpoint {
+                    if old != connection.endpoint { suspend(endpoint: old, state: &state) }
+                    if let previous = try credentials.read(old), previous.token != connection.token {
+                        state.rules.removeValue(forKey: old)
+                        state.snapshot.removeValue(forKey: old)
+                        if previous.token.hasPrefix("oauth:") { try? TokenStore.delete(account: previous.token) }
+                    }
+                }
                 try credentials.save(connection)
                 if state.endpoint != connection.endpoint { state.selectedAMS = message.amsID }
                 state.endpoint = connection.endpoint
                 updateRegistration(state: &state, force: false)
             } else {
-                if let endpoint = state.endpoint { suspend(endpoint: endpoint, state: &state) }
+                if let endpoint = state.endpoint {
+                    if let previous = try credentials.read(endpoint), previous.token.hasPrefix("oauth:") {
+                        try? TokenStore.delete(account: previous.token)
+                    }
+                    state.rules.removeValue(forKey: endpoint)
+                    state.snapshot.removeValue(forKey: endpoint)
+                    suspend(endpoint: endpoint, state: &state)
+                }
                 state.endpoint = nil
             }
             state.phoneRevision = message.revision
