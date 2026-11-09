@@ -1,6 +1,7 @@
+# HTTP on host port 8080 for a reverse proxy.
 name: airkeep
 services:
-  airkeep:
+  airkeep-relay:
     image: ${AIRKEEP_RELAY_IMAGE:-ghcr.io/danohn/airkeep-relay}:${AIRKEEP_IMAGE_TAG:-latest}
     restart: unless-stopped
     init: true
@@ -21,6 +22,11 @@ services:
       options:
         max-size: 10m
         max-file: '3'
+    networks:
+      default:
+        aliases:
+          # Published web images use this hostname for the relay.
+          - airkeep
     volumes:
       - airkeep-data:/data
       - type: bind
@@ -29,15 +35,13 @@ services:
         read_only: true
         bind:
           create_host_path: false
-  web:
+  airkeep-web:
     image: ${AIRKEEP_WEB_IMAGE:-ghcr.io/danohn/airkeep-web}:${AIRKEEP_IMAGE_TAG:-latest}
     restart: unless-stopped
     init: true
     depends_on:
-      airkeep:
+      airkeep-relay:
         condition: service_healthy
-    ports:
-      - '127.0.0.1:8787:8080'
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -51,5 +55,7 @@ services:
       options:
         max-size: 10m
         max-file: '3'
+    ports:
+      - '8080:8080'
 volumes:
   airkeep-data:

@@ -1,171 +1,102 @@
 # Docker deployment
 
-Airkeep runs as two containers. `airkeep` collects MQTT readings, stores history and rules, and serves the Python API. `web` serves the built dashboard through Nginx and proxies API requests to `airkeep:8787`. The browser and native clients use the same address.
+Airkeep uses two images. `ghcr.io/danohn/airkeep-relay` reads from the printer and stores its history. `ghcr.io/danohn/airkeep-web` serves the dashboard and forwards API requests to the relay. Both use the `latest` tag by default.
 
-| Image | Contents |
-| --- | --- |
-| `ghcr.io/danohn/airkeep-relay` | Python backend and locked runtime dependencies |
-| `ghcr.io/danohn/airkeep-web` | Nginx, dashboard assets and optional HTTPS support |
+## 1. Set up the printer and URL
 
-Both images run without root, with read-only filesystems. `compose.yml` defines the two services, the relay's data volume and its read-only APNs key mount. The root `.env` holds the Compose settings and relay configuration. The relay alone loads it as a service environment file.
-
-## Pull and start
-
-Use a host with Docker Compose that can reach the printer's LAN. From the repository root:
+From the repository’s `server/` directory on a Docker host that can reach the printer, run:
 
 ```sh
-cd server
-mkdir -p private/apns
-chmod 700 private private/apns
-install -m 600 .env.example .env
+./setup.sh
 ```
 
-Set the printer address, serial, LAN access code and a random bearer token in `.env`. Generate a token with `openssl rand -hex 32`.
+The script creates a private `.env` with an API token and signing key, or keeps your existing file. Edit the printer IP, serial number, LAN access code, and HTTPS URL you’ll open on your devices (`AIRKEEP_WEB_ORIGIN`).
 
-Choose a published tag in an ignored `.env` next to `compose.yml`:
+<details>
+<summary>Set up manually</summary>
 
-```dotenv
-AIRKEEP_IMAGE_TAG=latest
-```
+1. From `server/`, run `mkdir -p -m 700 private private/apns` to create the directories Compose expects.
+2. If you’re starting fresh, run `install -m 600 .env.example .env` to create a private copy of the template. If you already have an `.env`, use that file.
+3. Run `openssl rand -hex 32` once for each empty secret. Put one value in `AIRKEEP_API_TOKEN` and the other in `AIRKEEP_JWT_SIGNING_KEY`. Keep any values you already use.
+4. Fill in the printer IP, serial number, LAN access code, and `AIRKEEP_WEB_ORIGIN`, then continue to the HTTPS setup below.
 
-Both services default to `latest`, which follows successful builds from `main`. The `main` image tag remains an alias for those builds. To pin a deployment, use `sha-` followed by the full source commit SHA from a successful publishing run. Version tags such as `0.3.1` become available when the corresponding `v0.3.1` Git tag is published.
+</details>
 
-Pull and start the published images:
+## 2. Connect Airkeep to HTTPS
 
-```sh
-docker compose pull
-docker compose up -d
-curl --fail http://127.0.0.1:8787/health
-```
+Airkeep serves HTTP on port `8080` for your reverse proxy. The dashboard and apps require a reachable HTTPS URL with a certificate your devices trust. Set `AIRKEEP_WEB_ORIGIN` to that HTTPS URL.
 
-Port 8787 on loopback reaches Nginx. The Python backend is reachable within the Compose network. `/health` checks the backend through the proxy; `/web-health` checks Nginx. Check printer connectivity and reading age separately in an app or the Admin dashboard.
+Use `compose.http.yml` to publish Airkeep’s HTTP endpoint on port `8080` on the Docker host. Configure your preferred reverse proxy to accept HTTPS and forward to `http://127.0.0.1:8080` if it runs on the same host. If it runs on another machine, use the Docker host’s reachable address on port `8080`. After starting Airkeep, you can check the HTTP endpoint from the host with `curl --fail http://127.0.0.1:8080/health`.
 
-GitHub creates new container packages with private visibility. The package owner can make both packages public in GitHub's package settings for anonymous pulls. Private packages require `docker login ghcr.io` with a credential that can read them. See [GitHub's Container registry guide](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
+<details>
+<summary>I have a certificate and want Airkeep to serve HTTPS</summary>
 
-For a fork or another registry, set `AIRKEEP_RELAY_IMAGE` and `AIRKEEP_WEB_IMAGE` to the image names, keeping the shared tag in `AIRKEEP_IMAGE_TAG`.
-
-## HTTPS for clients
-
-Give every client a reachable HTTPS URL with a trusted certificate. An existing reverse proxy can forward that address to Nginx on loopback port 8787. Keep the printer's MQTT port private.
-
-To let the Airkeep web container handle HTTPS with an existing certificate, copy the example to a local override:
-
-```sh
-cp compose.override.yml.example compose.override.yml
-```
-
-Add the certificate settings to `.env`:
+Use `compose.https.yml` and add these settings to `.env`:
 
 ```dotenv
 AIRKEEP_HOST=airkeep.example.com
 AIRKEEP_TLS_DIR=/path/to/certificates
-AIRKEEP_BIND_ADDRESS=127.0.0.1
-AIRKEEP_HTTPS_PORT=8443
+AIRKEEP_BIND_ADDRESS=192.0.2.20
+AIRKEEP_HTTPS_PORT=443
 ```
 
-Set `AIRKEEP_BIND_ADDRESS` to the interface clients should reach. Compose loads the override automatically with the usual commands:
+Use your certificate hostname, the directory containing `fullchain.pem` and `key.pem`, and the Docker host’s IP address on the client network. Point the hostname at that IP. If host port `443` is available, set `AIRKEEP_HTTPS_PORT=443` and use `https://airkeep.example.com` for `AIRKEEP_WEB_ORIGIN`. If you omit the port setting, Airkeep publishes `8443` and the URL becomes `https://airkeep.example.com:8443`.
 
-```sh
-docker compose up -d
-curl --fail https://airkeep.example.com:8443/health
-```
+Nginx checks for renewed certificates in the mounted directory. If the files require a different container user, set `AIRKEEP_TLS_UID` and `AIRKEEP_TLS_GID` (both default to `1000`).
 
-The certificate directory must contain `fullchain.pem` and `key.pem`, with a certificate valid for `AIRKEEP_HOST`. The web container uses UID and GID `1000` by default for this setup. Set `AIRKEEP_TLS_UID` and `AIRKEEP_TLS_GID` if the files require different IDs.
-
-The web container mounts that directory read-only. It checks for certificate replacements every 60 seconds, validates them and reloads Nginx when valid. Manage certificate issuance and renewal outside Airkeep.
+</details>
 
 ## Accounts and sign-in
 
-Set `AIRKEEP_WEB_ORIGIN` in `.env` to the exact public HTTPS origin, including its port. Set `AIRKEEP_JWT_SIGNING_KEY` to a private value generated by `openssl rand -hex 32`. Keep a backup of that key with the deployment configuration. Changing it invalidates outstanding access JWTs.
+The commands below use `-f compose.http.yml`. If Airkeep serves HTTPS directly, use `-f compose.https.yml`.
 
-For a new installation, create the first administrator. The command prompts for a password:
+If you keep your deployment in a separate directory, you can copy your chosen file there as `compose.yml` and use plain `docker compose` commands. Keep `.env` and `private/` beside it. Remove any `COMPOSE_FILE` setting left over from a previous setup so Compose picks up the default filename.
 
-```sh
-docker compose run --rm --no-deps airkeep python manage_accounts.py bootstrap owner
-docker compose up -d --wait
-```
-
-For an existing relay, back up SQLite, `.env`, and both image tags first. Stop the relay, use the new relay image for bootstrap, and add `--import-owner-password` to keep the current password. The old `AIRKEEP_WEB_PASSWORD_HASH` must still be set for the import. Bootstrap assigns existing rules and alert events to this administrator and clears old sessions and push registrations. Remove the old password hash after verifying sign-in. If you roll back, restore the database and environment backups with the old image pair.
-
-Sign in to the dashboard with the new username and password. Add users under Admin → Accounts. After the upgrade, sign in from Settings → Relay on each Apple device, re-enable alerts as needed, and reconnect Apple Watch from the iPhone. The ESP32 uses the existing bearer token for the telemetry snapshot.
-
-If you lose admin access, run the host recovery command with the administrator's username:
+Pull the images, create your first administrator, then start Airkeep. Replace `owner` with the username you want. The account command prompts for a password of at least 12 characters.
 
 ```sh
-docker compose run --rm --no-deps airkeep python manage_accounts.py recover owner
+docker compose -f compose.http.yml pull
+docker compose -f compose.http.yml run --rm --no-deps airkeep-relay python manage_accounts.py bootstrap owner
+docker compose -f compose.http.yml up -d --wait
 ```
 
-## Optional APNs
+Open your HTTPS URL with `/health` appended to check the connection. Then open the dashboard and sign in. Check for a recent printer reading. Add users under **Admin → Accounts**.
 
-Follow [push setup](push-setup.md), then place keys in `private/apns/` and set the team, key IDs, key paths and app topics in `.env`. Use container paths such as `/run/keys/sandbox.p8` for the signing keys.
+<details>
+<summary>Recover an administrator account</summary>
 
-On Linux, restrict the key directory to the backend container's user:
+Run `docker compose -f compose.http.yml run --rm --no-deps airkeep-relay python manage_accounts.py recover owner` with the administrator’s username and your usual Compose file selection.
 
-```sh
-sudo chown -R 10001:10001 private/apns
-sudo chmod 700 private/apns
-sudo chmod 600 private/apns/*.p8
-docker compose up -d
-```
+</details>
 
-Keys mount read-only at `/run/keys/` in the relay. Keep the outer `private/` directory and `.env` owned by the operator, with modes 700 and 600. Leave `private/apns/` empty if you skip Apple push setup.
+## Optional Apple push notifications
 
-Watch widget updates use their own app topic and key settings. [Watch push setup](web-dashboard.md#watch-widget-updates) covers separate topic-authorized keys and explicitly sharing an authorized provider key.
+Start with [push setup](push-setup.md) and [Watch widget push setup](web-dashboard.md#watch-widget-updates). For Docker, put the `.p8` keys in `private/apns/` and use container paths such as `/run/keys/sandbox.p8` in `.env`. On Linux, make the directory and keys readable by the relay’s UID and GID `10001`, with mode `700` on the directory and `600` on the keys. After editing `.env`, rerun the same `up -d --wait` command you used to start Airkeep.
 
 ## Updates and rollback
 
-Pull both images before replacing containers:
+Back up SQLite with its online backup API, or stop the relay before copying the database and its sidecar files. Keep a copy of `.env` and `private/` with your backup. Record the running image version before pulling.
 
 ```sh
-docker compose pull
-docker compose up -d --remove-orphans
-docker compose ps
-docker compose logs --tail 50
+docker compose -f compose.http.yml pull
+docker compose -f compose.http.yml up -d --wait --remove-orphans
 ```
 
-Set the previous shared image tag to roll back both services together. Keep the previous images available until the update is verified.
+Use the same file selection you used to start Airkeep. To pin or roll back both images, set `AIRKEEP_IMAGE_TAG` to a release tag or `sha-<full commit SHA>`. Restore the matching database backup if the update changed the schema. Use the Compose `down` subcommand to stop the stack and keep the `airkeep-data` database volume.
 
-The `airkeep-data` volume preserves readings, rules, subscriptions, sessions and registrations. Back up SQLite before upgrades using its online backup API, or stop the backend before copying the database and its sidecar files. Back up `.env`, `private/` and the Compose configuration separately. `docker compose down` keeps the data volume; `--volumes` removes it.
+<details>
+<summary>Build the images locally</summary>
 
-### Move from the older Compose files
-
-If you have `private/relay.env`, back up both environment files and merge its settings into the root `.env` beside `compose.yml`. Resolve any duplicate keys and keep the single quotes around `AIRKEEP_WEB_PASSWORD_HASH`. Keep the merged `.env` at mode 600. After applying the new Compose file and verifying the relay, archive the old `private/relay.env` with your backups.
-
-Keep the existing Compose project name and data volume. Install the updated `compose.yml` and keep `private/apns/` in place, or create an empty directory there if you skipped push setup. If you used `compose.tls.yml`, rename it to `compose.override.yml` and keep your existing `.env`. The main file now includes the APNs mount, so you can archive `compose.apns.yml` and use plain `docker compose` commands.
-
-If you are upgrading from the older combined image and still run a separate `tls` service, stop it using the old files before switching. That service used the same ports Nginx now serves:
-
-```sh
-docker compose -f compose.yml -f compose.tls.yml stop tls
-```
-
-Use `compose.override.yml.example` as the HTTPS template in that case. Select a matching pair of published image tags, then run `docker compose pull` and `docker compose up -d --remove-orphans`.
-
-Older single-rule databases migrate to shared alerts on backend startup. Keep a pre-upgrade database backup for rollback across that schema migration.
-
-## Build locally
-
-Build both images from the repository root:
+Run from the repository root:
 
 ```sh
 docker build -f server/Dockerfile -t airkeep-relay:local .
 docker build -f web/Dockerfile -t airkeep-web:local .
-```
-
-To run those images with Compose, set `AIRKEEP_RELAY_IMAGE=airkeep-relay`, `AIRKEEP_WEB_IMAGE=airkeep-web` and `AIRKEEP_IMAGE_TAG=local` in `.env`, then run `docker compose up -d --pull never` from `server/`.
-
-For a container integration check, from the repository root:
-
-```sh
 uv run --directory server python ../scripts/check-containers.py
 ```
 
-The check uses the local images in an isolated network with disposable credentials and a test certificate. It exercises static files, HTTPS, ESP32 telemetry access, cookie-free sign-in, revocation and rule conflicts, and confirms that Nginx serves the frontend while the backend is stopped. Its test containers and temporary data are removed afterward.
+To run the local images, set `AIRKEEP_RELAY_IMAGE=airkeep-relay`, `AIRKEEP_WEB_IMAGE=airkeep-web`, and `AIRKEEP_IMAGE_TAG=local` in `.env`, then start Airkeep with your usual Compose file selection and `up -d --pull never`.
 
-## Image publishing
+See the [container workflow](../.github/workflows/containers.yml) for build and publishing details.
 
-[Container images](../.github/workflows/containers.yml) runs relay and browser tests, builds both images and checks the two-container stack on pull requests. Publishing runs after successful checks on main, `v*` tags or a manual run on main. Pull requests run checks without publishing.
-
-The publishing jobs build `linux/amd64` and `linux/arm64` images. Each image gets the full `sha-<commit>` tag. Builds from `main` also get `main` and `latest`. Versioned builds get their version and major/minor tags. Use the same tag for both images.
-
-Publishing uses the workflow's `GITHUB_TOKEN` with `packages: write`. Runtime credentials and Apple keys belong on the Docker host. They are excluded from both image builds.
+</details>
