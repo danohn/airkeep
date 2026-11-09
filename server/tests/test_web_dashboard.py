@@ -18,7 +18,7 @@ ORIGIN = 'https://airkeep.example.com'
 
 
 def configured(tmp_path, **extra):
-    return Settings(api_token=TOKEN,db_path=tmp_path/'data.db',mqtt_enabled=False,
+    return Settings(db_path=tmp_path/'data.db',mqtt_enabled=False,
                     web_password_hash=HASH,web_origin=ORIGIN,_env_file=None,**extra)
 
 
@@ -54,8 +54,7 @@ def test_owner_cookie_scopes_csrf_logout_and_native_compatibility(tmp_path):
         response=client.post('/auth/logout',headers=headers)
         assert response.status_code==200
         assert client.get('/v2/alerts').status_code==401
-        assert client.get('/v1/snapshot',headers={'Authorization':'Bearer '+TOKEN}).status_code==200
-        assert len(client.get('/v1/snapshot',headers={'Authorization':'Bearer '+TOKEN}).content)<16384
+        assert client.get('/v1/snapshot',headers={'Authorization':'Bearer '+TOKEN}).status_code==401
 
 
 def test_cookie_attributes_expiry_rotation_and_disabling(tmp_path):
@@ -90,9 +89,9 @@ def test_login_rate_limit_and_unconfigured_browser(tmp_path):
 def test_insecure_cookie_configuration_is_loopback_only(tmp_path):
     with pytest.raises(ValueError):
         configured(tmp_path,web_secure_cookies=False)
-    assert Settings(api_token=TOKEN,web_origin='http://127.0.0.1:4173',web_secure_cookies=False,_env_file=None)
+    assert Settings(web_origin='http://127.0.0.1:4173',web_secure_cookies=False,_env_file=None)
     with pytest.raises(ValueError):
-        Settings(api_token=TOKEN,web_origin='http://public.example.com',web_secure_cookies=False,_env_file=None)
+        Settings(web_origin='http://public.example.com',web_secure_cookies=False,_env_file=None)
 
 
 def test_full_week_aggregation_original_timestamps_and_outage_gaps(tmp_path):
@@ -201,7 +200,7 @@ def test_parallel_password_verification_is_bounded(tmp_path):
 def test_backend_only_routes_security_headers_and_quoted_password_hash(tmp_path):
     environment=tmp_path/'relay.env'
     environment.write_text("AIRKEEP_WEB_PASSWORD_HASH='"+HASH+"'\n")
-    parsed=Settings(api_token=TOKEN,web_origin=ORIGIN,_env_file=environment)
+    parsed=Settings(web_origin=ORIGIN,_env_file=environment)
     assert parsed.web_password_hash==HASH
     app=create_app(configured(tmp_path))
     with TestClient(app,base_url=ORIGIN) as client:
@@ -215,26 +214,24 @@ def test_backend_only_routes_security_headers_and_quoted_password_hash(tmp_path)
 
 
 def test_activity_registration_metadata_preserves_unknown_legacy_creation(tmp_path):
-    import sqlite3
-    config=configured(tmp_path)
-    with sqlite3.connect(config.db_path) as db:
-        db.execute('CREATE TABLE activities(id TEXT PRIMARY KEY,token TEXT,environment TEXT,ams TEXT,expires REAL,last_sent REAL DEFAULT 0)')
-        db.execute('INSERT INTO activities(id,token,environment,ams,expires) VALUES(?,?,?,?,?)',('old','a'*64,'sandbox','0',time.time()+3600))
-    app=create_app(config)
-    with TestClient(app,base_url=ORIGIN) as client:
-        sign_in(client)
-        old=client.get('/v2/admin/activities').json()[0]
+    from test_accounts import account_app, account_headers
+    app = account_app(configured(tmp_path))
+    with TestClient(app, base_url=ORIGIN) as client:
+        app.state.store.execute('INSERT INTO activities(id,token,environment,ams,expires) VALUES(?,?,?,?,?)',
+                                ('old', 'a'*64, 'sandbox', '0', time.time()+3600))
+        admin = account_headers(client)
+        old = client.get('/v2/admin/activities', headers=admin).json()[0]
         assert old['createdAt'] is None and old['lastRegisteredAt'] is None
         assert old['topic']=='io.airkeep.push-type.liveactivity'
-        native={'Authorization':'Bearer '+TOKEN}
+        native = account_headers(client, 'apple-ios', 'phone')
         body={'id':'old','token':'a'*64,'environment':'sandbox','amsID':'0','expiresAt':time.time()+3600}
         assert client.post('/v1/activities',json=body,headers=native).status_code==200
-        refreshed=client.get('/v2/admin/activities').json()[0]
+        refreshed=client.get('/v2/admin/activities',headers=admin).json()[0]
         assert refreshed['createdAt'] is None and refreshed['lastRegisteredAt'] is not None
-        body['id']='new'
+        body.update(id='new', token='b'*64)
         assert client.post('/v1/activities',json=body,headers=native).status_code==200
-        created=next(r for r in client.get('/v2/admin/activities').json() if r['id']=='new')
+        created=next(r for r in client.get('/v2/admin/activities',headers=admin).json() if r['id']=='new')
         assert created['createdAt'] and created['lastRegisteredAt']
         original=created['createdAt']
         assert client.post('/v1/activities',json=body,headers=native).status_code==200
-        assert next(r for r in client.get('/v2/admin/activities').json() if r['id']=='new')['createdAt']==original
+        assert next(r for r in client.get('/v2/admin/activities',headers=admin).json() if r['id']=='new')['createdAt']==original

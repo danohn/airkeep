@@ -5,12 +5,12 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from fastapi.testclient import TestClient
 
-from app import create_app, tick
+from app import tick
 from config import Settings
 from domain import AlertRule, NamedAlertInput, Reading
 from storage import RuleConflict, Store
 
-TOKEN = 'test-token-' + 'x' * 40
+from test_accounts import account_app, account_headers
 
 
 def sample(humidity, at, ams='0'):
@@ -44,10 +44,10 @@ def test_legacy_migration_is_atomic_and_preserves_state_and_subscribers(tmp_path
 
 
 def test_versioned_api_auth_conflicts_and_compact_legacy_snapshot(tmp_path):
-    app = create_app(Settings(api_token=TOKEN,db_path=tmp_path/'test.db',mqtt_enabled=False,_env_file=None))
+    app = account_app(Settings(db_path=tmp_path/'test.db',mqtt_enabled=False,_env_file=None))
     with TestClient(app) as client:
         assert client.get('/v2/alerts').status_code == 401
-        client.headers['Authorization'] = 'Bearer ' + TOKEN
+        client.headers.update(account_headers(client))
         first = client.get('/v2/alerts').json()[0]
         created = client.post('/v2/alerts',json={}).json()
         assert created['name'] == 'Alert 2' and not created['enabled']
@@ -148,9 +148,9 @@ def test_simultaneous_edits_allow_only_one_writer(tmp_path):
 
 
 def test_device_subscription_api_and_legacy_refresh_do_not_undo_opt_out(tmp_path):
-    app = create_app(Settings(api_token=TOKEN,db_path=tmp_path/'test.db',mqtt_enabled=False,_env_file=None))
+    app = account_app(Settings(db_path=tmp_path/'test.db',mqtt_enabled=False,_env_file=None))
     with TestClient(app) as client:
-        client.headers['Authorization'] = 'Bearer ' + TOKEN
+        client.headers.update(account_headers(client, 'apple-ios', 'phone'))
         registration = {'token':'a'*64,'platform':'ios','environment':'sandbox'}
         assert not client.put('/v2/devices/phone',json=registration).json()['receiveAlerts']
         assert client.patch('/v2/devices/phone',json={'receiveAlerts':True}).json()['receiveAlerts']

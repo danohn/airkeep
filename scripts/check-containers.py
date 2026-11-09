@@ -18,7 +18,7 @@ def main():
     parser.add_argument('--relay-image', default='airkeep-relay:local')
     parser.add_argument('--web-image', default='airkeep-web:local')
     args = parser.parse_args()
-    token, password = secrets.token_hex(32), secrets.token_urlsafe(24)
+    password = secrets.token_urlsafe(24)
     origin = 'https://airkeep-web:8443'
     project = 'airkeep-test-' + secrets.token_hex(5)
     with tempfile.TemporaryDirectory(prefix='airkeep-containers-') as directory:
@@ -37,7 +37,7 @@ def main():
             'airkeep-relay': {
                 'image': args.relay_image, 'read_only': True, 'cap_drop': ['ALL'],
                 'security_opt': ['no-new-privileges:true'],
-                'environment': {'AIRKEEP_API_TOKEN': token, 'AIRKEEP_MQTT_ENABLED': 'false',
+                'environment': {'AIRKEEP_MQTT_ENABLED': 'false',
                                 'AIRKEEP_WEB_PASSWORD_HASH': PasswordHasher().hash(password),
                                 'AIRKEEP_JWT_SIGNING_KEY': secrets.token_hex(32),
                                 'AIRKEEP_WEB_ORIGIN': origin},
@@ -58,10 +58,10 @@ def main():
         compose_file.write_text(json.dumps({'services': services}).replace('$', '$$'))
         compose = ['docker', 'compose', '-p', project, '-f', str(compose_file)]
         probe = r'''
-import base64, hashlib, httpx, os, re, ssl
+import base64, hashlib, httpx, os, re, ssl, time
 from urllib.parse import parse_qs, urlsplit
 assert os.getuid() != 0
-token, password, origin = VALUES
+password, origin = VALUES
 context = ssl.create_default_context(cafile='/test-ca.pem')
 with httpx.Client(base_url=origin, verify=context) as client:
     page = client.get('/')
@@ -80,11 +80,9 @@ with httpx.Client(base_url=origin, verify=context) as client:
     assert client.get('/.env').status_code == 404
     assert client.get('/health').status_code == 200
     assert client.get('/v1/snapshot').status_code == 401
-    snapshot = client.get('/v1/snapshot', headers={'Authorization': 'Bearer '+token})
-    assert snapshot.status_code == 200 and len(snapshot.content) < 16384
-    assert snapshot.headers['cache-control'] == 'no-store'
-    assert 'alertRule' not in snapshot.json()
-    assert client.get('/v2/alerts', headers={'Authorization':'Bearer '+token}).status_code == 401
+    retired = {'Authorization': 'Bearer ' + 'retired-shared-token-' + 'x'*32}
+    assert client.get('/v1/snapshot', headers=retired).status_code == 401
+    assert client.get('/v2/alerts', headers=retired).status_code == 401
     client.headers['Origin'] = origin
     verifier = 'v'*43
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip('=')
@@ -102,6 +100,21 @@ with httpx.Client(base_url=origin, verify=context) as client:
     tokens = client.post('/auth/token',data=dict(client_id='dashboard',grant_type='authorization_code',
                           redirect_uri=authorization['redirect_uri'],code_verifier=verifier,code=callback['code'][0])).json()
     headers = {'Authorization':'Bearer '+tokens['access_token']}
+    assert client.get('/device').status_code == 200
+    pair = client.post('/auth/device/code', data={'client_id':'esp32','installation_id':'a'*32}).json()
+    decision = client.post('/auth/device/decision', headers=headers,
+                           json={'user_code':pair['user_code'],'approve':True})
+    assert decision.status_code == 204, decision.text
+    time.sleep(pair['interval'])
+    display = client.post('/auth/token', data={'client_id':'esp32','device_code':pair['device_code'],
+                         'grant_type':'urn:ietf:params:oauth:grant-type:device_code'})
+    assert display.status_code == 200, display.text
+    display_headers = {'Authorization': 'Bearer ' + display.json()['access_token']}
+    snapshot = client.get('/v1/snapshot', headers=display_headers)
+    assert snapshot.status_code == 200 and len(snapshot.content) < 16384
+    assert snapshot.headers['cache-control'] == 'no-store'
+    assert 'alertRule' not in snapshot.json()
+    assert client.get('/v2/alerts', headers=display_headers).status_code == 403
     assert client.get('/auth/me',headers=headers).status_code == 200
     assert client.get('/v2/history?hours=169',headers=headers).status_code == 422
     assert client.get('/v2/admin/overview',headers=headers).status_code == 200
@@ -120,8 +133,8 @@ with httpx.Client(base_url=origin, verify=context) as client:
 with httpx.Client(base_url='http://airkeep-relay:8787') as backend:
     for path in ['/', '/index.html', '/assets/main.js', '/brand/mark.svg']:
         assert backend.get(path).status_code == 404
-print('HTTPS, static assets, telemetry compatibility, cookie-free OAuth, revocation and rule conflicts passed.')
-'''.replace('VALUES', repr((token, password, origin)))
+print('HTTPS, static assets, scoped display OAuth, cookie-free OAuth, revocation and rule conflicts passed.')
+'''.replace('VALUES', repr((password, origin)))
         try:
             subprocess.run(compose + ['up', '-d', '--wait', '--wait-timeout', '90'], check=True)
             subprocess.run(compose + ['exec', '-T', 'airkeep-relay', 'python', 'manage_accounts.py', 'bootstrap', 'owner', '--import-owner-password'], check=True)

@@ -4,18 +4,18 @@ import time
 from fastapi.testclient import TestClient
 import pytest
 
-from app import create_app,tick
+from app import tick
 from config import Settings
 from domain import NamedAlertInput,Reading
 from push import PushOutcome
 from storage import Store
 from widgets import WidgetRegistration,delete_widget,upsert_widget
 
-TOKEN='native-test-'+'x'*40
+from test_accounts import account_app, account_headers
 
 
 def settings(tmp_path):
-    return Settings(api_token=TOKEN,db_path=tmp_path/'data.db',mqtt_enabled=False,
+    return Settings(db_path=tmp_path/'data.db',mqtt_enabled=False,
                     apns_team_id='TEAM',watch_apns_key_id='WATCH',watch_apns_key_path='/missing-test-key',_env_file=None)
 
 
@@ -37,11 +37,13 @@ class Push:
 
 
 def test_registry_auth_generation_idempotency_tombstones_and_cookie_isolation(tmp_path):
-    app=create_app(settings(tmp_path));url='/v2/widgets/watch'
+    app=account_app(settings(tmp_path));url='/v2/widgets/watch'
     with TestClient(app) as client:
         body=registration().model_dump()
         assert client.put(url,json=body).status_code==401
-        client.headers['Authorization']='Bearer '+TOKEN
+        phone = account_headers(client, 'apple-ios', 'phone')
+        grant = client.post('/auth/watch', headers=phone, json={'installation_id': 'watch'}).json()
+        client.headers['Authorization'] = 'Bearer ' + grant['access_token']
         first=client.put(url,json=body)
         assert first.status_code==200 and first.json()['generation']==1 and first.json()['active']
         assert first.json()['topic']=='io.airkeep.watch.push-type.widgets'

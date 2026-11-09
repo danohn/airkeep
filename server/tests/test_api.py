@@ -1,18 +1,18 @@
 import time
 from fastapi.testclient import TestClient
-from app import create_app, tick
+from app import tick
 from config import Settings
 from domain import AlertRule, Reading
 from storage import Store
 
-TOKEN="test-token-"+"x"*40
+from test_accounts import account_app, account_headers
 
 def test_auth_snapshot_history_and_rule(tmp_path):
-    settings=Settings(api_token=TOKEN,db_path=tmp_path/"test.db",mqtt_enabled=False,_env_file=None)
-    app=create_app(settings)
+    settings=Settings(db_path=tmp_path/"test.db",mqtt_enabled=False,_env_file=None)
+    app=account_app(settings)
     with TestClient(app) as client:
         assert client.get('/v1/snapshot').status_code==401
-        client.headers['Authorization']='Bearer '+TOKEN
+        client.headers.update(account_headers(client, 'apple-ios', 'phone'))
         app.state.store.save_reading(Reading(amsID='0',humidity=24,temperature=31.6,rawIndex=3,observedAt=time.time()))
         assert client.get('/v1/snapshot').json()['readings'][0]['humidity']==24
         assert len(client.get('/v1/history').json())==1
@@ -25,10 +25,10 @@ class Push:
     async def send(self,*args,**kwargs): self.calls.append((args,kwargs)); return self.status
 
 def test_eight_hour_activity_registration_and_token_rotation_preserve_expiry(tmp_path):
-    settings=Settings(api_token=TOKEN,db_path=tmp_path/'test.db',mqtt_enabled=False,_env_file=None)
-    app=create_app(settings)
+    settings=Settings(db_path=tmp_path/'test.db',mqtt_enabled=False,_env_file=None)
+    app=account_app(settings)
     with TestClient(app) as client:
-        client.headers['Authorization']='Bearer '+TOKEN
+        client.headers.update(account_headers(client, 'apple-ios', 'phone'))
         now=time.time()
         activity={'id':'session','token':'a'*64,'expiresAt':now+8*3600}
         assert client.post('/v1/activities',json=activity).status_code==200
@@ -42,7 +42,7 @@ def test_eight_hour_activity_registration_and_token_rotation_preserve_expiry(tmp
             assert client.post('/v1/activities',json=activity).status_code==422
 
 async def test_live_updates_remain_fresh_between_pushes_and_end_on_time(tmp_path):
-    settings=Settings(api_token=TOKEN,db_path=tmp_path/'test.db',mqtt_enabled=False,
+    settings=Settings(db_path=tmp_path/'test.db',mqtt_enabled=False,
         apns_team_id='T',apns_key_id='K',apns_key_path='not-read',_env_file=None)
     store=Store(settings.db_path)
     try:
@@ -72,7 +72,7 @@ async def test_live_updates_remain_fresh_between_pushes_and_end_on_time(tmp_path
         store.close()
 
 async def test_outbox_retries_without_repeating_alert(tmp_path):
-    settings=Settings(api_token=TOKEN,db_path=tmp_path/'test.db',mqtt_enabled=False,apns_team_id='T',apns_key_id='K',apns_key_path='not-read',_env_file=None)
+    settings=Settings(db_path=tmp_path/'test.db',mqtt_enabled=False,apns_team_id='T',apns_key_id='K',apns_key_path='not-read',_env_file=None)
     store=Store(settings.db_path)
     store.set_rule(AlertRule(enabled=True,holdSeconds=0))
     store.execute('INSERT INTO devices(id,token,topic,environment) VALUES(?,?,?,?)',('one','a'*64,'com.example.app','sandbox'))

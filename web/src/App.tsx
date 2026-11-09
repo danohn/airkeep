@@ -37,6 +37,7 @@ import type {
 } from "./api";
 import { AccountLogin, AccountSettings, beginDashboardSignIn, startOIDC } from "./AccountAuth";
 import { clearTokens, finishDashboardAuthorization, type Account } from "./auth";
+import { DevicePairing } from "./DevicePairing";
 import "@fontsource/quicksand/latin-700.css";
 import "./style.css";
 
@@ -87,7 +88,7 @@ export function App() {
     clearTokens();
     setMode("user");
     setPage("overview");
-    history.replaceState(null, "", "/");
+    if (location.pathname !== "/device") history.replaceState(null, "", "/");
     setCsrf("");
     setSnapshot(null);
     setRules([]);
@@ -226,6 +227,10 @@ export function App() {
         }}
       />
     );
+  if (location.pathname === "/device") {
+    return oauth ? <DevicePairing /> :
+      <main className="login"><p>Set up an Airkeep account to pair your display. <a href="/">Back to Airkeep</a></p></main>;
+  }
   return (
     <div className="shell">
       <aside className="sidebar">

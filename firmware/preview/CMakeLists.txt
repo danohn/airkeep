@@ -12,6 +12,7 @@ target_link_libraries(airkeep-preview PRIVATE lvgl)
 enable_testing()
 add_test(NAME footer-touch COMMAND airkeep-preview --test-touch)
 add_test(NAME relay-ui-state COMMAND airkeep-preview --test-relay-state)
+add_test(NAME display-pairing COMMAND airkeep-preview --test-pairing)
 
 # Reuse cJSON from the installed SDK without downloading another copy.
 set(AIRKEEP_CJSON_DIR "$ENV{IDF_PATH}/components/json/cJSON" CACHE PATH "Existing ESP-IDF cJSON source")

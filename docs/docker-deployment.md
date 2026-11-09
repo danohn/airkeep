@@ -10,14 +10,14 @@ From the repository’s `server/` directory on a Docker host that can reach the 
 ./setup.sh
 ```
 
-The script creates a private `.env` with an API token and signing key, or keeps your existing file. Edit the printer IP, serial number, LAN access code, and HTTPS URL you’ll open on your devices (`AIRKEEP_WEB_ORIGIN`).
+The script creates a private `.env` with a signing key, or keeps your existing file. Edit the printer IP, serial number, LAN access code, and HTTPS URL you’ll open on your devices (`AIRKEEP_WEB_ORIGIN`).
 
 <details>
 <summary>Set up manually</summary>
 
 1. From `server/`, run `mkdir -p -m 700 private private/apns` to create the directories Compose expects.
 2. If you’re starting fresh, run `install -m 600 .env.example .env` to create a private copy of the template. If you already have an `.env`, use that file.
-3. Run `openssl rand -hex 32` once for each empty secret. Put one value in `AIRKEEP_API_TOKEN` and the other in `AIRKEEP_JWT_SIGNING_KEY`. Keep any values you already use.
+3. If `AIRKEEP_JWT_SIGNING_KEY` is empty, set it to the output of `openssl rand -hex 32`. Keep your existing signing key when upgrading.
 4. Fill in the printer IP, serial number, LAN access code, and `AIRKEEP_WEB_ORIGIN`, then continue to the HTTPS setup below.
 
 </details>
@@ -60,7 +60,7 @@ docker compose -f compose.http.yml run --rm --no-deps airkeep-relay python manag
 docker compose -f compose.http.yml up -d --wait
 ```
 
-Open your HTTPS URL with `/health` appended to check the connection. Then open the dashboard and sign in. Check for a recent printer reading. Add users under **Admin → Accounts**.
+Open your HTTPS URL with `/health` appended to check the connection. Then open the dashboard and sign in. Check for a recent printer reading. Add users under **Admin → Accounts**. To connect an ESP32 display, tap **Pair display** and approve the code in the dashboard. After upgrading the relay, displays using the old shared token need new firmware and pairing.
 
 For an external sign-in provider, see [optional single sign-on](web-dashboard.md#optional-single-sign-on).
 

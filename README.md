@@ -34,7 +34,7 @@ AMS humidity describes the air around the filament.
 
 ## Set up the relay
 
-Run the relay on an always-on host that can reach the printer's LAN. You'll need the printer's address, serial number and LAN access code, plus a bearer token for the ESP32 display and user accounts for the dashboard and Apple apps.
+Run the relay on an always-on host that can reach the printer's LAN. You'll need the printer's address, serial number and LAN access code, plus an Airkeep account to sign in or pair a display.
 
 Follow [Docker deployment](docs/docker-deployment.md) to configure and start it. The guide covers persistent storage, HTTPS and optional APNs keys. Clients on other devices need a reachable HTTPS address with a trusted certificate. Keep the printer's MQTT port private.
 
@@ -69,14 +69,14 @@ The firmware targets **Waveshare ESP32-S3-Touch-AMOLED-1.8 V2**, with a CO5300 p
 
 ```sh
 scripts/idf.sh menuconfig
-# Under Airkeep connection, set Wi-Fi, relay HTTPS URL, bearer token and AMS ID.
+# Under Airkeep connection, set Wi-Fi, relay HTTPS URL and AMS ID.
 scripts/idf.sh build
 scripts/idf.sh -p /dev/cu.YOUR_BOARD flash monitor
 ```
 
-Tap Details on the display to adjust brightness. [Firmware setup](firmware/README.md) covers the board, networking and host renderer.
+Tap **Pair display**, scan the QR code, then sign in to Airkeep and approve the code. Tap **Details** on the display to adjust brightness. [Firmware setup](firmware/README.md) covers the board, networking and host renderer.
 
-Wi-Fi credentials and the relay token are stored in ignored local configuration and compiled firmware. Keep those binaries private.
+Wi-Fi credentials are stored in ignored local configuration and compiled firmware. Keep those binaries private.
 
 ## Alerts and monitoring
 
@@ -95,7 +95,7 @@ The relay lives in `server/`, the SwiftUI apps and widgets in `apple/`, the brow
 ```sh
 cd server
 cp .env.example .env
-# Set printer credentials and a bearer token. Generate a token with: openssl rand -hex 32
+# Set printer credentials, the HTTPS origin, and a JWT signing key.
 uv sync --locked
 uv run uvicorn app:create_app --factory --host 127.0.0.1 --port 8787
 ```

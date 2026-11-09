@@ -2,14 +2,13 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi.testclient import TestClient
 
-from app import create_app
 from config import Settings
 
-TOKEN = "notification-status-test-" + "x" * 40
+from test_accounts import account_app, account_headers
 
 
 def configuration(tmp_path, **overrides):
-    return Settings(api_token=TOKEN, db_path=tmp_path / "test.db", mqtt_enabled=False,
+    return Settings(db_path=tmp_path / "test.db", mqtt_enabled=False,
                     _env_file=None, **overrides)
 
 
@@ -27,10 +26,10 @@ def private_key(path, curve=ec.SECP256R1()):
 
 def test_status_requires_auth_and_checks_registration_environment_and_topic(tmp_path):
     settings = configuration(tmp_path)
-    app = create_app(settings)
+    app = account_app(settings)
     with TestClient(app) as client:
         assert status(client).status_code == 401
-        client.headers["Authorization"] = "Bearer " + TOKEN
+        client.headers.update(account_headers(client, "apple-mac", "mac-one"))
         result = status(client).json()
         assert result == dict(registered=False, configuration="missing", reason="credentials_missing", environment="sandbox", receiveAlerts=False)
         registration = dict(id="mac-one", token="a" * 64, platform="mac", environment="sandbox")
@@ -49,9 +48,9 @@ def test_readiness_is_specific_to_the_requested_environment_and_never_sends(tmp_
     private_key(key)
     settings = configuration(tmp_path, apns_team_id="EXAMPLE", apns_key_id="EXAMPLE",
                              apns_key_path=str(key), apns_key_environment="sandbox")
-    app = create_app(settings)
+    app = account_app(settings)
     with TestClient(app) as client:
-        client.headers["Authorization"] = "Bearer " + TOKEN
+        client.headers.update(account_headers(client, "apple-mac", "mac-one"))
         sandbox = status(client).json()
         assert sandbox["configuration"] == "available"
         assert sandbox["reason"] == "local_checks_passed"
@@ -68,8 +67,8 @@ def test_readiness_is_specific_to_the_requested_environment_and_never_sends(tmp_
 def test_invalid_and_unreadable_keys_are_not_ready_and_paths_are_private(tmp_path):
     key = tmp_path / "operator-private-key.p8"
     settings = configuration(tmp_path, apns_team_id="EXAMPLE", apns_key_id="EXAMPLE", apns_key_path=str(key))
-    with TestClient(create_app(settings)) as client:
-        client.headers["Authorization"] = "Bearer " + TOKEN
+    with TestClient(account_app(settings)) as client:
+        client.headers.update(account_headers(client, "apple-mac", "mac-one"))
         response = status(client)
         assert response.json()["reason"] == "key_unreadable"
         assert str(tmp_path) not in response.text

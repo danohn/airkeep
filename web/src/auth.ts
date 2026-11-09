@@ -8,7 +8,7 @@ export type Account = {
 };
 
 type Tokens = { access_token: string; refresh_token: string; grant_id: string };
-type Pending = { verifier: string; state: string; redirect: string };
+type Pending = { verifier: string; state: string; redirect: string; deviceCode?: string };
 type StoredGrant = { refresh: string; id: string };
 
 const grantKey = "airkeep.oauth.grant";
@@ -97,12 +97,31 @@ function base64url(data: Uint8Array) {
   return btoa(String.fromCharCode(...data)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 }
 
+export function devicePairingCode() {
+  return (new URLSearchParams(location.hash.slice(1)).get("user_code") ?? "").slice(0, 16);
+}
+
+export function devicePairingPath(code: string, search = "") {
+  return "/device" + search + (code ? "#" + new URLSearchParams({ user_code: code }) : "");
+}
+
+export function restoreDevicePairingAfterSSOError() {
+  if (location.pathname !== "/" || !new URLSearchParams(location.search).has("sso_error")) return;
+  const raw = sessionStorage.getItem(pendingKey);
+  if (!raw) return;
+  const pending: Pending = JSON.parse(raw);
+  if (pending.deviceCode === undefined) return;
+  sessionStorage.removeItem(pendingKey);
+  history.replaceState(null, "", devicePairingPath(pending.deviceCode, location.search));
+}
+
 export async function dashboardAuthorization() {
   const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
   const state = base64url(crypto.getRandomValues(new Uint8Array(32)));
   const challenge = base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
   const redirect = location.origin + "/auth/callback";
   const pending: Pending = { verifier, state, redirect };
+  if (location.pathname === "/device") pending.deviceCode = devicePairingCode();
   sessionStorage.setItem(pendingKey, JSON.stringify(pending));
   return {
     client_id: "dashboard", redirect_uri: redirect, state, code_challenge: challenge,
@@ -118,9 +137,12 @@ export function finishDashboardAuthorization() {
     const query = new URLSearchParams(location.search);
     const raw = sessionStorage.getItem(pendingKey);
     sessionStorage.removeItem(pendingKey);
-    history.replaceState(null, "", "/");
-    if (!raw) throw new Error("Start sign-in again.");
+    if (!raw) {
+      history.replaceState(null, "", "/");
+      throw new Error("Start sign-in again.");
+    }
     const pending = JSON.parse(raw) as Pending;
+    history.replaceState(null, "", pending.deviceCode === undefined ? "/" : devicePairingPath(pending.deviceCode));
     const code = query.get("code");
     if (!code || pending.state !== query.get("state")) throw new Error("Start sign-in again.");
     const tokens = await token({

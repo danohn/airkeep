@@ -12,7 +12,16 @@
 #include "display.h"
 
 LV_FONT_DECLARE(airkeep_digits_128);
-static QueueHandle_t readings, statuses;
+static QueueHandle_t readings, statuses, pairing_updates, actions;
+static airkeep_pairing_t pairing_state = AIRKEEP_STARTING;
+static lv_obj_t *footer_caption, *pair_screen, *pair_message, *pair_code, *pair_uri, *disconnect_button;
+#if LV_USE_QRCODE
+static lv_obj_t *pair_qr;
+#endif
+typedef struct {
+    airkeep_pairing_t state;
+    char message[80], code[10], uri[500], qr[520];
+} pairing_update_t;
 static lv_obj_t *value, *temperature, *status, *bar, *chart, *chart_range, *details, *detail_text, *age, *brightness_text;
 static lv_chart_series_t *series;
 static airkeep_reading_t current;
@@ -47,6 +56,49 @@ static void toggle_details(lv_event_t *event)
     ESP_LOGI("airkeep_ui", "Touch: details %s", lv_obj_is_hidden(details) ? "closed" : "opened");
 }
 
+static void footer_action(lv_event_t *event)
+{
+    if (pairing_state == AIRKEEP_UNPAIRED || pairing_state == AIRKEEP_RETRY) {
+        airkeep_action_t action = AIRKEEP_PAIR;
+        xQueueOverwrite(actions, &action);
+    } else {
+        toggle_details(event);
+    }
+}
+
+static void cancel_pairing(lv_event_t *event)
+{
+    (void)event;
+    airkeep_action_t action = AIRKEEP_CANCEL;
+    xQueueOverwrite(actions, &action);
+}
+
+static void disconnect(lv_event_t *event)
+{
+    (void)event;
+    airkeep_action_t action = AIRKEEP_DISCONNECT;
+    xQueueOverwrite(actions, &action);
+}
+
+static void update_pairing(const pairing_update_t *update)
+{
+    pairing_state = update->state;
+    lv_label_set_text(footer_caption, pairing_state == AIRKEEP_RETRY ? "Try again" :
+        pairing_state == AIRKEEP_UNPAIRED ? "Pair display" : "Details");
+    lv_obj_set_hidden(disconnect_button, pairing_state != AIRKEEP_PAIRED);
+    lv_obj_set_hidden(pair_screen, pairing_state != AIRKEEP_PAIRING);
+    lv_label_set_text(pair_message, update->message);
+    lv_label_set_text(pair_code, update->code);
+    lv_label_set_text(pair_uri, update->uri);
+    lv_label_set_text(status, update->message);
+    if (pairing_state == AIRKEEP_UNPAIRED || pairing_state == AIRKEEP_RETRY)
+        lv_obj_set_hidden(details, true);
+#if LV_USE_QRCODE
+    lv_obj_set_hidden(pair_qr, !update->qr[0] ||
+        lv_qrcode_update(pair_qr, update->qr, strlen(update->qr)) != LV_RESULT_OK);
+#endif
+}
+
 static void brightness(lv_event_t *event)
 {
     int percent=lv_slider_get_value(lv_event_get_target(event));
@@ -65,6 +117,8 @@ static void timer(lv_timer_t *timer)
 {
     (void)timer;
     char text[256], connection[80];
+    pairing_update_t pairing;
+    if (xQueueReceive(pairing_updates, &pairing, 0) == pdTRUE) update_pairing(&pairing);
     if (xQueueReceive(readings,&current,0)==pdTRUE) {
         has_reading=true;
         snprintf(text,sizeof(text),"%d",current.humidity); lv_label_set_text(value,text);
@@ -90,7 +144,10 @@ static void timer(lv_timer_t *timer)
             chart_at=current.sampled_us;
         }
     }
-    if (xQueueReceive(statuses,connection,0)==pdTRUE) lv_label_set_text(status,connection);
+    if (xQueueReceive(statuses, connection, 0) == pdTRUE) {
+        lv_label_set_text(status, connection);
+        if (pairing_state == AIRKEEP_PAIRING) lv_label_set_text(pair_message, connection);
+    }
     int seconds = has_reading ? (int)((esp_timer_get_time()-current.sampled_us)/1000000) : -1;
     int stale_after = current.stale_after_seconds > 0 ? current.stale_after_seconds : 90;
     bool stale = seconds<0 || seconds>stale_after;
@@ -107,10 +164,30 @@ static void timer(lv_timer_t *timer)
 void airkeep_ui_reading(const airkeep_reading_t *reading) { xQueueOverwrite(readings,reading); }
 void airkeep_ui_status(const char *text) { char out[80]; strlcpy(out,text,sizeof(out)); xQueueOverwrite(statuses,out); }
 
+void airkeep_ui_pairing(airkeep_pairing_t state, const char *message,
+                        const char *code, const char *uri, const char *qr)
+{
+    pairing_update_t update = {.state = state};
+    strlcpy(update.message, message, sizeof(update.message));
+    if (code) strlcpy(update.code, code, sizeof(update.code));
+    if (uri) strlcpy(update.uri, uri, sizeof(update.uri));
+    if (qr) strlcpy(update.qr, qr, sizeof(update.qr));
+    xQueueOverwrite(pairing_updates, &update);
+}
+
+airkeep_action_t airkeep_ui_action(void)
+{
+    airkeep_action_t action = AIRKEEP_NO_ACTION;
+    xQueueReceive(actions, &action, 0);
+    return action;
+}
+
 void airkeep_ui_start(void)
 {
     readings=xQueueCreate(1,sizeof(airkeep_reading_t)); statuses=xQueueCreate(1,80);
-    if (!readings || !statuses || !airkeep_display_start()) abort();
+    pairing_updates = xQueueCreate(1, sizeof(pairing_update_t));
+    actions = xQueueCreate(1, sizeof(airkeep_action_t));
+    if (!readings || !statuses || !pairing_updates || !actions || !airkeep_display_start()) abort();
     bsp_display_brightness_set(65);
     if (!bsp_display_lock(3000)) abort();
     lv_obj_t *screen=lv_screen_active();
@@ -145,14 +222,22 @@ void airkeep_ui_start(void)
     lv_obj_t *button=lv_button_create(screen); lv_obj_set_pos(button,20,393); lv_obj_set_size(button,328,48);
     lv_obj_set_ext_click_area(button,12);
     lv_obj_set_style_bg_color(button,lv_color_hex(0x252524),0); lv_obj_set_style_shadow_width(button,0,0);
-    lv_obj_t *caption=label(button,"Details",0,0,&lv_font_montserrat_18,ivory); lv_obj_center(caption);
-    lv_obj_add_event_cb(button,toggle_details,LV_EVENT_CLICKED,NULL);
+    footer_caption = label(button,"Details",0,0,&lv_font_montserrat_18,ivory);
+    lv_obj_center(footer_caption);
+    lv_obj_add_event_cb(button,footer_action,LV_EVENT_CLICKED,NULL);
     details=lv_obj_create(screen); lv_obj_set_pos(details,0,0); lv_obj_set_size(details,368,448);
     lv_obj_set_style_bg_color(details,lv_color_black(),0); lv_obj_set_style_border_width(details,0,0);
     lv_obj_set_style_pad_all(details,20,0); lv_obj_set_hidden(details,true);
     lv_obj_set_scrollable(details,false);
     label(details,"Connection details",0,0,&lv_font_montserrat_24,ivory);
     detail_text=label(details,"",0,45,&lv_font_montserrat_14,muted); lv_obj_set_width(detail_text,320);
+    disconnect_button = lv_button_create(details);
+    lv_obj_set_pos(disconnect_button, 0, 221);
+    lv_obj_set_size(disconnect_button, 320, 42);
+    lv_obj_set_style_bg_color(disconnect_button, lv_color_hex(0x252524), 0);
+    lv_obj_center(label(disconnect_button, "Disconnect display", 0, 0, &lv_font_montserrat_18, ivory));
+    lv_obj_add_event_cb(disconnect_button, disconnect, LV_EVENT_CLICKED, NULL);
+    lv_obj_set_hidden(disconnect_button, true);
     brightness_text=label(details,"Brightness · 65%",0,279,&lv_font_montserrat_18,ivory);
     lv_obj_t *slider=lv_slider_create(details); lv_obj_set_pos(slider,8,304); lv_obj_set_size(slider,300,24);
     lv_obj_set_ext_click_area(slider,20);
@@ -162,9 +247,37 @@ void airkeep_ui_start(void)
     lv_obj_t *back=lv_button_create(details); lv_obj_set_pos(back,0,354); lv_obj_set_size(back,320,72);
     lv_obj_set_ext_click_area(back,2);
     lv_obj_set_style_bg_color(back,lv_color_hex(0x252524),0);
-    caption=label(back,"Back",0,0,&lv_font_montserrat_18,ivory); lv_obj_center(caption);
+    lv_obj_t *caption=label(back,"Back",0,0,&lv_font_montserrat_18,ivory); lv_obj_center(caption);
     lv_obj_add_event_cb(back,toggle_details,LV_EVENT_CLICKED,NULL);
-    lv_timer_create(timer,1000,NULL);
+    pair_screen = lv_obj_create(screen);
+    lv_obj_remove_style_all(pair_screen);
+    lv_obj_set_size(pair_screen, 368, 448);
+    lv_obj_set_style_bg_color(pair_screen, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(pair_screen, LV_OPA_COVER, 0);
+    lv_obj_set_scrollable(pair_screen, false);
+    lv_obj_set_hidden(pair_screen, true);
+    label(pair_screen, "Pair display", 20, 14, &lv_font_montserrat_24, ivory);
+    pair_message = label(pair_screen, "", 20, 48, &lv_font_montserrat_14, muted);
+#if LV_USE_QRCODE
+    pair_qr = lv_qrcode_create(pair_screen);
+    lv_qrcode_set_size(pair_qr, 212);
+    lv_qrcode_set_dark_color(pair_qr, lv_color_black());
+    lv_qrcode_set_light_color(pair_qr, lv_color_white());
+    lv_qrcode_set_quiet_zone(pair_qr, true);
+    lv_obj_align(pair_qr, LV_ALIGN_TOP_MID, 0, 76);
+    lv_obj_set_hidden(pair_qr, true);
+#endif
+    pair_code = label(pair_screen, "", 20, 308, &lv_font_montserrat_24, amber);
+    pair_uri = label(pair_screen, "", 20, 343, &lv_font_montserrat_14, ivory);
+    lv_obj_set_size(pair_uri, 328, 45);
+    lv_label_set_long_mode(pair_uri, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_t *cancel = lv_button_create(pair_screen);
+    lv_obj_set_pos(cancel, 20, 393);
+    lv_obj_set_size(cancel, 328, 48);
+    lv_obj_set_style_bg_color(cancel, lv_color_hex(0x252524), 0);
+    lv_obj_center(label(cancel, "Cancel", 0, 0, &lv_font_montserrat_18, ivory));
+    lv_obj_add_event_cb(cancel, cancel_pairing, LV_EVENT_CLICKED, NULL);
+    lv_timer_create(timer, 250, NULL);
     bsp_display_unlock();
     ESP_LOGI("airkeep_ui", "LVGL dashboard created at 368x448");
 }

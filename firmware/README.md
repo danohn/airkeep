@@ -4,13 +4,13 @@ The firmware targets **Waveshare ESP32-S3-Touch-AMOLED-1.8 V2**: CO5300/CST820, 
 
 ## Build and configure
 
-From the repository root, run `scripts/idf.sh menuconfig`. Set Wi-Fi credentials, `AIRKEEP_RELAY_URL` (for example `https://airkeep.example.com:8443`), `AIRKEEP_RELAY_TOKEN` and the AMS ID. Then run `scripts/idf.sh build`.
+From the repository root, run `scripts/idf.sh menuconfig`. Set Wi-Fi credentials, `AIRKEEP_RELAY_URL` (for example `https://airkeep.example.com:8443`) and the AMS ID. Then run `scripts/idf.sh build`.
 
 The wrapper needs an existing ESP-IDF v5.5.x installation. It resolves managed components using the checked-in `dependencies.lock`, but doesn't download a full SDK or flash the board automatically. Wi-Fi credentials and the relay token stay in ignored local configuration and compiled binaries. Keep those binaries private.
 
 ## Readings and display
 
-The ESP32 fetches `/v1/snapshot` over verified HTTPS every five seconds. It uses the relay bearer token and has no MQTT connection or printer credentials. Requests time out after ten seconds and reconnect on a later poll. Redirects are rejected, and responses are limited to 16 KiB. HTTP 401/403 displays "Check relay token". Network failures display "Relay unavailable".
+The ESP32 fetches `/v1/snapshot` over verified HTTPS every five seconds. Tap **Pair display**, scan the QR code or enter the displayed code at the relay’s `/device` page, then sign in and approve. The display keeps its refresh credential across restarts and needs pairing again after 90 days or 30 days without renewal. Requests time out after ten seconds and reconnect on a later poll. Redirects are rejected, and responses are limited to 16 KiB. Revocation or expiry prompts you to pair again. Network failures display "Relay unavailable".
 
 The chart keeps 120 received samples at 30-second intervals in RAM, then starts over after reboot. It doesn't fill the chart with startup data. The percentage bar spans 0–100%, and zero or invalid humidity values are ignored.
 
@@ -44,3 +44,5 @@ The renderer labels its synthetic readings as sample data. Nothing is sent to th
 The touch regression sends a bottom-edge tap observed during board testing through LVGL's input system. It checks Details/Back and the slider callback.
 
 The `relay-snapshot` test reuses cJSON from the installed SDK, discovered through firmware build metadata or `AIRKEEP_CJSON_DIR`. It covers cached sample age, samples older than device uptime, printer-offline state, nullable fields, malformed payloads, wrong AMS IDs, invalid humidity and future timestamps.
+
+Upgrade the relay and dashboard before pairing new firmware. The updated relay rejects the old shared token, so plan to flash and pair any existing displays during the upgrade.

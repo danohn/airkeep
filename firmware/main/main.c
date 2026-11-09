@@ -1,6 +1,5 @@
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -8,19 +7,13 @@
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_sntp.h"
-#include "esp_timer.h"
 #include "esp_wifi.h"
 #include "nvs_flash.h"
-#include "esp_http_client.h"
-#include "esp_crt_bundle.h"
-#include "relay_snapshot.h"
 #include "ui.h"
+#include "display_relay.h"
 
 static EventGroupHandle_t network;
 static const char *TAG = "airkeep";
-static int64_t logged_reading_at;
-
-
 static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
@@ -38,95 +31,6 @@ static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data)
     }
 }
 
-#define MAX_SNAPSHOT_BYTES 16384
-
-typedef struct {
-    char body[MAX_SNAPSHOT_BYTES + 1];
-    size_t length;
-    bool overflow;
-} snapshot_response_t;
-
-static esp_err_t http_event(esp_http_client_event_t *event)
-{
-    snapshot_response_t *response = event->user_data;
-    if (event->event_id == HTTP_EVENT_ON_DATA && event->data_len > 0) {
-        if ((size_t)event->data_len > MAX_SNAPSHOT_BYTES - response->length) {
-            response->overflow = true;
-            return ESP_FAIL;
-        }
-        if (!response->overflow) {
-            memcpy(response->body + response->length, event->data, event->data_len);
-            response->length += event->data_len;
-        }
-    }
-    return ESP_OK;
-}
-
-static void poll_relay(void *arg)
-{
-    (void)arg;
-    snapshot_response_t *response = calloc(1, sizeof(*response));
-    size_t token_length = strlen(CONFIG_AIRKEEP_RELAY_TOKEN);
-    char *authorization = malloc(token_length + 8);
-    if (!response || !authorization) abort();
-    snprintf(authorization, token_length + 8, "Bearer %s", CONFIG_AIRKEEP_RELAY_TOKEN);
-    char url[512];
-    const char *base = CONFIG_AIRKEEP_RELAY_URL;
-    snprintf(url, sizeof(url), "%s%sv1/snapshot", base, base[strlen(base)-1] == '/' ? "" : "/");
-    esp_http_client_config_t config = {
-        .url = url,
-        .crt_bundle_attach = esp_crt_bundle_attach,
-        .event_handler = http_event,
-        .user_data = response,
-        .timeout_ms = 10000,
-        .keep_alive_enable = true,
-        // Never forward the bearer token to a redirect destination.
-        .disable_auto_redirect = true,
-    };
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (!client) abort();
-    ESP_ERROR_CHECK(esp_http_client_set_header(client, "Authorization", authorization));
-    ESP_ERROR_CHECK(esp_http_client_set_header(client, "Accept", "application/json"));
-    free(authorization);
-    int previous_status = -1;
-    for (;;) {
-        xEventGroupWaitBits(network, 1, pdFALSE, pdTRUE, portMAX_DELAY);
-        response->length = 0;
-        response->overflow = false;
-        esp_err_t err = esp_http_client_perform(client);
-        int status = err == ESP_OK ? esp_http_client_get_status_code(client) : 0;
-        if (status != previous_status) {
-            ESP_LOGI(TAG, "Relay HTTPS status %d (%s)", status, esp_err_to_name(err));
-            previous_status = status;
-        }
-        if (status == 200 && !response->overflow) {
-            response->body[response->length] = '\0';
-            struct timeval now;
-            gettimeofday(&now, NULL);
-            airkeep_reading_t reading;
-            bool connected;
-            if (airkeep_parse_snapshot(response->body, response->length, CONFIG_AIRKEEP_AMS_ID,
-                    now.tv_sec + now.tv_usec / 1000000.0, esp_timer_get_time(), &reading, &connected)) {
-                airkeep_ui_reading(&reading);
-                airkeep_ui_status(connected ? "Relay connected" : "Printer offline");
-                int64_t now_us = esp_timer_get_time();
-                if (!logged_reading_at || now_us - logged_reading_at >= 30000000LL) {
-                    ESP_LOGI(TAG, "Relay AMS %s: %d%% RH, %.1f C, sample age %lld s, printer %s",
-                        CONFIG_AIRKEEP_AMS_ID, reading.humidity, reading.temperature,
-                        (long long)((now_us-reading.sampled_us)/1000000), connected ? "online" : "offline");
-                    logged_reading_at = now_us;
-                }
-            } else airkeep_ui_status("No valid AMS data");
-        } else {
-            airkeep_ui_status(status == 401 || status == 403 ? "Check relay token" :
-                              response->overflow ? "Relay response too large" : "Relay unavailable");
-            // Close the failed connection so the next poll can reconnect.
-            esp_http_client_close(client);
-        }
-        vTaskDelay(pdMS_TO_TICKS(5000));
-    }
-}
-
 void app_main(void)
 {
     esp_err_t err = nvs_flash_init();
@@ -134,7 +38,7 @@ void app_main(void)
         ESP_ERROR_CHECK(nvs_flash_erase()); ESP_ERROR_CHECK(nvs_flash_init());
     } else ESP_ERROR_CHECK(err);
     airkeep_ui_start();
-    if (!strlen(CONFIG_AIRKEEP_WIFI_SSID) || !strlen(CONFIG_AIRKEEP_RELAY_TOKEN) ||
+    if (!strlen(CONFIG_AIRKEEP_WIFI_SSID) ||
         strncmp(CONFIG_AIRKEEP_RELAY_URL, "https://", 8) || strlen(CONFIG_AIRKEEP_RELAY_URL) > 480) {
         airkeep_ui_status("Configure connection in menuconfig");
         return;
@@ -181,5 +85,6 @@ void app_main(void)
     airkeep_ui_status("Synchronizing clock");
     while (sntp_get_sync_status() == SNTP_SYNC_STATUS_RESET) vTaskDelay(pdMS_TO_TICKS(500));
     ESP_LOGI(TAG, "Clock synchronized; starting verified HTTPS relay polling");
-    if (xTaskCreate(poll_relay, "airkeep_relay", 8192, NULL, 5, NULL) != pdPASS) abort();
+    // Leave room for the TLS handshake while processing pairing or renewal.
+    if (xTaskCreate(airkeep_relay_task, "airkeep_relay", 14336, network, 5, NULL) != pdPASS) abort();
 }

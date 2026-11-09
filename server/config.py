@@ -10,7 +10,6 @@ class Settings(BaseSettings):
     printer_ip: str = ""
     printer_serial: str = ""
     printer_code: str = ""
-    api_token: str = Field(min_length=32)
     db_path: Path = Path(".local/airkeep.sqlite3")
     ca_path: Path = Path(__file__).parent / "bambu-ca.pem"
     mqtt_enabled: bool = True
