@@ -86,8 +86,10 @@ jobs:
         id: meta
         with:
           images: ghcr.io/${{ steps.namespace.outputs.owner }}/${{ matrix.image }}
+          flavor: latest=false
           tags: |
             type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha,format=long
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}

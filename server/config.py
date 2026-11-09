@@ -29,8 +29,10 @@ class Settings(BaseSettings):
     watch_apns_production_key_id: str = ""
     watch_apns_production_key_path: str = ""
     watch_apns_use_shared_credentials: bool = False
+    jwt_signing_key: str = ""
     web_password_hash: str = ""
     web_origin: str = ""
+    allow_http_loopback: bool = False
     web_secure_cookies: bool = True
 
     @model_validator(mode='after')
@@ -40,10 +42,13 @@ class Settings(BaseSettings):
             if value.username or value.password or value.query or value.fragment or value.path not in ('','/') or not value.hostname:
                 raise ValueError('AIRKEEP_WEB_ORIGIN must be a plain browser origin')
             loopback = value.hostname in ('localhost','127.0.0.1','::1')
-            if value.scheme != 'https' and not (value.scheme=='http' and loopback and not self.web_secure_cookies):
+            local_http = loopback and (self.allow_http_loopback or not self.web_secure_cookies)
+            if value.scheme != 'https' and not (value.scheme=='http' and local_http):
                 raise ValueError('Browser access needs HTTPS; plain HTTP is available only for explicit loopback development')
             if not self.web_secure_cookies and not loopback:
                 raise ValueError('Insecure browser cookies are restricted to loopback development')
+        if self.jwt_signing_key and (len(self.jwt_signing_key.encode()) < 32 or not self.web_origin):
+            raise ValueError('Set a signing key of at least 32 bytes and the dashboard origin.')
         if self.web_password_hash and not self.web_password_hash.startswith('$argon2id$'):
             raise ValueError('AIRKEEP_WEB_PASSWORD_HASH must be an Argon2id hash from setup_web.py')
         return self

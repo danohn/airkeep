@@ -26,7 +26,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { api, ApiError, setCsrf, amsName, when, age } from "./api";
+import { api, ApiError, setCsrf, setOAuth, amsName, when, age } from "./api";
 import type {
   AlertEvent,
   EventPage,
@@ -35,6 +35,8 @@ import type {
   Rule,
   Snapshot,
 } from "./api";
+import { AccountLogin, AccountSettings } from "./AccountAuth";
+import { clearTokens, finishDashboardAuthorization, type Account } from "./auth";
 import "@fontsource/quicksand/latin-700.css";
 import "./style.css";
 
@@ -46,8 +48,10 @@ type Page =
   | "devices"
   | "activities"
   | "push"
-  | "queue";
-type Session = { authenticated: boolean; configured: boolean; csrf?: string };
+  | "queue"
+  | "accounts"
+  | "password";
+type Session = { authenticated: boolean; configured: boolean; csrf?: string; mode?: "oauth"; account?: Account };
 type RecordRow = Record<string, unknown>;
 const userPages = [
   ["overview", "Overview", House],
@@ -79,7 +83,11 @@ export function App() {
   const [tick, setTick] = useState(Date.now() / 1000);
   const [sessionError, setSessionError] = useState("");
   const loggedOut = () => {
-    setSession({ authenticated: false, configured: true });
+    setSession((current) => ({ authenticated: false, configured: true, mode: current?.mode }));
+    clearTokens();
+    setMode("user");
+    setPage("overview");
+    history.replaceState(null, "", "/");
     setCsrf("");
     setSnapshot(null);
     setRules([]);
@@ -87,16 +95,38 @@ export function App() {
     setEditor(null);
   };
   useEffect(() => {
+    let mounted = true;
     api<Session>("/auth/session")
-      .then((s) => {
-        setSession(s);
-        setCsrf(s.csrf || "");
+      .then(async (initial) => {
+        if (!mounted) return;
+        let next = initial;
+        if (initial.mode === "oauth") {
+          setOAuth(true);
+          if (mounted) setSession(initial);
+          if (initial.configured && await finishDashboardAuthorization()) {
+            next = { ...initial, authenticated: true, account: await api<Account>("/auth/me") };
+          }
+        } else {
+          setOAuth(false);
+          if (!initial.authenticated && initial.configured) {
+            next = await api<Session>("/auth/session", { credentials: "same-origin" });
+          }
+        }
+        if (mounted) {
+          setSession(next);
+          setCsrf(next.csrf || "");
+        }
       })
-      .catch(() =>
-        setSessionError("Could not reach the relay. Refresh to try again."),
-      );
+      .catch((error: Error) => {
+        if (mounted) {
+          setSessionError(error.message);
+        }
+      });
     window.addEventListener("airkeep:session-ended", loggedOut);
-    return () => window.removeEventListener("airkeep:session-ended", loggedOut);
+    return () => {
+      mounted = false;
+      window.removeEventListener("airkeep:session-ended", loggedOut);
+    };
   }, []);
   useEffect(() => {
     const t = setInterval(() => setTick(Date.now() / 1000), 1000);
@@ -164,15 +194,22 @@ export function App() {
   useEffect(() => {
     const sync = () => {
       const value = location.hash.slice(1) as Page;
-      if ([...userPages, ...adminPages].some((p) => p[0] === value)) {
+      if (value === "password" || value === "accounts" || [...userPages, ...adminPages].some((p) => p[0] === value)) {
         setPage(value);
-        setMode(adminPages.some((p) => p[0] === value) ? "admin" : "user");
+        setMode(value === "accounts" || adminPages.some((p) => p[0] === value) ? "admin" : "user");
       }
     };
     sync();
     window.addEventListener("hashchange", sync);
     return () => window.removeEventListener("hashchange", sync);
   }, []);
+  const oauth = session?.mode === "oauth";
+  const canAdmin = !oauth || session.account?.role === "admin";
+  const effectiveMode = canAdmin ? mode : "user";
+  const adminPage = adminPages.some(([key]) => key === page);
+  const effectivePage = !canAdmin && (adminPage || page === "accounts") ? "overview" : page;
+  if (!session?.authenticated && oauth)
+    return <AccountLogin configured={session.configured} error={sessionError} />;
   if (!session?.authenticated)
     return (
       <Login
@@ -200,7 +237,7 @@ export function App() {
           <span>Airkeep</span>
         </a>
         <nav aria-label="Main navigation">
-          {(mode === "user" ? userPages : adminPages).map(
+          {(effectiveMode === "user" ? userPages : adminPages).map(
             ([id, label, Icon]) => (
               <button
                 className={page === id ? "nav-item selected" : "nav-item"}
@@ -212,13 +249,18 @@ export function App() {
               </button>
             ),
           )}
+          {oauth && <button className={page === "accounts" || page === "password" ? "nav-item selected" : "nav-item"}
+            onClick={() => go(effectiveMode === "admin" ? "accounts" : "password")}>
+            <User size={25} weight="light" />
+            <span>{effectiveMode === "admin" ? "Accounts" : "My account"}</span>
+          </button>}
         </nav>
         <div className="sidebar-bottom">
           <span className="eyebrow">View</span>
           <div className="view-row">
             <User size={25} weight="light" />
             <div className="segmented modes">
-              {(["user", "admin"] as const).map((m) => (
+              {(canAdmin ? ["user", "admin"] as const : ["user"] as const).map((m) => (
                 <button
                   key={m}
                   className={mode === m ? "chosen" : ""}
@@ -236,7 +278,7 @@ export function App() {
             className="logout"
             onClick={async () => {
               try {
-                await api("/auth/logout", { method: "POST" });
+                await api(oauth ? "/auth/revoke" : "/auth/logout", { method: "POST" });
                 loggedOut();
               } catch (e) {
                 setSessionError((e as Error).message);
@@ -304,9 +346,11 @@ export function App() {
             {connectionError}
           </p>
         )}
-        {mode === "user" ? (
+        {oauth && (effectivePage === "password" || effectivePage === "accounts") ? (
+          <AccountSettings key={effectivePage} admin={effectivePage === "accounts"} signedOut={loggedOut} />
+        ) : effectiveMode === "user" ? (
           <>
-            {page === "overview" && (
+            {effectivePage === "overview" && (
               <>
                 <section className="hero">
                   <h1 className="eyebrow">Relative humidity</h1>
@@ -347,7 +391,7 @@ export function App() {
                 </button>
               </>
             )}
-            {page === "history" && (
+            {effectivePage === "history" && (
               <>
                 <div className="page-heading">
                   <h1>History</h1>
@@ -356,7 +400,7 @@ export function App() {
                 <HistoryChart ams={ams} expanded />
               </>
             )}
-            {page === "alerts" && (
+            {effectivePage === "alerts" && (
               <Alerts
                 rules={rules}
                 units={units}
@@ -369,7 +413,7 @@ export function App() {
             )}
           </>
         ) : (
-          <Admin key={page} page={page} />
+          <Admin key={effectivePage} page={effectivePage} />
         )}
         <footer>
           Airkeep <span>Readings from your relay</span>
@@ -1263,6 +1307,8 @@ function Admin({ page }: { page: Page }) {
     activities: "Live Activities",
     push: "Apple push",
     queue: "Pending queue",
+    accounts: "Accounts",
+    password: "Change password",
   }[page];
   return (
     <>

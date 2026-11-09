@@ -214,6 +214,26 @@ struct RelaySettingsView: View {
                     }
                 }
                 Button("Edit connection") { editConnection = true }.disabled(model.demo)
+                if TokenStore.read().hasPrefix("oauth:") {
+                    Button("Sign out", role: .destructive) {
+                        Task {
+                            let relay = RelayClient()
+                            do {
+                                do { _ = try await relay.request("auth/revoke", method: "POST") }
+                                catch RelayClient.RelayError.http(401) { }
+                                #if os(iOS)
+                                await LiveMonitor.shared.stopAll(relay: relay)
+                                WatchCompanion.shared.clearConnection()
+                                #endif
+                                SharedConfiguration.clearAccountData(endpoint: relay.endpoint)
+                                try TokenStore.delete(account: relay.token)
+                                try TokenStore.delete(account: "bearer-token")
+                                model.connectionChanged()
+                                await model.alertRules.refresh()
+                            } catch { model.error = error.localizedDescription }
+                        }
+                    }
+                }
                 Button("Check connection") { Task { await model.refresh(forceHistory: true); await notifications.refresh() } }
                     .disabled(model.demo || model.refreshing)
                 if let error = model.error { Text(error).font(.caption).foregroundStyle(.orange) }
@@ -230,7 +250,7 @@ struct RelaySettingsView: View {
             WatchCompanionSettings(amsID: model.selectedAMS, demo: model.demo)
             #endif
             Section("Privacy") {
-                Text("Your connection token is stored securely in Keychain.")
+                Text("Airkeep keeps your sign-in in Keychain.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

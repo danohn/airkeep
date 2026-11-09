@@ -34,7 +34,7 @@ AMS humidity describes the air around the filament.
 
 ## Set up the relay
 
-Run the relay on an always-on host that can reach the printer's LAN. You'll need the printer's address, serial number and LAN access code, plus a bearer token for client access.
+Run the relay on an always-on host that can reach the printer's LAN. You'll need the printer's address, serial number and LAN access code, plus a bearer token for the ESP32 display and user accounts for the dashboard and Apple apps.
 
 Follow [Docker deployment](docs/docker-deployment.md) to configure and start it. The guide covers persistent storage, HTTPS and optional APNs keys. Clients on other devices need a reachable HTTPS address with a trusted certificate. Keep the printer's MQTT port private.
 
@@ -49,19 +49,19 @@ open apple/Airkeep.xcodeproj
 
 Set your team and bundle prefix in `Local.xcconfig`, then select `Airkeep-iOS`, `Airkeep-macOS` or `Airkeep-watchOS`. The iOS app includes the Watch companion. [Apple setup](docs/apple-setup.md) covers signing, shared storage, push entitlements and project regeneration with XcodeGen.
 
-In Settings → Relay, enter the relay's HTTPS URL and bearer token. Credentials are stored in Keychain. For a UI preview, launch with `--demo`.
+In Settings → Relay, enter the relay's HTTPS URL and sign in with your username and password. Credentials are stored in Keychain. For a UI preview, launch with `--demo`.
 
 ### Connect Apple Watch
 
 Install Airkeep on the paired Watch, then open Settings → Relay → Apple Watch in the iPhone app and choose Connect Apple Watch. Wait for Connected to appear. On the Watch, add Airkeep through the watch-face complication picker or Smart Stack and choose the AMS to display.
 
-The Watch app fetches directly from the relay, with a reachable-iPhone fallback and cached readings when offline. Complications fetch directly and retain cached readings with their original timestamps. Edit shared alert rules on iPhone, iPad, Mac or the web dashboard; the Watch shows their status.
+The Watch app fetches directly from the relay, with a reachable-iPhone fallback and cached readings when offline. Complications fetch directly and retain cached readings with their original timestamps. Edit your alert rules on iPhone, iPad, Mac or the web dashboard; the Watch shows their status.
 
 ## Web dashboard
 
-The dashboard runs in an Nginx container alongside the Python backend. Nginx serves the frontend and forwards API requests, so the dashboard and native clients use the same HTTPS address. [Docker deployment](docs/docker-deployment.md) covers the two GHCR images and shared image tags. Configure an owner password and browser origin using [web dashboard setup](docs/web-dashboard.md), restart the backend, then sign in.
+The dashboard runs in an Nginx container alongside the Python backend. Nginx serves the frontend and forwards API requests, so the dashboard and native clients use the same HTTPS address. [Docker deployment](docs/docker-deployment.md) covers the two GHCR images and shared image tags. Create the first administrator using [account setup](docs/docker-deployment.md#accounts-and-sign-in), then sign in with your username and password.
 
-Switch between User and Admin views with the same owner account. User view includes shared rules and a seven-day timeline of triggered and recovered alerts. Admin view shows relay health, device subscriptions, Live Activity sessions, Watch widget registrations and recent APNs requests. Manage rules in User view and device subscriptions in each Apple app. Successful push requests are labelled **Accepted by Apple**.
+Each user has their own rules and a seven-day timeline of triggered and recovered alerts. Administrators can create accounts and switch to Admin view. Admin view shows relay health, device subscriptions, Live Activity sessions, Watch widget registrations and recent APNs requests. Manage rules in User view and device subscriptions in each Apple app. Successful push requests are labelled **Accepted by Apple**.
 
 ## Build the desk display
 
@@ -82,7 +82,7 @@ Wi-Fi credentials and the relay token are stored in ignored local configuration 
 
 In Settings → Humidity alerts, or Humidity alerts on the web, create named rules for each AMS with their own threshold, hold duration and recovery margin. New rules start disabled. The relay keeps rules in sync across clients and evaluates each independently. Each rule sends an alert once its threshold has been sustained and a recovery alert after humidity falls below the reset point. Cached rules remain readable offline; saving requires a relay connection.
 
-Choose Receive alerts on this device in Settings → Notifications on each iPhone, iPad or Mac that should receive them. Watch notifications follow the paired iPhone's notification settings. Shared rules apply to every subscribed device.
+Choose Receive alerts on this device in Settings → Notifications on each iPhone, iPad or Mac that should receive them. Watch notifications follow the paired iPhone's notification settings. Your rules apply to your subscribed devices.
 
 Remote alerts, background Live Activity updates and Watch widget push updates need an Apple Developer Program account and your own APNs signing keys. Follow [push setup](docs/push-setup.md) for alerts and Live Activities, and [Watch widget push setup](docs/web-dashboard.md#watch-widget-updates) for the Watch topic and keys. Readings, history and scheduled widget refreshes work independently of APNs.
 

@@ -25,10 +25,13 @@ enum SharedConfiguration {
         #endif
     }
     static var deviceID: String {
-        if let id = defaults.string(forKey: "deviceID") { return id }
-        let id = UUID().uuidString
-        defaults.set(id, forKey: "deviceID")
-        return id
+        get {
+            if let id = defaults.string(forKey: "deviceID") { return id }
+            let id = UUID().uuidString
+            defaults.set(id, forKey: "deviceID")
+            return id
+        }
+        set { defaults.set(newValue, forKey: "deviceID") }
     }
     static func cachedRules(endpoint: String) -> AlertRulesCache? {
         guard let data = defaults.data(forKey: "alertRules.\(endpoint)") else { return nil }
@@ -42,6 +45,10 @@ enum SharedConfiguration {
     }
     static func saveReceiveAlertsIntent(_ enabled: Bool, endpoint: String) {
         defaults.set(enabled, forKey: "receiveAlerts.\(endpoint)")
+    }
+    static func clearAccountData(endpoint: String) {
+        defaults.removeObject(forKey: "alertRules.\(endpoint)")
+        defaults.removeObject(forKey: "receiveAlerts.\(endpoint)")
     }
     static var cached: Reading? {
         get {

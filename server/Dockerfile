@@ -1,5 +1,5 @@
 FROM python:3.14-slim-bookworm AS builder
-COPY --from=ghcr.io/astral-sh/uv:0.11.15 /uv /usr/local/bin/uv
+RUN pip install --no-cache-dir uv==0.11.15
 ENV UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never UV_COMPILE_BYTECODE=1
 WORKDIR /app
 COPY server/pyproject.toml server/uv.lock ./

@@ -16,6 +16,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>airkeep</string>
+				<string>io.airkeep.oauth</string>
 			</array>
 		</dict>
 	</array>

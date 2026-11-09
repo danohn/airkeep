@@ -71,8 +71,8 @@ def history_v2(store, ams, hours, now, stale):
     return {'amsID':ams,'from':start,'to':now,'bucketSeconds':width,'series':series}
 
 
-def events_page(store, *, ams=None, rule_id=None, cursor=None, limit=50):
-    where, args = ['at>=?'], [time.time()-7*86400]
+def events_page(store, *, ams=None, rule_id=None, cursor=None, limit=50,owner=None):
+    where, args = ['at>=?','owner_id IS ?'], [time.time()-7*86400,owner]
     if ams is not None:
         where.append('ams=?'); args.append(ams)
     if rule_id is not None:
@@ -91,13 +91,13 @@ def events_page(store, *, ams=None, rule_id=None, cursor=None, limit=50):
     if len(rows)>limit:
         last = selected[-1]
         next_cursor = base64.urlsafe_b64encode(json.dumps([last['at'],last['id']]).encode()).decode()
-    current={rule['id']:rule for rule in store.rules()}
+    current={rule['id']:rule for rule in store.rules(owner)}
     known={identifier:{'id':identifier,'name':rule['name'],'deleted':False} for identifier,rule in current.items()}
-    event_rules=store.rows("SELECT rule_id,json_extract(json,'$.name') AS name,MAX(at) FROM alert_events WHERE at>=? GROUP BY rule_id",(time.time()-7*86400,))
+    event_rules=store.rows("SELECT rule_id,json_extract(json,'$.name') AS name,MAX(at) FROM alert_events WHERE at>=? AND owner_id IS ? GROUP BY rule_id",(time.time()-7*86400,owner))
     for row in event_rules:
         known.setdefault(row['rule_id'],{'id':row['rule_id'],'name':row['name'],'deleted':True})
     units={reading.amsID for reading in store.readings()} | {rule['amsID'] for rule in current.values()}
-    units.update(row[0] for row in store.rows('SELECT DISTINCT ams FROM alert_events WHERE at>=?',(time.time()-7*86400,)))
+    units.update(row[0] for row in store.rows('SELECT DISTINCT ams FROM alert_events WHERE at>=? AND owner_id IS ?',(time.time()-7*86400,owner)))
     return {'events':[json.loads(r['json']) for r in selected], 'nextCursor':next_cursor,
             'filters':{'amsIDs':sorted(units),'rules':sorted(known.values(),key=lambda rule:(rule['name'].casefold(),rule['id']))}}
 
@@ -106,7 +106,7 @@ class Login(BaseModel):
     password: str = Field(min_length=1, max_length=1024)
 
 
-def install_web(app, store, settings, auth, authorize_user, collector):
+def install_web(app, store, settings, auth, authorize_user, collector, admin, oauth):
     started = time.time()
 
     @app.middleware('http')
@@ -120,39 +120,47 @@ def install_web(app, store, settings, auth, authorize_user, collector):
             response.headers['Cache-Control'] = 'no-store'
         return response
 
-    @app.get('/auth/session')
-    def session(request: Request):
-        try:
-            row = auth.session(request)
-        except HTTPException:
-            return {'authenticated':False,'configured':auth.configured}
-        return {'authenticated':True,'configured':True,'csrf':row['csrf'],'expiresAt':row['expires']}
+    if oauth:
+        @app.get('/auth/session')
+        def status():
+            return {'authenticated':False,'configured':bool(store.rows('SELECT 1 FROM accounts LIMIT 1')),
+                    'mode':'oauth'}
+    else:
+        @app.get('/auth/session')
+        def session(request: Request):
+            try:
+                row = auth.session(request)
+            except HTTPException:
+                return {'authenticated':False,'configured':auth.configured}
+            return {'authenticated':True,'configured':True,'csrf':row['csrf'],'expiresAt':row['expires']}
 
-    @app.post('/auth/login')
-    def login(body: Login, request: Request, response: Response):
-        if not auth.configured:
-            raise HTTPException(503, 'Set up the browser password on your relay.')
-        token, csrf = auth.login(request,body.password)
-        response.set_cookie(COOKIE,token,max_age=LIFETIME,httponly=True,secure=settings.web_secure_cookies,
-                            samesite='strict',path='/')
-        return {'authenticated':True,'csrf':csrf,'expiresAt':time.time()+LIFETIME}
+        @app.post('/auth/login')
+        def login(body: Login, request: Request, response: Response):
+            if not auth.configured:
+                raise HTTPException(503, 'Set up the browser password on your relay.')
+            token, csrf = auth.login(request,body.password)
+            response.set_cookie(COOKIE,token,max_age=LIFETIME,httponly=True,secure=settings.web_secure_cookies,
+                                samesite='strict',path='/')
+            return {'authenticated':True,'csrf':csrf,'expiresAt':time.time()+LIFETIME}
 
-    @app.post('/auth/logout', dependencies=[Depends(auth.require)])
-    def logout(request: Request, response: Response):
-        store.execute('DELETE FROM web_sessions WHERE id=?',(auth.digest(request.cookies.get(COOKIE,'')),))
-        response.delete_cookie(COOKIE,path='/',secure=settings.web_secure_cookies,httponly=True,samesite='strict')
-        return {'authenticated':False}
+        @app.post('/auth/logout', dependencies=[Depends(auth.require)])
+        def logout(request: Request, response: Response):
+            store.execute('DELETE FROM web_sessions WHERE id=?',(auth.digest(request.cookies.get(COOKIE,'')),))
+            response.delete_cookie(COOKIE,path='/',secure=settings.web_secure_cookies,httponly=True,samesite='strict')
+            return {'authenticated':False}
 
     @app.get('/v2/history', dependencies=[Depends(authorize_user)])
     def history(ams: str=Query(default='0',min_length=1,max_length=8),hours: int=Query(default=1,ge=1,le=168)):
         return history_v2(store,ams,hours,time.time(),settings.stale_seconds)
 
-    @app.get('/v2/alert-events', dependencies=[Depends(authorize_user)])
+    @app.get('/v2/alert-events')
     def events(ams: str | None=None,rule_id: str | None=None,cursor: str | None=Query(default=None,max_length=500),
-               limit: int=Query(default=50,ge=1,le=100)):
-        return events_page(store,ams=ams,rule_id=rule_id,cursor=cursor,limit=limit)
+               limit: int=Query(default=50,ge=1,le=100), identity=Depends(authorize_user)):
+        if identity and identity.client == 'watch':
+            raise HTTPException(403,'Open alert history in the dashboard.')
+        return events_page(store,ams=ams,rule_id=rule_id,cursor=cursor,limit=limit,owner=identity.user if identity else None)
 
-    @app.get('/v2/admin/overview', dependencies=[Depends(auth.require)])
+    @app.get('/v2/admin/overview', dependencies=[Depends(admin)])
     def overview():
         latest = store.readings()
         now = time.time()
@@ -169,21 +177,21 @@ def install_web(app, store, settings, auth, authorize_user, collector):
                     for table in ('samples','devices','activities','alert_rules','outbox')},
                 'timelineStartedAt':json.loads(store.rows("SELECT json FROM config WHERE id='events_started_at'")[0][0])}
 
-    @app.get('/v2/admin/devices', dependencies=[Depends(auth.require)])
+    @app.get('/v2/admin/devices', dependencies=[Depends(admin)])
     def devices():
         return [{'id':r['id'],'platform':'mac' if r['topic']==settings.mac_topic else 'ios',
                  'topic':r['topic'],'environment':r['environment'],'receiveAlerts':bool(r['receive_alerts']),
                  'tokenFingerprint':token_fingerprint(r['token']),'createdAt':r['created_at'],'lastRegisteredAt':r['registered_at']}
                 for r in store.rows('SELECT * FROM devices ORDER BY registered_at DESC')]
 
-    @app.get('/v2/admin/activities', dependencies=[Depends(auth.require)])
+    @app.get('/v2/admin/activities', dependencies=[Depends(admin)])
     def activities():
         return [{'id':r['id'],'amsID':r['ams'],'environment':r['environment'],'topic':settings.ios_topic+'.push-type.liveactivity',
                  'createdAt':r['created_at'],'lastRegisteredAt':r['registered_at'],'expiresAt':r['expires'],
                  'lastAcceptedAt':r['last_sent'] or None,'tokenFingerprint':token_fingerprint(r['token'])}
                 for r in store.rows('SELECT * FROM activities ORDER BY expires DESC')]
 
-    @app.get('/v2/admin/widgets', dependencies=[Depends(auth.require)])
+    @app.get('/v2/admin/widgets', dependencies=[Depends(admin)])
     def widgets():
         now=time.time(); readings={r.amsID:r for r in store.readings()}
         result=[]
@@ -198,13 +206,13 @@ def install_web(app, store, settings, auth, authorize_user, collector):
                 'pending':pending,'nextAttemptAt':max(now,row['next_attempt'],row['last_attempt']+300) if pending else None})
         return result
 
-    @app.get('/v2/admin/push-attempts', dependencies=[Depends(auth.require)])
-    def attempts(before: int | None=None,limit: int=Query(default=50,ge=1,le=100)):
+    @app.get('/v2/admin/push-attempts', dependencies=[Depends(admin)])
+    def attempts(before: int | None=None,limit: int=Query(default=50,ge=1,le=100), identity=Depends(authorize_user)):
         rows = store.rows('SELECT * FROM push_attempts WHERE at>=? AND id<? ORDER BY id DESC LIMIT ?',
                           (time.time()-7*86400,before or 2**63-1,limit+1))
         return {'attempts':[dict(r) for r in rows[:limit]],'nextCursor':rows[limit-1]['id'] if len(rows)>limit else None}
 
-    @app.get('/v2/admin/queue', dependencies=[Depends(auth.require)])
+    @app.get('/v2/admin/queue', dependencies=[Depends(admin)])
     def queue():
         return [{'id':r['id'],'deviceID':r['device'],'ruleID':r['rule_id'],'attempts':r['attempts'],
                  'nextAttemptAt':r['next'],'createdAt':r['created']} for r in store.rows('SELECT * FROM outbox ORDER BY next LIMIT 100')]

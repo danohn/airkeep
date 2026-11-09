@@ -44,7 +44,9 @@
 		5DFFB7CCA76E42995714C6CF /* MonitorLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0BCBD863DB6989FF82B0F16 /* MonitorLiveActivity.swift */; };
 		5E870AA5FBE6F98EE4D019AF /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C44A5EEEC49510E3B55E58A /* MenuBarView.swift */; };
 		5EE349F194D450ACFD3054AB /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = F4EE0E1C731B0FD7391C3141 /* AppIcon.icon */; };
+		5FBB2537C08E9C4997958531 /* RelayOAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4EB3A47078335B4D7A2A461 /* RelayOAuth.swift */; };
 		612333A0C672C6B50DEB5C5A /* AirkeepWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35C254892B1B824E5858C2C2 /* AirkeepWatchApp.swift */; };
+		621CD7FEADC4B00FED9533BF /* RelayOAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4EB3A47078335B4D7A2A461 /* RelayOAuth.swift */; };
 		658B7B30223798631447F79B /* ActivityUpdateRegistration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18703F94E54245B02C9E10AE /* ActivityUpdateRegistration.swift */; };
 		6CF37655E4EC3C4D820BE053 /* LiveActivityTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D319A487EBF679137A93D2 /* LiveActivityTiming.swift */; };
 		6FB221AA8FD2BA8A1BEF682D /* ActivityUpdateRegistration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18703F94E54245B02C9E10AE /* ActivityUpdateRegistration.swift */; };
@@ -52,21 +54,26 @@
 		7068986D73F20B335909AE70 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90D2C4C5758A3D1FACF767B /* Theme.swift */; };
 		70814F42111627E14BA3E986 /* LiveActivitiesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40BE96C78C2C605CF2CD60A /* LiveActivitiesView.swift */; };
 		71E7F648D977DB81B8F8CFA1 /* WatchWidgetIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BC8D82B6B407FD7C9A6890A /* WatchWidgetIntent.swift */; };
+		73D2BED72E474BA678DBA592 /* RelayOAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4EB3A47078335B4D7A2A461 /* RelayOAuth.swift */; };
 		77A8CBDA3E4A66858E7A22C7 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90D2C4C5758A3D1FACF767B /* Theme.swift */; };
 		781DBA147761DC8B72ABCF4A /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D023DF191CDF108295056FBE /* RelayClient.swift */; };
+		7A9C57B4B8D4FABC333D6F80 /* RelayOAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4EB3A47078335B4D7A2A461 /* RelayOAuth.swift */; };
 		7C2B2A2F4D9D0DC459DFD699 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38C2728CA3712EAC2D51E16B /* Configuration.swift */; };
 		7EC8FCC0F83707A9BFAE6E79 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38C2728CA3712EAC2D51E16B /* Configuration.swift */; };
 		7F085A1551C9B0EF6AEA8A8E /* LiveActivityTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D319A487EBF679137A93D2 /* LiveActivityTiming.swift */; };
+		8189C78BBEC5E43EA13C88CB /* RelaySignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CB08CB4762C382960E2505C /* RelaySignIn.swift */; };
 		823F642C2E21E28680DEDF21 /* ActivityUpdateRegistration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18703F94E54245B02C9E10AE /* ActivityUpdateRegistration.swift */; };
 		82DA77D360B0C039B72117D8 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1DB4886A3FDF55872BBD78 /* Models.swift */; };
 		8CC2062AC740753B11E48BF1 /* LiveActivityTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D319A487EBF679137A93D2 /* LiveActivityTiming.swift */; };
 		9151929EB12D45A8F87DC76F /* AlertRulesModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30AEEA8F381CAE2C1C4138C9 /* AlertRulesModel.swift */; };
 		93BCFEAF510BFC5B8AB4CC5F /* AlertsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78357A924B65198BDC69A5CD /* AlertsView.swift */; };
+		98B8D4B1004F1EFB2FA3073E /* RelayOAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4EB3A47078335B4D7A2A461 /* RelayOAuth.swift */; };
 		99A257587A7E83C66A4EC227 /* LiveActivitiesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40BE96C78C2C605CF2CD60A /* LiveActivitiesView.swift */; };
 		9BE769DC95C87B2419D64865 /* ChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FFF9C4333814393241E70DD /* ChartView.swift */; };
 		9C6DD11B44F28B89ED332BBA /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90D2C4C5758A3D1FACF767B /* Theme.swift */; };
 		9D1B4BCEAC310A4CF5257BC0 /* WatchWidgetIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BC8D82B6B407FD7C9A6890A /* WatchWidgetIntent.swift */; };
 		9E3A20775FAFF53290EB0B65 /* RefreshIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02AED6709E1040FAB4F5E6EF /* RefreshIntent.swift */; };
+		A0B28150B9CCDF0577B665FB /* RelayOAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4EB3A47078335B4D7A2A461 /* RelayOAuth.swift */; };
 		A218239772F11B95BE8F9D02 /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D023DF191CDF108295056FBE /* RelayClient.swift */; };
 		A4BE94AD48DD60EE7E916D52 /* MonitorAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD62B603226DF5B13DCA4C4 /* MonitorAttributes.swift */; };
 		A70BEECFA2A696A1BE6E38AB /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC6B8778F752D0D723E8BD3 /* ConnectionView.swift */; };
@@ -95,6 +102,7 @@
 		D8794EA62CF40441F0A23443 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40A00CA41C906188F9CC4A80 /* DashboardView.swift */; };
 		E0F5E0F6E24F5760F32064BC /* WatchDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA48A175DE4EA045776139D4 /* WatchDashboardView.swift */; };
 		E0F9F47A4F67F166FC5B1F28 /* ChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FFF9C4333814393241E70DD /* ChartView.swift */; };
+		E2DA075466422F9621F4C10B /* RelaySignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CB08CB4762C382960E2505C /* RelaySignIn.swift */; };
 		E3E959B7D3C071BE50FB1D77 /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D023DF191CDF108295056FBE /* RelayClient.swift */; };
 		E9C1C554BEB31A902CAF99EE /* AirkeepApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5B6D99C65B201622A6F44C4 /* AirkeepApp.swift */; };
 		EA7EFE14CC9DE971D6489EA4 /* RefreshIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02AED6709E1040FAB4F5E6EF /* RefreshIntent.swift */; };
@@ -102,6 +110,7 @@
 		F24A729C1C6DD2842BF65DCA /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90D2C4C5758A3D1FACF767B /* Theme.swift */; };
 		F252CCC23BFF26BECE2418F3 /* RefreshIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02AED6709E1040FAB4F5E6EF /* RefreshIntent.swift */; };
 		F2EEB742A39F982AB362145D /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC6B8778F752D0D723E8BD3 /* ConnectionView.swift */; };
+		F5F44D8D64C6CE165CA16172 /* RelayOAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4EB3A47078335B4D7A2A461 /* RelayOAuth.swift */; };
 		FAA073CAF95A18AF09FE117E /* WatchRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E844DCA12EF3149EB7A6A0 /* WatchRelay.swift */; };
 		FAD5B85DEA49E583E0546893 /* AirkeepWatchWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BCCA0C2DF4E7D98CD9CED16 /* AirkeepWatchWidgets.swift */; };
 		FCF295014DEEBC06722364E9 /* AirkeepWidgets-macOS.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0591C52E875EE17272A2A40B /* AirkeepWidgets-macOS.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -221,6 +230,7 @@
 		65E844DCA12EF3149EB7A6A0 /* WatchRelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchRelay.swift; sourceTree = "<group>"; };
 		6982B2505016558F4B918A21 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		78357A924B65198BDC69A5CD /* AlertsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertsView.swift; sourceTree = "<group>"; };
+		7CB08CB4762C382960E2505C /* RelaySignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelaySignIn.swift; sourceTree = "<group>"; };
 		9510B7600328346F6089C8B4 /* WatchCompanionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCompanionTests.swift; sourceTree = "<group>"; };
 		965831A6AC0B33D725EAECE7 /* WatchBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchBridge.swift; sourceTree = "<group>"; };
 		99E658523EB6001641E2CD7C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -232,6 +242,7 @@
 		B40BE96C78C2C605CF2CD60A /* LiveActivitiesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivitiesView.swift; sourceTree = "<group>"; };
 		B744B1CDFFFB2CFA91C6C587 /* Airkeep-watchOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Airkeep-watchOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C32743AF97BD35AEEA5B49E8 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		C4EB3A47078335B4D7A2A461 /* RelayOAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayOAuth.swift; sourceTree = "<group>"; };
 		C90D2C4C5758A3D1FACF767B /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		D023DF191CDF108295056FBE /* RelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayClient.swift; sourceTree = "<group>"; };
 		D57502BA6DFC22D9F7C4666E /* WatchCompanion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCompanion.swift; sourceTree = "<group>"; };
@@ -308,6 +319,7 @@
 				B40BE96C78C2C605CF2CD60A /* LiveActivitiesView.swift */,
 				E7CBBCD7F1448B58DDED8A87 /* MonitorModel.swift */,
 				E70CA9BF577566983215A154 /* NotificationManager.swift */,
+				7CB08CB4762C382960E2505C /* RelaySignIn.swift */,
 				540CBBB611F0AB4052AD53B3 /* SettingsView.swift */,
 			);
 			path = App;
@@ -382,6 +394,7 @@
 				EDD62B603226DF5B13DCA4C4 /* MonitorAttributes.swift */,
 				02AED6709E1040FAB4F5E6EF /* RefreshIntent.swift */,
 				D023DF191CDF108295056FBE /* RelayClient.swift */,
+				C4EB3A47078335B4D7A2A461 /* RelayOAuth.swift */,
 				C90D2C4C5758A3D1FACF767B /* Theme.swift */,
 			);
 			path = Shared;
@@ -632,6 +645,7 @@
 				D14BEA204C1D977A293107A4 /* NotificationManager.swift in Sources */,
 				3B3843D0E67110337DACC4D7 /* NotificationManagerTests.swift in Sources */,
 				E3E959B7D3C071BE50FB1D77 /* RelayClient.swift in Sources */,
+				73D2BED72E474BA678DBA592 /* RelayOAuth.swift in Sources */,
 				290E18CBEE3125277018DE19 /* WatchCompanionTests.swift in Sources */,
 				1A5FA9B103B67D8CF13A6CED /* WatchRelay.swift in Sources */,
 				15BC2C6F1EF9E54C1DF0223B /* WatchState.swift in Sources */,
@@ -652,6 +666,7 @@
 				1D1DAE9CB5DEA0A11C7EC936 /* MonitorLiveActivity.swift in Sources */,
 				9E3A20775FAFF53290EB0B65 /* RefreshIntent.swift in Sources */,
 				1F23575566D5B1931865567D /* RelayClient.swift in Sources */,
+				7A9C57B4B8D4FABC333D6F80 /* RelayOAuth.swift in Sources */,
 				77A8CBDA3E4A66858E7A22C7 /* Theme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -677,6 +692,8 @@
 				3281FCC5DEBBC1521F2FBF7B /* NotificationManager.swift in Sources */,
 				FEE4BCE3F13C203B1D5BFD73 /* RefreshIntent.swift in Sources */,
 				781DBA147761DC8B72ABCF4A /* RelayClient.swift in Sources */,
+				621CD7FEADC4B00FED9533BF /* RelayOAuth.swift in Sources */,
+				8189C78BBEC5E43EA13C88CB /* RelaySignIn.swift in Sources */,
 				152C85766D60FCE352AF4EB3 /* SettingsView.swift in Sources */,
 				9C6DD11B44F28B89ED332BBA /* Theme.swift in Sources */,
 			);
@@ -690,6 +707,7 @@
 				7C2B2A2F4D9D0DC459DFD699 /* Configuration.swift in Sources */,
 				3694931692FCAF83467BB771 /* Models.swift in Sources */,
 				525831603F0C3895E5829F44 /* RelayClient.swift in Sources */,
+				F5F44D8D64C6CE165CA16172 /* RelayOAuth.swift in Sources */,
 				7068986D73F20B335909AE70 /* Theme.swift in Sources */,
 				FAA073CAF95A18AF09FE117E /* WatchRelay.swift in Sources */,
 				D81727B61D7627D6CF38F16D /* WatchState.swift in Sources */,
@@ -706,6 +724,7 @@
 				7EC8FCC0F83707A9BFAE6E79 /* Configuration.swift in Sources */,
 				54B5DED6E56EDD93C00A67C2 /* Models.swift in Sources */,
 				A218239772F11B95BE8F9D02 /* RelayClient.swift in Sources */,
+				5FBB2537C08E9C4997958531 /* RelayOAuth.swift in Sources */,
 				F24A729C1C6DD2842BF65DCA /* Theme.swift in Sources */,
 				28C658179A4932C94192D6C9 /* WatchBridge.swift in Sources */,
 				E0F5E0F6E24F5760F32064BC /* WatchDashboardView.swift in Sources */,
@@ -736,6 +755,8 @@
 				3B6E1B88F76DB35672970372 /* NotificationManager.swift in Sources */,
 				EA7EFE14CC9DE971D6489EA4 /* RefreshIntent.swift in Sources */,
 				D0BB92A5D6513CCA2DA82595 /* RelayClient.swift in Sources */,
+				A0B28150B9CCDF0577B665FB /* RelayOAuth.swift in Sources */,
+				E2DA075466422F9621F4C10B /* RelaySignIn.swift in Sources */,
 				D2B7025E0DF50694C50E14C0 /* SettingsView.swift in Sources */,
 				0D000129F5A72497D0E99F23 /* Theme.swift in Sources */,
 				B5B9BF6F00DBA5B9E0B60702 /* WatchCompanion.swift in Sources */,
@@ -756,6 +777,7 @@
 				5DFFB7CCA76E42995714C6CF /* MonitorLiveActivity.swift in Sources */,
 				F252CCC23BFF26BECE2418F3 /* RefreshIntent.swift in Sources */,
 				CCD73B9D14628A6A3135C756 /* RelayClient.swift in Sources */,
+				98B8D4B1004F1EFB2FA3073E /* RelayOAuth.swift in Sources */,
 				1A3B10BA9FBFE01E35AD8465 /* Theme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
