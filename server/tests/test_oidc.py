@@ -17,7 +17,7 @@ from accounts import NATIVE_CALLBACK, PASSWORD, bootstrap
 from app import create_app
 from config import Settings
 from storage import Store
-from test_accounts import ORIGIN, OWNER_PASSWORD, STATE, VERIFIER, begin, bearer, login
+from test_accounts import ORIGIN, OWNER_PASSWORD, STATE, VERIFIER, begin, bearer, browser_headers, login
 
 ISSUER = 'https://identity.example.test/oidc/'
 CALLBACK = ORIGIN + '/auth/oidc/callback'
@@ -91,7 +91,7 @@ def sso(tmp_path, monkeypatch):
         transport=httpx.MockTransport(provider.respond), **kwargs))
     app = create_app(settings)
     with TestClient(app, base_url=ORIGIN, headers={'Origin': ORIGIN}) as client:
-        admin = bearer(login(client, 'Owner', OWNER_PASSWORD)['access_token'])
+        admin = login(client, 'Owner', OWNER_PASSWORD)
         yield client, app.state.store, provider, admin
 
 
@@ -112,7 +112,10 @@ def exchange(client, response, app='dashboard'):
     assert query['state'] == [STATE]
     result = client.post('/auth/token', data=dict(grant_type='authorization_code', client_id=app,
                         redirect_uri=callback, code=query['code'][0], code_verifier=VERIFIER))
-    assert result.status_code == 200 and 'set-cookie' not in result.headers
+    assert result.status_code == 200
+    if app == 'dashboard':
+        return browser_headers(client, result)
+    assert 'set-cookie' not in result.headers
     return result.json()
 
 
@@ -136,12 +139,12 @@ def test_creation_roles_and_native_grant(sso):
                                                   refresh_token=tokens['refresh_token']))
     assert refresh.status_code == 200 and refresh.json()['access_token'] != tokens['access_token']
     url = request_provider(client, provider, teams=['Airkeep admins'], preferred_username='Changed')
-    assert client.get('/auth/me', headers=bearer(exchange(
-        client, client.get(url, follow_redirects=False))['access_token'])).json() == member
+    assert client.get('/auth/me', headers=exchange(
+        client, client.get(url, follow_redirects=False))).json() == member
     for subject, teams, role in [('admin', ['Airkeep admins'], 'admin'),
                                  ('malformed', ['Airkeep admins', 42], 'member')]:
         url = request_provider(client, provider, subject=subject, teams=teams)
-        headers = bearer(exchange(client, client.get(url, follow_redirects=False))['access_token'])
+        headers = exchange(client, client.get(url, follow_redirects=False))
         assert client.get('/auth/me', headers=headers).json()['role'] == role
     owner_id = client.get('/auth/me', headers=admin).json()['id']
     assert client.patch(f'/v2/admin/accounts/{owner_id}', headers=admin, json={'role': 'member'}).status_code == 409
@@ -177,7 +180,7 @@ def test_invitations_expire_replace_revoke_and_redeem_once(sso):
         responses = list(threads.map(lambda url: client.get(url, follow_redirects=False), callbacks))
     successes = [response for response in responses if '/auth/callback?' in response.headers['location']]
     assert len(successes) == 1
-    headers = bearer(exchange(client, successes[0])['access_token'])
+    headers = exchange(client, successes[0])
     assert client.get('/auth/me', headers=headers).json()['username'] == 'Invited'
     assert len(store.rows('SELECT * FROM oidc_identities')) == 1
     assert client.get(callbacks[0], follow_redirects=False).headers['location'].startswith('/?sso_error=')
@@ -189,10 +192,10 @@ def test_invite_links_local_account_without_moving_data(sso):
     rule = client.post('/v2/alerts', headers=admin, json={'name': 'Keep my alert'}).json()
     invitation = client.post(INVITES, headers=admin, json={'account_id': me['id']}).json()
     url = request_provider(client, provider, invitation=urlsplit(invitation['url']).fragment)
-    sso_headers = bearer(exchange(client, client.get(url, follow_redirects=False))['access_token'])
+    sso_headers = exchange(client, client.get(url, follow_redirects=False))
     assert client.get('/auth/me', headers=sso_headers).json() == me
     assert rule['id'] in {item['id'] for item in client.get('/v2/alerts', headers=sso_headers).json()}
-    assert login(client, 'Owner', OWNER_PASSWORD)['access_token']
+    assert login(client, 'Owner', OWNER_PASSWORD)['Cookie']
 
 
 @pytest.mark.parametrize('claims', [{'nonce':'wrong'}, {'aud':'wrong'}, {'iss':'https://wrong.test/'},
@@ -230,7 +233,7 @@ def test_oidc_dashboard_session_can_approve_display(sso):
     client, store, provider, admin = sso
     assert client.put(POLICY, headers=admin, json={'automatic_creation': True}).status_code == 200
     callback = request_provider(client, provider, subject='display-owner')
-    member = bearer(exchange(client, client.get(callback, follow_redirects=False))['access_token'])
+    member = exchange(client, client.get(callback, follow_redirects=False))
     display = client.post('/auth/device/code', data={'client_id': 'esp32', 'installation_id': 'c' * 32}).json()
     assert client.post('/auth/device/decision', headers=member,
                        json={'user_code': display['user_code'], 'approve': True}).status_code == 204

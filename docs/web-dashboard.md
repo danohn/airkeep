@@ -87,14 +87,16 @@ For this loopback setup only, set `AIRKEEP_WEB_ORIGIN=http://127.0.0.1:4173` and
 
 ## Relay interfaces
 
-Account access JWTs authorize API requests. Alert and event endpoints return only the signed-in user's data. A paired ESP32 can read the compact telemetry snapshot and revoke its own connection. Device and activity registration writes require a native app grant, and Watch widget registrations require a paired Watch grant.
+The dashboard signs in through OAuth 2.0 with PKCE. The relay puts the dashboard JWT in an HttpOnly cookie with an eight-hour lifetime. The cookie is shared across tabs and uses Secure and SameSite=Strict in production. Requests that change data must come from the configured dashboard origin. Upgrading from browser-stored tokens requires signing in again.
+
+Apple apps and paired ESP32 displays use bearer JWTs and rotating refresh tokens. The relay checks the active grant on every authenticated request. Alert and event endpoints return only the signed-in user's data. A paired ESP32 can read the compact telemetry snapshot and revoke its own connection. Device and activity registration writes require a native app grant, and Watch widget registrations require a paired Watch grant.
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /auth/session` | Public account setup status |
+| `GET /auth/session` | Account setup status and the current dashboard account, if signed in |
 | `GET/POST /auth/authorize` | Start a PKCE authorization request |
 | `POST /auth/credentials` | Verify username and password and complete first-sign-in password change |
-| `POST /auth/token` | Exchange a code or rotate a refresh token |
+| `POST /auth/token` | Exchange a code for a dashboard JWT cookie or device tokens, or rotate a device refresh token |
 | `POST /auth/device/code` | Start ESP32 pairing |
 | `POST /auth/device/verify` and `POST /auth/device/decision` | Review a pairing code and approve or deny it from a signed-in dashboard |
 | `GET /auth/me` | Current account identity and role |

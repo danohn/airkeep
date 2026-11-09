@@ -6,6 +6,7 @@ from urllib.parse import parse_qs, urlsplit
 from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
+import jwt
 import pytest
 
 from accounts import NATIVE_CALLBACK, PASSWORD, bootstrap, recover
@@ -58,10 +59,20 @@ def code_form(client, username, password, *, new_password=None, app='dashboard',
                 redirect_uri=callback, code_verifier=VERIFIER)
 
 
+def browser_headers(client, response):
+    # Keep independent browser sessions explicit when tests share an HTTP client.
+    assert response.json() == {'authenticated': True}
+    cookie = response.headers['set-cookie'].split(';', 1)[0]
+    client.cookies.clear()
+    return {'Cookie': cookie, 'Origin': ORIGIN}
+
+
 def login(client, username, password, **kwargs):
     form = code_form(client, username, password, **kwargs)
     response = client.post('/auth/token', data=form)
     assert response.status_code == 200, response.text
+    if form['client_id'] == 'dashboard':
+        return browser_headers(client, response)
     assert 'set-cookie' not in response.headers
     return response.json()
 
@@ -78,7 +89,8 @@ def account_app(settings):
 
 def account_headers(client, app='dashboard', installation=None):
     client.headers['Origin'] = ORIGIN
-    return bearer(login(client, 'Owner', OWNER_PASSWORD, app=app, installation=installation)['access_token'])
+    session = login(client, 'Owner', OWNER_PASSWORD, app=app, installation=installation)
+    return session if app == 'dashboard' else bearer(session['access_token'])
 
 
 @pytest.fixture
@@ -114,24 +126,24 @@ def test_bootstrap_is_reversible_and_rejects_the_old_shared_token(relay):
     assert snapshot.status_code == 401
     assert client.get('/v2/alerts',headers=bearer(ESP)).status_code == 401
     assert client.get('/v1/history',headers=bearer(ESP)).status_code == 401
-    admin = bearer(login(client,'owner',OWNER_PASSWORD)['access_token'])
+    admin = login(client,'owner',OWNER_PASSWORD)
     assert client.get('/v2/alerts',headers=admin).json() == [old_rule]
     assert client.get('/v2/alert-events',headers=admin).json()['events'][0]['ruleID'] == old_rule['id']
     recover(store,'OWNER',PASSWORD.hash('recovered administrator'))
     assert client.get('/auth/me',headers=admin).status_code == 401
-    assert login(client,'Owner','recovered administrator')['access_token']
+    assert login(client,'Owner','recovered administrator')['Cookie']
 
 
 def test_oauth_pkce_rotation_replay_and_revoke(relay):
     client, _, _, _ = relay
-    form = code_form(client,'Owner',OWNER_PASSWORD)
+    form = code_form(client,'Owner',OWNER_PASSWORD,app='apple-ios',installation='phone')
     assert client.post('/auth/token',data={**form,'code_verifier':'w'*43}).status_code == 400
     assert client.post('/auth/token',data={**form,'redirect_uri':'https://attacker.example/'}).status_code == 400
     response = client.post('/auth/token',data=form)
     assert response.status_code == 200 and response.json()['expires_in'] == 600
     assert client.post('/auth/token',data=form).status_code == 400
     first = response.json()
-    refresh = dict(grant_type='refresh_token',client_id='dashboard',refresh_token=first['refresh_token'])
+    refresh = dict(grant_type='refresh_token',client_id='apple-ios',refresh_token=first['refresh_token'])
     second = client.post('/auth/token',data=refresh).json()
     assert second['refresh_token'] != first['refresh_token']
     assert client.get('/auth/me',headers=bearer(second['access_token'])).status_code == 200
@@ -146,13 +158,13 @@ def test_oauth_pkce_rotation_replay_and_revoke(relay):
 
 def test_accounts_own_alerts_events_and_registrations(relay):
     client, store, old_rule, _ = relay
-    admin = bearer(login(client,'Owner',OWNER_PASSWORD)['access_token'])
+    admin = login(client,'Owner',OWNER_PASSWORD)
     created = client.post('/v2/admin/accounts',json={'username':'Member'},headers=admin)
     assert created.status_code == 201
     member_id, temporary = created.json()['id'], created.json()['temporaryPassword']
     assert client.post('/v2/admin/accounts',json={'username':'mEmBeR'},headers=admin).status_code == 409
     assert code_form(client,'Member',temporary) == {'passwordChangeRequired':True}
-    member = bearer(login(client,'Member',temporary,new_password=MEMBER_PASSWORD)['access_token'])
+    member = login(client,'Member',temporary,new_password=MEMBER_PASSWORD)
     assert client.get('/v2/admin/overview',headers=member).status_code == 403
     assert client.get('/v2/alerts',headers=member).json() == []
     assert client.get('/v2/alerts/'+old_rule['id'],headers=member).status_code == 404
@@ -184,7 +196,7 @@ def test_accounts_own_alerts_events_and_registrations(relay):
 
 def test_expired_temporary_password_cannot_start_enrollment(relay):
     client, store, _, _ = relay
-    admin = bearer(login(client,'Owner',OWNER_PASSWORD)['access_token'])
+    admin = login(client,'Owner',OWNER_PASSWORD)
     new = client.post('/v2/admin/accounts',json={'username':'Expired'},headers=admin).json()
     store.execute('UPDATE accounts SET temporary_until=? WHERE id=?',(time.time()-1,new['id']))
     tx, _ = begin(client)
@@ -249,20 +261,52 @@ async def test_watch_receives_its_own_copy_of_the_owners_alert(tmp_path):
         await push.close()
 
 
-def test_expiry_logout_and_password_change_stop_existing_access(relay):
+def test_browser_cookie_session_origin_logout_expiry_and_password_change(relay):
     client, store, _, _ = relay
-    tokens = login(client,'Owner',OWNER_PASSWORD)
-    headers = bearer(tokens['access_token'])
+    form = code_form(client,'Owner',OWNER_PASSWORD)
+    assert client.post('/auth/token', data=form, headers={'Origin':'https://attacker.example'}).status_code == 403
+    response = client.post('/auth/token', data=form)
+    assert response.status_code == 200 and response.json() == {'authenticated': True}
+    cookie = response.headers['set-cookie']
+    assert cookie.startswith('__Host-airkeep_session=')
+    assert {'httponly', 'secure', 'samesite=strict', 'max-age=28800', 'path=/'} <= {
+        item.strip().lower() for item in cookie.split(';')[1:]
+    }
+    assert 'domain=' not in cookie.lower()
+    assert client.get('/auth/session').json()['account']['username'] == 'Owner'
+    assert client.get('/v2/admin/overview').status_code == 200
+    assert client.get('/auth/me', headers=bearer('invalid')).status_code == 401
+    assert client.post('/auth/watch', json={'installation_id':'browser'}).status_code == 403
+    assert client.post('/auth/token', data=form).status_code == 400
+    grant = client.get('/auth/grants').json()[0]
+    assert grant['current']
+    assert client.get('/auth/me', headers={'Cookie':'__Host-airkeep_session='+grant['id']}).status_code == 401
+    assert client.post('/v2/alerts', json={'name':'CSRF'}, headers={'Origin':'https://attacker.example'}).status_code == 403
+    assert client.post('/auth/revoke', headers={'Origin':'null'}).status_code == 403
+    client.headers.pop('Origin')
+    assert client.post('/auth/revoke').status_code == 403
+    client.headers['Origin'] = ORIGIN
+    token = response.cookies.get('__Host-airkeep_session')
+    claims = jwt.decode(token, 'x'*64, algorithms=['HS256'], audience='airkeep-web', issuer=ORIGIN)
+    assert claims['sid'] == grant['id'] and 8 * 3600 - 1 <= claims['exp'] - claims['iat'] <= 8 * 3600
+    assert client.get('/auth/me', headers=bearer(token)).status_code == 401
+    assert client.post('/auth/token', data={
+        'grant_type':'refresh_token','client_id':'dashboard','refresh_token':token,
+    }).status_code == 400
+    logout = client.post('/auth/revoke')
+    assert logout.status_code == 204 and 'Max-Age=0' in logout.headers['set-cookie']
+    assert not client.cookies and not client.get('/auth/session').json()['authenticated']
+    assert client.get('/auth/me', headers={'Cookie':'__Host-airkeep_session='+token}).status_code == 401
+
+    headers = login(client,'Owner',OWNER_PASSWORD)
     assert client.post('/auth/password',headers=headers,json={
         'password':OWNER_PASSWORD,'new_password':'new owner password',
     }).status_code == 204
     assert client.get('/auth/me',headers=headers).status_code == 401
-    next_tokens = login(client,'Owner','new owner password')
-    store.execute('UPDATE oauth_grants SET idle_until=? WHERE id=?',(time.time()-1,next_tokens['grant_id']))
-    assert client.get('/auth/me',headers=bearer(next_tokens['access_token'])).status_code == 401
-    assert client.post('/auth/token',data={
-        'grant_type':'refresh_token','client_id':'dashboard','refresh_token':next_tokens['refresh_token'],
-    }).status_code == 400
+    next_session = login(client,'Owner','new owner password')
+    grant = next(row for row in client.get('/auth/grants',headers=next_session).json() if row['current'])
+    store.execute('UPDATE oauth_grants SET expires=? WHERE id=?',(time.time()-1,grant['id']))
+    assert client.get('/auth/me',headers=next_session).status_code == 401
 
 
 def test_native_authorization_redirect_and_grant_ownership(relay):
@@ -274,10 +318,10 @@ def test_native_authorization_redirect_and_grant_ownership(relay):
     assert response.status_code == 303
     assert response.headers['location'].startswith('/connect?transaction=')
     assert 'set-cookie' not in response.headers
-    tokens = login(client,'Owner',OWNER_PASSWORD)
-    admin = bearer(tokens['access_token'])
-    assert client.get('/auth/grants',headers=admin).json()[0]['current']
-    assert client.delete('/auth/grants/'+tokens['grant_id'],headers=admin).status_code == 204
+    admin = login(client,'Owner',OWNER_PASSWORD)
+    grant = client.get('/auth/grants',headers=admin).json()[0]
+    assert grant['current']
+    assert client.delete('/auth/grants/'+grant['id'],headers=admin).status_code == 204
     assert client.get('/auth/me',headers=admin).status_code == 401
 
 
@@ -285,10 +329,10 @@ def test_concurrent_refresh_detects_replay_and_bootstrap_cannot_repeat(relay):
     from concurrent.futures import ThreadPoolExecutor
     from accounts import OAuth
     client, store, _, _ = relay
-    tokens = login(client,'Owner',OWNER_PASSWORD)
+    tokens = login(client,'Owner',OWNER_PASSWORD,app='apple-ios',installation='phone')
     settings = Settings(jwt_signing_key='x'*64,web_origin=ORIGIN,mqtt_enabled=False,_env_file=None)
     oauth = OAuth(store,settings)
-    form = dict(client_id='dashboard',grant_type='refresh_token',refresh_token=tokens['refresh_token'])
+    form = dict(client_id='apple-ios',grant_type='refresh_token',refresh_token=tokens['refresh_token'])
     with ThreadPoolExecutor(max_workers=2) as pool:
         outcomes = list(pool.map(lambda _:oauth.exchange(form),range(2)))
     assert sum(result is not None for result in outcomes) == 1

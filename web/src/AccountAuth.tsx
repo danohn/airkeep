@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, setOAuth } from "./api";
+import { api } from "./api";
 import { dashboardAuthorization, type Account } from "./auth";
 import { OIDCSettings } from "./OIDCSettings";
 
@@ -44,7 +44,6 @@ export function AccountLogin({ native = false, invite = false, configured = true
     return () => { active = false; };
   }, [native, invite]);
   async function authorization() {
-    setOAuth(true);
     if (transaction) return transaction;
     if (native) throw new Error("Start sign-in again from the Airkeep app.");
     return beginDashboardSignIn();

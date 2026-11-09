@@ -122,11 +122,21 @@ def install_web(app, store, settings, auth, authorize_user, collector, admin, oa
 
     if oauth:
         @app.get('/auth/session')
-        def status():
+        def status(request: Request):
+            from accounts import account_details
+
             configured = bool(store.rows('SELECT 1 FROM accounts LIMIT 1'))
             result = {'authenticated': False, 'configured': configured, 'mode': 'oauth'}
             if configured and settings.oidc_issuer:
                 result['oidc_label'] = settings.oidc_label
+            try:
+                identity = oauth.browser_session(request)
+            except HTTPException as error:
+                if error.status_code != 401:
+                    raise
+            else:
+                row = store.rows('SELECT id,username,role,hash FROM accounts WHERE id=?', (identity.user,))[0]
+                result.update(authenticated=True, account=account_details(row))
             return result
     else:
         @app.get('/auth/session')
