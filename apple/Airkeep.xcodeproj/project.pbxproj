@@ -32,6 +32,7 @@
 		3281FCC5DEBBC1521F2FBF7B /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70CA9BF577566983215A154 /* NotificationManager.swift */; };
 		33426E8C20AFAC14EAD90B7A /* MonitorAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD62B603226DF5B13DCA4C4 /* MonitorAttributes.swift */; };
 		3694931692FCAF83467BB771 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1DB4886A3FDF55872BBD78 /* Models.swift */; };
+		3A107BB1FDF88E14830A10B2 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70CA9BF577566983215A154 /* NotificationManager.swift */; };
 		3B3843D0E67110337DACC4D7 /* NotificationManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44D10A3EFF857880D1098814 /* NotificationManagerTests.swift */; };
 		3B6E1B88F76DB35672970372 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70CA9BF577566983215A154 /* NotificationManager.swift */; };
 		3ECA3A4F65B264DB3167161D /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = F4EE0E1C731B0FD7391C3141 /* AppIcon.icon */; };
@@ -723,6 +724,7 @@
 				AA50C809423631370CE16A5B /* ChartView.swift in Sources */,
 				7EC8FCC0F83707A9BFAE6E79 /* Configuration.swift in Sources */,
 				54B5DED6E56EDD93C00A67C2 /* Models.swift in Sources */,
+				3A107BB1FDF88E14830A10B2 /* NotificationManager.swift in Sources */,
 				A218239772F11B95BE8F9D02 /* RelayClient.swift in Sources */,
 				5FBB2537C08E9C4997958531 /* RelayOAuth.swift in Sources */,
 				F24A729C1C6DD2842BF65DCA /* Theme.swift in Sources */,

@@ -228,7 +228,7 @@ class Store:
                 body = f'AMS {ams}: {reading.humidity:g}% RH. Your limit is {rule.threshold:g}%.'
                 payload = json.dumps({'aps':{'alert':{'title':title,'body':body},'sound':'default',
                                              'thread-id':f'airkeep.ams.{rule.amsID}'},
-                                      'amsID':rule.amsID,'ruleID':row['id']})
+                                      'amsID':rule.amsID,'ruleID':row['id'],'eventID':event_id})
                 if multiuser:
                     self.db.execute("""INSERT INTO outbox(device,json,next,created,rule_id)
                         SELECT d.id,?,?,?,? FROM devices d JOIN registration_owners o

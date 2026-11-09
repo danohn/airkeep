@@ -53,31 +53,35 @@ struct RelayClient: Sendable {
     func deleteRule(_ rule: ManagedAlertRule) async throws {
         _ = try await request("v2/alerts/\(rule.id)", method: "DELETE", revision: rule.revision)
     }
-    func registerDevice(_ token: String) async throws {
+    private static var notificationPlatform: String {
         #if os(macOS)
-        let platform = "mac"
+        "mac"
+        #elseif os(watchOS)
+        "watch"
         #else
-        let platform = "ios"
+        "ios"
         #endif
-        _ = try await request("v2/devices/\(SharedConfiguration.deviceID)", method: "PUT", body: JSONSerialization.data(withJSONObject:
-            ["token": token, "platform": platform, "environment": SharedConfiguration.environment,
-             "initialReceiveAlerts": SharedConfiguration.receiveAlertsIntent(endpoint: endpoint) ?? false]))
     }
-    func setReceiveAlerts(_ enabled: Bool) async throws -> Bool {
+    func registerDevice(_ token: String, deviceID: String = SharedConfiguration.deviceID) async throws {
+        #if os(watchOS)
+        let initialReceiveAlerts = false
+        #else
+        let initialReceiveAlerts = SharedConfiguration.receiveAlertsIntent(endpoint: endpoint) ?? false
+        #endif
+        _ = try await request("v2/devices/\(deviceID)", method: "PUT", body: JSONSerialization.data(withJSONObject:
+            ["token": token, "platform": Self.notificationPlatform, "environment": SharedConfiguration.environment,
+             "initialReceiveAlerts": initialReceiveAlerts]))
+    }
+    func setReceiveAlerts(_ enabled: Bool, deviceID: String = SharedConfiguration.deviceID) async throws -> Bool {
         struct Subscription: Decodable { var receiveAlerts: Bool }
         return try JSONDecoder().decode(Subscription.self,
-            from: await request("v2/devices/\(SharedConfiguration.deviceID)", method: "PATCH",
+            from: await request("v2/devices/\(deviceID)", method: "PATCH",
                                 body: JSONSerialization.data(withJSONObject: ["receiveAlerts": enabled]))).receiveAlerts
     }
-    func notificationStatus() async throws -> NotificationRelayStatus {
-        #if os(macOS)
-        let platform = "mac"
-        #else
-        let platform = "ios"
-        #endif
+    func notificationStatus(deviceID: String = SharedConfiguration.deviceID) async throws -> NotificationRelayStatus {
         var query = URLComponents()
-        query.queryItems = [URLQueryItem(name: "device", value: SharedConfiguration.deviceID),
-                           URLQueryItem(name: "platform", value: platform),
+        query.queryItems = [URLQueryItem(name: "device", value: deviceID),
+                           URLQueryItem(name: "platform", value: Self.notificationPlatform),
                            URLQueryItem(name: "environment", value: SharedConfiguration.environment),
                            URLQueryItem(name: "bundle_id", value: Bundle.main.bundleIdentifier ?? "")]
         return try JSONDecoder().decode(NotificationRelayStatus.self,

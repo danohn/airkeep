@@ -3,14 +3,16 @@ import hashlib
 import sqlite3
 import time
 from urllib.parse import parse_qs, urlsplit
+from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
 import pytest
 
 from accounts import NATIVE_CALLBACK, PASSWORD, bootstrap, recover
-from app import create_app
+from app import create_app, tick
 from config import Settings
 from domain import AlertRule, Reading
+from push import PushOutcome
 from storage import Store
 
 ORIGIN = 'https://airkeep.example.test'
@@ -188,6 +190,63 @@ def test_expired_temporary_password_cannot_start_enrollment(relay):
     tx, _ = begin(client)
     result = client.post('/auth/credentials',json={'transaction':tx,'username':'Expired','password':new['temporaryPassword']})
     assert result.status_code == 401
+
+
+async def test_watch_receives_its_own_copy_of_the_owners_alert(tmp_path):
+    settings = Settings(db_path=tmp_path/'watch.db', mqtt_enabled=False, apns_team_id='TEAM',
+                        apns_key_id='PHONE', apns_key_path='/phone-key',
+                        watch_apns_key_id='WATCH', watch_apns_key_path='/watch-key', _env_file=None)
+    app = account_app(settings)
+    store = app.state.store
+    push = app.state.push
+    push.send_request = AsyncMock(return_value=PushOutcome(200))
+    # Keep the background tick off so the test controls when readings are evaluated.
+    client = TestClient(app)
+    try:
+        phone = account_headers(client, 'apple-ios', 'phone')
+        dashboard = account_headers(client)
+        grant = client.post('/auth/watch', headers=phone, json={'installation_id':'watch'})
+        assert grant.status_code == 200
+        watch = bearer(grant.json()['access_token'])
+        phone_body = dict(platform='ios', token='a'*64, initialReceiveAlerts=True)
+        watch_body = dict(platform='watch', token='b'*64)
+        assert client.put('/v2/devices/phone', json=phone_body, headers=phone).json()['receiveAlerts']
+        assert client.put('/v2/devices/watch', json=watch_body, headers=phone).status_code == 403
+        assert client.put('/v2/devices/watch', json=phone_body, headers=watch).status_code == 403
+        assert client.put('/v2/devices/another-watch', json=watch_body, headers=watch).status_code == 404
+        assert not client.put('/v2/devices/watch', json=watch_body, headers=watch).json()['receiveAlerts']
+        assert client.patch('/v2/devices/watch', json={'receiveAlerts':True}, headers=watch).json()['receiveAlerts']
+        rotated = {**watch_body, 'token':'c'*64}
+        assert client.put('/v2/devices/watch', json=rotated, headers=watch).json()['receiveAlerts']
+        status = client.get('/v1/notifications/status', headers=watch,
+                            params={'device':'watch','platform':'watch','bundle_id':'io.airkeep.watch'}).json()
+        assert status['registered'] and status['receiveAlerts']
+        assert client.post('/v2/alerts', headers=dashboard,
+                           json={'name':'Watch test','enabled':True,'holdSeconds':0}).status_code == 201
+
+        now = time.time()
+        store.save_reading(Reading(amsID='0', humidity=80, temperature=None, rawIndex=None, observedAt=now))
+        await tick(store, settings, push, now, multiuser=True)
+        deliveries = {call.args[1]: call for call in push.send_request.await_args_list}
+        assert set(deliveries) == {'io.airkeep', 'io.airkeep.watch'}
+        phone_delivery, watch_delivery = deliveries['io.airkeep'], deliveries['io.airkeep.watch']
+        assert watch_delivery.args[0] == rotated['token']
+        assert watch_delivery.kwargs['push_type'] == 'alert'
+        assert watch_delivery.args[3] == phone_delivery.args[3]
+        assert watch_delivery.args[3]['aps']['alert']['title'].startswith('Watch test:')
+
+        assert not client.patch('/v2/devices/watch', json={'receiveAlerts':False}, headers=watch).json()['receiveAlerts']
+        assert not client.put('/v2/devices/watch', json=watch_body, headers=watch).json()['receiveAlerts']
+        push.send_request.reset_mock()
+        store.save_reading(Reading(amsID='0', humidity=10, temperature=None, rawIndex=None, observedAt=now+1))
+        await tick(store, settings, push, now+1, multiuser=True)
+        assert [call.args[1] for call in push.send_request.await_args_list] == ['io.airkeep']
+        assert client.delete('/auth/watch', headers=phone).status_code == 204
+        assert not store.rows("SELECT 1 FROM devices WHERE id='watch'")
+    finally:
+        client.close()
+        store.close()
+        await push.close()
 
 
 def test_expiry_logout_and_password_change_stop_existing_access(relay):

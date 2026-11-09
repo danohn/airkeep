@@ -32,7 +32,7 @@ class DeviceRegistration(BaseModel):
 
 class DeviceUpsert(BaseModel):
     token: str = Field(pattern=r"^[0-9a-fA-F]{64,256}$")
-    platform: Literal["ios", "mac"]
+    platform: Literal["ios", "mac", "watch"]
     environment: Literal["sandbox", "production"] = "sandbox"
     initialReceiveAlerts: bool = False
 
@@ -184,6 +184,16 @@ def create_app(settings: Settings | None = None):
             raise HTTPException(403,'An Apple app connection is required.')
         return identity
 
+    def alert_device(identity=Depends(principal)):
+        if identity.client not in ('apple-ios', 'apple-mac', 'watch'):
+            raise HTTPException(403, 'An Apple app connection is required.')
+        return identity
+
+    def device_topic(platform, identity):
+        if (platform == 'watch') != (identity.client == 'watch'):
+            raise HTTPException(403, 'Use the matching Apple app to register for alerts.')
+        return {'ios': settings.ios_topic, 'mac': settings.mac_topic, 'watch': settings.watch_topic}[platform]
+
     def watch(identity=Depends(principal)):
         if identity and identity.client != 'watch':
             raise HTTPException(403,'An Apple Watch connection is required.')
@@ -329,17 +339,17 @@ def create_app(settings: Settings | None = None):
         return {"registered":True,"pushConfigured":settings.apns_ready}
 
     @app.put('/v2/devices/{device_id}')
-    def upsert_device(device_id: str, device: DeviceUpsert, identity=Depends(native)):
+    def upsert_device(device_id: str, device: DeviceUpsert, identity=Depends(alert_device)):
         if not 1 <= len(device_id) <= 128:
             raise HTTPException(422,'Invalid device identifier')
-        topic = settings.ios_topic if device.platform == 'ios' else settings.mac_topic
+        topic = device_topic(device.platform, identity)
         with registration(identity,'device',device_id,claim=True):
             check_push_destination(identity,'devices',device_id,device.token,device.environment,topic)
             enabled = store.upsert_device(device_id,device.token,topic,device.environment,device.initialReceiveAlerts)
         return {'registered':True,'receiveAlerts':enabled}
 
     @app.patch('/v2/devices/{device_id}')
-    def subscribe_device(device_id: str, subscription: DeviceSubscription, identity=Depends(native)):
+    def subscribe_device(device_id: str, subscription: DeviceSubscription, identity=Depends(alert_device)):
         try:
             with registration(identity,'device',device_id):
                 enabled = store.set_subscription(device_id,subscription.receiveAlerts)
@@ -350,12 +360,12 @@ def create_app(settings: Settings | None = None):
     @app.get("/v1/notifications/status")
     def notification_status(
         device: str = Query(min_length=1, max_length=128),
-        platform: Literal["ios", "mac"] = "ios",
+        platform: Literal["ios", "mac", "watch"] = "ios",
         environment: Literal["sandbox", "production"] = "sandbox",
         bundle_id: str = Query(min_length=1, max_length=255),
-        identity=Depends(native),
+        identity=Depends(alert_device),
     ):
-        topic = settings.mac_topic if platform == "mac" else settings.ios_topic
+        topic = device_topic(platform, identity)
         owned = not identity or bool(store.rows("SELECT 1 FROM registration_owners WHERE kind='device' AND id=? AND grant_id=?",(device,identity.grant)))
         rows = store.rows(
             "SELECT receive_alerts FROM devices WHERE id=? AND topic=? AND environment=?",

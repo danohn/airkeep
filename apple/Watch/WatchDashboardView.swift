@@ -59,6 +59,9 @@ struct WatchDashboardView: View {
         }
         .tint(AirkeepTheme.amber)
         .task { if !model.demo { WatchBridge.shared.activate() }; model.setActive(phase == .active && !ambient) }
+        .task(id: phase == .active && !ambient ? model.connectionID : nil) {
+            if !model.demo && phase == .active && !ambient { await NotificationManager.shared.refresh() }
+        }
         .onChange(of: phase) { _, value in model.setActive(value == .active && !ambient) }
         .onChange(of: ambient) { _, value in model.setActive(phase == .active && !value) }
         .onReceive(NotificationCenter.default.publisher(for: .airkeepWatchChanged)) { _ in
@@ -145,6 +148,7 @@ struct WatchAlertsView: View {
     var model: WatchMonitorModel
     var body: some View {
         List {
+            if !model.demo { WatchAlertDeliverySection() }
             ForEach(model.rules) { rule in
                 VStack(alignment: .leading, spacing: 5) {
                     Text(rule.name).font(.headline)
@@ -156,6 +160,38 @@ struct WatchAlertsView: View {
             if model.rules.isEmpty { Text("Add alerts in Airkeep on iPhone or Mac.").font(.caption).foregroundStyle(.secondary) }
             if let synced = model.rulesSyncedAt { Text("Synced \(synced, style: .relative) ago").font(.caption2).foregroundStyle(.secondary) }
         }.navigationTitle("Alerts")
+    }
+}
+
+private struct WatchAlertDeliverySection: View {
+    @State private var notifications = NotificationManager.shared
+
+    var body: some View {
+        Section("Watch delivery") {
+            Toggle("Receive alerts on this Watch", isOn: Binding(
+                get: { notifications.receiveAlerts == true },
+                set: { enabled in Task { await notifications.setReceiveAlerts(enabled) } }
+            ))
+            .disabled(!notifications.canChangeSubscription ||
+                      (notifications.receiveAlerts != true && notifications.server != .available))
+            Text("Receive humidity alerts over Wi-Fi or cellular, even when your iPhone is off.")
+                .font(.caption2).foregroundStyle(.secondary)
+            Text(notifications.permission.title).font(.caption2)
+            if notifications.permission.authorization == .denied {
+                Text("Allow Airkeep in your Watch notification settings.").font(.caption2)
+            }
+            Text(notifications.registration.title).font(.caption2)
+            if notifications.server != .available {
+                Text(notifications.server.title).font(.caption2)
+            }
+            if let error = notifications.subscriptionError ?? notifications.registrationError {
+                Text(error).font(.caption2).foregroundStyle(.orange)
+            }
+            if notifications.canRetryRegistration {
+                Button("Retry registration") { Task { await notifications.retryRegistration() } }
+                    .disabled(notifications.isChangingSubscription || notifications.isRefreshing)
+            }
+        }
     }
 }
 

@@ -82,7 +82,7 @@ Wi-Fi credentials are stored in ignored local configuration and compiled firmwar
 
 In Settings → Humidity alerts, or Humidity alerts on the web, create named rules for each AMS with their own threshold, hold duration and recovery margin. New rules start disabled. The relay keeps rules in sync across clients and evaluates each independently. Each rule sends an alert once its threshold has been sustained and a recovery alert after humidity falls below the reset point. Cached rules remain readable offline; saving requires a relay connection.
 
-Choose Receive alerts on this device in Settings → Notifications on each iPhone, iPad or Mac that should receive them. Watch notifications follow the paired iPhone's notification settings. Your rules apply to your subscribed devices.
+Choose Receive alerts on this device in Settings → Notifications on each iPhone, iPad or Mac that should receive them. In the Watch app, open Alerts and enable Receive alerts on this Watch for delivery over Wi-Fi or cellular, even when the iPhone is off. Your rules apply to your subscribed devices.
 
 Remote alerts, background Live Activity updates and Watch widget push updates need an Apple Developer Program account and your own APNs signing keys. Follow [push setup](docs/push-setup.md) for alerts and Live Activities, and [Watch widget push setup](docs/web-dashboard.md#watch-widget-updates) for the Watch topic and keys. Readings, history and scheduled widget refreshes work independently of APNs.
 
