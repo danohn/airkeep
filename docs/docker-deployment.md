@@ -62,6 +62,8 @@ docker compose -f compose.http.yml up -d --wait
 
 Open your HTTPS URL with `/health` appended to check the connection. Then open the dashboard and sign in. Check for a recent printer reading. Add users under **Admin → Accounts**.
 
+For an external sign-in provider, see [optional single sign-on](web-dashboard.md#optional-single-sign-on).
+
 <details>
 <summary>Recover an administrator account</summary>
 

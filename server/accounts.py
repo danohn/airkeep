@@ -22,6 +22,8 @@ PASSWORD = PasswordHasher()
 USERNAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.-]{2,63}$')
 PASSWORD_WORK = threading.Semaphore(2)
 VERIFIER = re.compile(r'[A-Za-z0-9._~-]{43,128}')
+# An empty hash marks an account that signs in through OIDC only.
+LOCAL_ADMIN = "role='admin' AND disabled=0 AND temporary_until IS NULL AND hash<>''"
 
 
 def digest(value):
@@ -207,7 +209,8 @@ class OAuth:
     def verify(self, password, password_hash):
         try:
             with PASSWORD_WORK:
-                return PASSWORD.verify(password_hash or self.dummy_hash, password)
+                verified = PASSWORD.verify(password_hash or self.dummy_hash, password)
+            return bool(password_hash) and verified
         except (InvalidHashError, VerificationError):
             return False
 
@@ -253,11 +256,14 @@ class OAuth:
                 db.execute('UPDATE accounts SET hash=?,temporary_until=NULL,version=? WHERE id=?',
                            (replacement,version,user['id']))
                 revoke_user(self.store,user['id'])
-            code = random_token()
-            db.execute('UPDATE oauth_requests SET user=?,version=?,code=?,expires=? WHERE id=?',
-                       (user['id'],version,digest(code),time.time()+60,tx['id']))
             db.execute('DELETE FROM oauth_attempts WHERE bucket=?', ('account:'+user['username'].lower(),))
-            return {'redirect':tx['redirect']+'?'+urlencode({'code':code,'state':tx['state']})}
+            return {'redirect': self.complete(db, tx, user['id'], version)}
+
+    def complete(self, db, transaction, user_id, version):
+        code = random_token()
+        db.execute('UPDATE oauth_requests SET user=?,version=?,code=?,expires=? WHERE id=?',
+                   (user_id,version,digest(code),time.time()+60,transaction['id']))
+        return transaction['redirect']+'?'+urlencode({'code':code,'state':transaction['state']})
 
     def grant(self, user, client, installation, parent=None):
         now = time.time()
@@ -366,8 +372,8 @@ def install_accounts(app, oauth, principal, admin):
 
     @app.get('/auth/me')
     def me(identity: Principal = Depends(principal)):
-        row = store.rows('SELECT id,username,role FROM accounts WHERE id=?',(identity.user,))[0]
-        return dict(row)
+        row = store.rows('SELECT id,username,role,hash FROM accounts WHERE id=?',(identity.user,))[0]
+        return account_details(row)
 
     @app.post('/auth/revoke', status_code=204)
     def revoke(identity: Principal = Depends(principal)):
@@ -436,7 +442,8 @@ def install_accounts(app, oauth, principal, admin):
             revoke_user(store,identity.user)
 
     def public_accounts():
-        return [dict(row) for row in store.rows('SELECT id,username,role,disabled,temporary_until FROM accounts ORDER BY username')]
+        return [account_details(row) for row in store.rows(
+            'SELECT id,username,role,disabled,temporary_until,hash FROM accounts ORDER BY username')]
 
     @app.get('/v2/admin/accounts', dependencies=[Depends(admin)])
     def accounts():
@@ -471,9 +478,8 @@ def install_accounts(app, oauth, principal, admin):
                 raise HTTPException(404,'Account not found.')
             role = body.role if body.role is not None else account['role']
             disabled = body.disabled if body.disabled is not None else account['disabled']
-            if account['role'] == 'admin' and not account['disabled'] and (role != 'admin' or disabled):
-                if not db.execute("SELECT 1 FROM accounts WHERE role='admin' AND disabled=0 AND temporary_until IS NULL AND id<>?",(user,)).fetchone():
-                    raise HTTPException(409,'Keep at least one active administrator.')
+            if role != 'admin' or disabled:
+                protect_local_admin(db, user)
             if role != account['role'] or disabled != account['disabled']:
                 db.execute('UPDATE accounts SET role=?,disabled=?,version=version+1 WHERE id=?',(role,int(disabled),user))
                 revoke_user(store,user)
@@ -490,9 +496,22 @@ def install_accounts(app, oauth, principal, admin):
             actor = oauth.active(identity.grant)
             if not actor or actor['role'] != 'admin':
                 raise HTTPException(403,'Administrator access required.')
-            row = store.db.execute('UPDATE accounts SET hash=?,temporary_until=?,version=version+1 WHERE id=?',
+            protect_local_admin(store.db, user)
+            row = store.db.execute("UPDATE accounts SET hash=?,temporary_until=?,version=version+1 WHERE id=? AND hash<>''",
                                    (password_hash,time.time()+DAY,user))
             if not row.rowcount:
                 raise HTTPException(404,'Account not found.')
             revoke_user(store,user)
         return {'temporaryPassword':temporary}
+
+
+def protect_local_admin(db, user):
+    if (db.execute(f'SELECT 1 FROM accounts WHERE {LOCAL_ADMIN} AND id=?', (user,)).fetchone()
+            and not db.execute(f'SELECT 1 FROM accounts WHERE {LOCAL_ADMIN} AND id<>?', (user,)).fetchone()):
+        raise HTTPException(409, 'Keep at least one active administrator with a local password.')
+
+
+def account_details(row):
+    account = dict(row)
+    account['local_password'] = bool(account.pop('hash'))
+    return account

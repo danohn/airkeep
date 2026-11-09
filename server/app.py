@@ -11,6 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from accounts import OAuth, install_accounts
+from oidc import install_oidc
 from collector import Collector
 from config import Settings
 from domain import AlertRule, NamedAlertInput, activity_payload, LIVE_ACTIVITY_DURATION_SECONDS, LIVE_ACTIVITY_UPDATE_SECONDS
@@ -220,6 +221,8 @@ def create_app(settings: Settings | None = None):
     install_web(app,store,settings,browser,authorize_user,collector,admin,oauth)
     if oauth:
         install_accounts(app,oauth,principal,admin)
+        if settings.oidc_issuer:
+            install_oidc(app, oauth, settings, admin)
 
     @app.put('/v2/widgets/{installation_id}')
     def register_widgets(installation_id: str, body: WidgetRegistration, identity=Depends(watch)):

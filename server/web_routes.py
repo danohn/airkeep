@@ -123,8 +123,11 @@ def install_web(app, store, settings, auth, authorize_user, collector, admin, oa
     if oauth:
         @app.get('/auth/session')
         def status():
-            return {'authenticated':False,'configured':bool(store.rows('SELECT 1 FROM accounts LIMIT 1')),
-                    'mode':'oauth'}
+            configured = bool(store.rows('SELECT 1 FROM accounts LIMIT 1'))
+            result = {'authenticated': False, 'configured': configured, 'mode': 'oauth'}
+            if configured and settings.oidc_issuer:
+                result['oidc_label'] = settings.oidc_label
+            return result
     else:
         @app.get('/auth/session')
         def session(request: Request):
