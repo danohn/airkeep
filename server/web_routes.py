@@ -182,7 +182,8 @@ def install_web(app, store, settings, auth, authorize_user, collector, admin, oa
 
     @app.get('/v2/admin/devices', dependencies=[Depends(admin)])
     def devices():
-        return [{'id':r['id'],'platform':'mac' if r['topic']==settings.mac_topic else 'ios',
+        platforms = {settings.ios_topic: 'ios', settings.mac_topic: 'mac', settings.watch_topic: 'watch'}
+        return [{'id':r['id'],'platform':platforms.get(r['topic'], 'ios'),
                  'topic':r['topic'],'environment':r['environment'],'receiveAlerts':bool(r['receive_alerts']),
                  'tokenFingerprint':token_fingerprint(r['token']),'createdAt':r['created_at'],'lastRegisteredAt':r['registered_at']}
                 for r in store.rows('SELECT * FROM devices ORDER BY registered_at DESC')]

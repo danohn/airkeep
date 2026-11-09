@@ -3,6 +3,8 @@ import Observation
 import UserNotifications
 #if os(macOS)
 import AppKit
+#elseif os(watchOS)
+import WatchKit
 #else
 import UIKit
 #endif
@@ -77,7 +79,9 @@ import UIKit
     struct Connection: Equatable, Sendable {
         var endpoint: String
         var token: String
+        var installationID: String? = nil
         var isConfigured: Bool { !endpoint.isEmpty && !token.isEmpty }
+        var deviceID: String { installationID ?? SharedConfiguration.deviceID }
     }
     struct Dependencies {
         var permission: @MainActor () async -> Permission
@@ -105,30 +109,51 @@ import UIKit
                 #endif
                 @unknown default: authorization = .denied
                 }
-                return Permission(authorization: authorization,
-                                  banners: settings.alertSetting == .enabled,
-                                  sounds: settings.soundSetting == .enabled,
-                                  lockScreen: .init(settings.lockScreenSetting),
-                                  notificationCenter: .init(settings.notificationCenterSetting),
-                                  badges: .init(settings.badgeSetting))
+                var permission = Permission(authorization: authorization,
+                                            banners: settings.alertSetting == .enabled,
+                                            sounds: settings.soundSetting == .enabled,
+                                            notificationCenter: .init(settings.notificationCenterSetting))
+                #if !os(watchOS)
+                permission.lockScreen = .init(settings.lockScreenSetting)
+                permission.badges = .init(settings.badgeSetting)
+                #endif
+                return permission
             }, requestAuthorization: {
+                #if os(watchOS)
+                _ = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+                #else
                 _ = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
+                #endif
             }, registerWithApple: {
                 #if os(macOS)
                 NSApplication.shared.registerForRemoteNotifications()
+                #elseif os(watchOS)
+                WKApplication.shared().registerForRemoteNotifications()
                 #else
                 UIApplication.shared.registerForRemoteNotifications()
                 #endif
             }, connection: {
+                #if os(watchOS)
+                guard let connection = try? WatchStorage.live.connection(), connection.token.hasPrefix("oauth:") else {
+                    return Connection(endpoint: "", token: "")
+                }
+                return Connection(endpoint: connection.endpoint, token: connection.token, installationID: connection.linkID)
+                #else
                 Connection(endpoint: SharedConfiguration.endpoint, token: TokenStore.read())
+                #endif
             }, status: { connection in
-                try await RelayClient(endpoint: connection.endpoint, token: connection.token).notificationStatus()
+                try await RelayClient(endpoint: connection.endpoint, token: connection.token).notificationStatus(deviceID: connection.deviceID)
             }, register: { connection, token in
-                try await RelayClient(endpoint: connection.endpoint, token: connection.token).registerDevice(token)
+                try await RelayClient(endpoint: connection.endpoint, token: connection.token).registerDevice(token, deviceID: connection.deviceID)
             }, setSubscription: { connection, enabled in
-                try await RelayClient(endpoint: connection.endpoint, token: connection.token).setReceiveAlerts(enabled)
-            }, readIntent: { SharedConfiguration.receiveAlertsIntent(endpoint: $0.endpoint) },
-               writeIntent: { SharedConfiguration.saveReceiveAlertsIntent($1, endpoint: $0.endpoint) })
+                try await RelayClient(endpoint: connection.endpoint, token: connection.token).setReceiveAlerts(enabled, deviceID: connection.deviceID)
+            }, readIntent: { connection in
+                connection.installationID == nil ? SharedConfiguration.receiveAlertsIntent(endpoint: connection.endpoint) : nil
+            }, writeIntent: { connection, enabled in
+                if connection.installationID == nil {
+                    SharedConfiguration.saveReceiveAlertsIntent(enabled, endpoint: connection.endpoint)
+                }
+            })
         }
     }
 
@@ -306,7 +331,7 @@ import UIKit
         case .invalid:
             let message: String
             switch status.reason {
-            case "topic_mismatch": message = "The relay's push topic doesn't match this app. Check its iOS or Mac topic configuration."
+            case "topic_mismatch": message = "The relay's push topic doesn't match this app. Check the app topic in the relay configuration."
             case "key_unreadable": message = "The relay cannot read its push signing key. Check the key mount and file permissions."
             default: message = "The relay's push signing key is invalid. Check its APNs key configuration."
             }
@@ -399,7 +424,7 @@ import UIKit
         if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") {
             NSWorkspace.shared.open(url)
         }
-        #else
+        #elseif os(iOS)
         if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
             UIApplication.shared.open(url)
         }

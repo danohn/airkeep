@@ -156,6 +156,7 @@ actor WatchWidgetRegistration {
     var isStale: Bool { reading?.isStale(after: snapshot?.staleAfter ?? 90) ?? true }
     var enabledCount: Int { rules.filter(\.enabled).count }
     var hasConnection: Bool { demo || connection?.isConfigured == true }
+    var connectionID: String? { connection?.linkID }
     var amsIDs: [String] { Array(Set((snapshot?.readings.map(\.amsID) ?? []) + [selectedAMS])).sorted() }
 
     func reloadCache() {

@@ -25,6 +25,12 @@ AIRKEEP_MAC_TOPIC=io.airkeep.mac
 
 Turning delivery off removes this device's queued humidity notifications. It does not unregister the app from APNs or end Live Activities. New installations start with delivery off; existing relay registrations retain delivery during migration. Token refreshes preserve an opt-out.
 
+## Apple Watch alerts
+
+Configure the relay's [Watch topic and signing keys](web-dashboard.md#watch-widget-updates), then open Alerts in Airkeep on the Watch and turn on Receive alerts on this Watch. Allow notifications when watchOS asks. The Watch needs to reach your relay to register. After setup, Apple can deliver alerts over Wi-Fi or cellular while your iPhone is off, even if your relay is on your home network.
+
+If you subscribe both devices, Airkeep sends the same alert to iPhone and Watch so Apple can choose where to present it. When direct Watch delivery is off, watchOS can still mirror the paired iPhone's alerts according to your Apple Watch notification settings.
+
 ## Delivery and monitoring sessions
 
 The relay sends HTTP/2 requests with ES256 authorization tokens refreshed every 50 minutes. Each device registration carries its APNs environment and platform topic.
