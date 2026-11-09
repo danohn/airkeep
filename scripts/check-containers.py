@@ -19,7 +19,7 @@ def main():
     parser.add_argument('--web-image', default='airkeep-web:local')
     args = parser.parse_args()
     token, password = secrets.token_hex(32), secrets.token_urlsafe(24)
-    origin = 'https://web:8443'
+    origin = 'https://airkeep-web:8443'
     project = 'airkeep-test-' + secrets.token_hex(5)
     with tempfile.TemporaryDirectory(prefix='airkeep-containers-') as directory:
         root = Path(directory)
@@ -27,14 +27,14 @@ def main():
         certificates.mkdir(mode=0o755)
         certificates.chmod(0o755)
         subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1',
-                        '-subj', '/CN=web', '-addext', 'subjectAltName=DNS:web',
+                        '-subj', '/CN=airkeep-web', '-addext', 'subjectAltName=DNS:airkeep-web',
                         '-keyout', str(certificates/'key.pem'), '-out', str(certificates/'fullchain.pem')],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         # This one-day test certificate has no access to a real deployment.
         (certificates/'key.pem').chmod(0o644)
         (certificates/'fullchain.pem').chmod(0o644)
         services = {
-            'airkeep': {
+            'airkeep-relay': {
                 'image': args.relay_image, 'read_only': True, 'cap_drop': ['ALL'],
                 'security_opt': ['no-new-privileges:true'],
                 'environment': {'AIRKEEP_API_TOKEN': token, 'AIRKEEP_MQTT_ENABLED': 'false',
@@ -43,13 +43,14 @@ def main():
                                 'AIRKEEP_WEB_ORIGIN': origin},
                 'tmpfs': ['/tmp', '/data:uid=10001,gid=10001,mode=0700'],
                 'volumes': [str(certificates/'fullchain.pem') + ':/test-ca.pem:ro'],
+                'networks': {'default': {'aliases': ['airkeep']}},
             },
-            'web': {
+            'airkeep-web': {
                 'image': args.web_image, 'read_only': True, 'cap_drop': ['ALL'],
                 'security_opt': ['no-new-privileges:true'], 'tmpfs': ['/tmp:mode=1777'],
-                'environment': {'AIRKEEP_TLS_ENABLED': 'true', 'AIRKEEP_HOST': 'web'},
+                'environment': {'AIRKEEP_TLS_ENABLED': 'true', 'AIRKEEP_HOST': 'airkeep-web'},
                 'volumes': [str(certificates) + ':/run/tls:ro'],
-                'depends_on': {'airkeep': {'condition': 'service_healthy'}},
+                'depends_on': {'airkeep-relay': {'condition': 'service_healthy'}},
             },
         }
         compose_file = root / 'compose.json'
@@ -62,7 +63,7 @@ from urllib.parse import parse_qs, urlsplit
 assert os.getuid() != 0
 token, password, origin = VALUES
 context = ssl.create_default_context(cafile='/test-ca.pem')
-with httpx.Client(base_url='https://web:8443', verify=context) as client:
+with httpx.Client(base_url=origin, verify=context) as client:
     page = client.get('/')
     assert page.status_code == 200 and '<title>Airkeep</title>' in page.text
     assert page.headers['cache-control'] == 'no-cache'
@@ -116,28 +117,28 @@ with httpx.Client(base_url='https://web:8443', verify=context) as client:
     assert client.post('/auth/revoke',headers=headers).status_code == 204
     assert client.get('/auth/me',headers=headers).status_code == 401
     assert not client.cookies
-with httpx.Client(base_url='http://airkeep:8787') as backend:
+with httpx.Client(base_url='http://airkeep-relay:8787') as backend:
     for path in ['/', '/index.html', '/assets/main.js', '/brand/mark.svg']:
         assert backend.get(path).status_code == 404
 print('HTTPS, static assets, telemetry compatibility, cookie-free OAuth, revocation and rule conflicts passed.')
 '''.replace('VALUES', repr((token, password, origin)))
         try:
             subprocess.run(compose + ['up', '-d', '--wait', '--wait-timeout', '90'], check=True)
-            subprocess.run(compose + ['exec', '-T', 'airkeep', 'python', 'manage_accounts.py', 'bootstrap', 'owner', '--import-owner-password'], check=True)
-            subprocess.run(compose + ['exec', '-T', 'airkeep', 'python', '-'], input=probe, text=True, check=True)
-            uid = subprocess.check_output(compose + ['exec', '-T', 'web', 'id', '-u'], text=True).strip()
+            subprocess.run(compose + ['exec', '-T', 'airkeep-relay', 'python', 'manage_accounts.py', 'bootstrap', 'owner', '--import-owner-password'], check=True)
+            subprocess.run(compose + ['exec', '-T', 'airkeep-relay', 'python', '-'], input=probe, text=True, check=True)
+            uid = subprocess.check_output(compose + ['exec', '-T', 'airkeep-web', 'id', '-u'], text=True).strip()
             assert uid != '0'
-            subprocess.run(compose + ['stop', 'airkeep'], check=True, stdout=subprocess.DEVNULL)
-            subprocess.run(compose + ['exec', '-T', 'web', 'sh', '-c',
+            subprocess.run(compose + ['stop', 'airkeep-relay'], check=True, stdout=subprocess.DEVNULL)
+            subprocess.run(compose + ['exec', '-T', 'airkeep-web', 'sh', '-c',
                                      'wget -q -O /dev/null http://127.0.0.1:8080/ && '
                                      'wget -q -O /dev/null http://127.0.0.1:8080/brand/mark.svg'], check=True)
             print('Frontend remains available while the backend is stopped. Both images run without root.')
-            services['web']['environment'] = {}
-            services['web'].pop('volumes')
+            services['airkeep-web']['environment'] = {}
+            services['airkeep-web'].pop('volumes')
             compose_file.write_text(json.dumps({'services': services}).replace('$', '$$'))
             subprocess.run(compose + ['up', '-d', '--no-deps', '--force-recreate', '--wait',
-                                     '--wait-timeout', '60', 'web'], check=True)
-            subprocess.run(compose + ['exec', '-T', 'web', 'sh', '-c',
+                                     '--wait-timeout', '60', 'airkeep-web'], check=True)
+            subprocess.run(compose + ['exec', '-T', 'airkeep-web', 'sh', '-c',
                                      'test ! -s /tmp/airkeep-tls.conf && '
                                      'wget -q -O /dev/null http://127.0.0.1:8080/'], check=True)
             print('HTTP-only frontend starts and serves assets without certificate mounts.')

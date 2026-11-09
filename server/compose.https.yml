@@ -1,0 +1,73 @@
+# Direct HTTPS using an existing certificate.
+name: airkeep
+services:
+  airkeep-relay:
+    image: ${AIRKEEP_RELAY_IMAGE:-ghcr.io/danohn/airkeep-relay}:${AIRKEEP_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    environment:
+      AIRKEEP_DB_PATH: /data/airkeep.sqlite3
+    expose: ['8787']
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    mem_limit: 256m
+    pids_limit: 64
+    stop_grace_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    networks:
+      default:
+        aliases:
+          # Published web images use this hostname for the relay.
+          - airkeep
+    volumes:
+      - airkeep-data:/data
+      - type: bind
+        source: ./private/apns
+        target: /run/keys
+        read_only: true
+        bind:
+          create_host_path: false
+  airkeep-web:
+    image: ${AIRKEEP_WEB_IMAGE:-ghcr.io/danohn/airkeep-web}:${AIRKEEP_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    init: true
+    depends_on:
+      airkeep-relay:
+        condition: service_healthy
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m,mode=1777
+    mem_limit: 128m
+    pids_limit: 32
+    stop_grace_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    user: ${AIRKEEP_TLS_UID:-1000}:${AIRKEEP_TLS_GID:-1000}
+    environment:
+      AIRKEEP_TLS_ENABLED: 'true'
+      AIRKEEP_HOST: ${AIRKEEP_HOST:?Set AIRKEEP_HOST to the certificate-covered hostname}
+      AIRKEEP_TLS_RELOAD_SECONDS: '60'
+    ports:
+      - '${AIRKEEP_BIND_ADDRESS:-127.0.0.1}:${AIRKEEP_HTTPS_PORT:-8443}:8443'
+    volumes:
+      - type: bind
+        source: ${AIRKEEP_TLS_DIR:?Set AIRKEEP_TLS_DIR to the ACME-managed certificate directory}
+        target: /run/tls
+        read_only: true
+        bind:
+          create_host_path: false
+volumes:
+  airkeep-data:
