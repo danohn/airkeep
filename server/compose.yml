@@ -1,10 +1,10 @@
 name: airkeep
 services:
   airkeep:
-    image: ${AIRKEEP_RELAY_IMAGE:-ghcr.io/danohn/airkeep-relay}:${AIRKEEP_IMAGE_TAG:-main}
+    image: ${AIRKEEP_RELAY_IMAGE:-ghcr.io/danohn/airkeep-relay}:${AIRKEEP_IMAGE_TAG:-latest}
     restart: unless-stopped
     init: true
-    env_file: private/relay.env
+    env_file: .env
     environment:
       AIRKEEP_DB_PATH: /data/airkeep.sqlite3
     expose: ['8787']
@@ -23,8 +23,14 @@ services:
         max-file: '3'
     volumes:
       - airkeep-data:/data
+      - type: bind
+        source: ./private/apns
+        target: /run/keys
+        read_only: true
+        bind:
+          create_host_path: false
   web:
-    image: ${AIRKEEP_WEB_IMAGE:-ghcr.io/danohn/airkeep-web}:${AIRKEEP_IMAGE_TAG:-main}
+    image: ${AIRKEEP_WEB_IMAGE:-ghcr.io/danohn/airkeep-web}:${AIRKEEP_IMAGE_TAG:-latest}
     restart: unless-stopped
     init: true
     depends_on:

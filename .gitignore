@@ -24,6 +24,7 @@ firmware/sdkconfig.old
 firmware/sdkconfig.secrets
 apple/Local.xcconfig
 server/private/
+server/compose.override.yml
 *.log
 web/node_modules/
 web/dist/

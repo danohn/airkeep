@@ -1,4 +1,4 @@
-# Reuse an existing ACME-managed certificate directory on a separate TLS port.
+# Copy to compose.override.yml to let Airkeep serve HTTPS using an existing certificate.
 services:
   web:
     user: ${AIRKEEP_TLS_UID:-1000}:${AIRKEEP_TLS_GID:-1000}
