@@ -2,6 +2,8 @@
 
 ![Airkeep. Care for every spool.](design/brand/github/readme-banner.png)
 
+[Visit the Airkeep website](https://airkeep.io/).
+
 Airkeep tracks humidity and temperature inside a Bambu Lab P2S's AMS. Check readings and history on your Apple devices, in a browser or on a Waveshare AMOLED desk display. Shared humidity alerts and iPhone Live Activities help you keep an eye on it while the app is closed.
 
 An always-on, self-hosted relay connects to one printer over local MQTT, stores seven days of history and serves readings to every client over authenticated HTTPS. It keeps collecting data and checking alert rules when the clients are closed. See the [architecture guide](docs/architecture.md) for the data flow and relay interfaces.
