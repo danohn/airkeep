@@ -5,9 +5,15 @@ on:
     paths:
       - '.github/workflows/containers.yml'
       - '.dockerignore'
+      - '.bumpversion.toml'
+      - 'apple/project.yml'
+      - 'apple/Airkeep.xcodeproj/project.pbxproj'
+      - 'firmware/version.txt'
       - 'server/**'
       - 'web/**'
       - 'scripts/check-containers.py'
+      - 'scripts/check-version.py'
+      - 'scripts/release-image-digest.sh'
   push:
     branches: [main]
     tags: ['v*']
@@ -24,13 +30,15 @@ permissions:
 
 concurrency:
   group: containers-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: ${{ github.ref_type == 'tag' && '0' || '1' }}
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: '0.11.15'
@@ -42,6 +50,14 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: web/package-lock.json
+      - name: Check release version
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            git merge-base --is-ancestor HEAD origin/main
+            uv run --no-project python scripts/check-version.py --tag "$GITHUB_REF_NAME"
+          else
+            uv run --no-project python scripts/check-version.py
+          fi
       - name: Relay tests
         run: uv run --locked --directory server pytest -q
       - name: Browser tests
@@ -70,11 +86,13 @@ jobs:
             dockerfile: web/Dockerfile
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Registry namespace
-        id: namespace
+      - name: Image source
+        id: source
         env:
           OWNER: ${{ github.repository_owner }}
-        run: echo "owner=${OWNER,,}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "owner=${OWNER,,}" >> "$GITHUB_OUTPUT"
+          echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
@@ -85,7 +103,8 @@ jobs:
       - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         id: meta
         with:
-          images: ghcr.io/${{ steps.namespace.outputs.owner }}/${{ matrix.image }}
+          images: ghcr.io/${{ steps.source.outputs.owner }}/${{ matrix.image }}
+          labels: org.opencontainers.image.revision=${{ steps.source.outputs.revision }}
           flavor: latest=false
           tags: |
             type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
@@ -93,7 +112,27 @@ jobs:
             type=sha,format=long
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+      - name: Check for an existing release image
+        id: release-image
+        if: github.ref_type == 'tag'
+        env:
+          OWNER: ${{ steps.source.outputs.owner }}
+          IMAGE: ${{ matrix.image }}
+          REVISION: ${{ steps.source.outputs.revision }}
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          image="ghcr.io/$OWNER/$IMAGE"
+          if docker buildx imagetools inspect "$image:$version" --raw > /dev/null 2> "$RUNNER_TEMP/inspect-error"; then
+            bash scripts/release-image-digest.sh "$image" "$version" "$REVISION"
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          elif grep -Eqi 'not found|manifest unknown' "$RUNNER_TEMP/inspect-error"; then
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          else
+            cat "$RUNNER_TEMP/inspect-error" >&2
+            exit 1
+          fi
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        if: steps.release-image.outputs.exists != 'true'
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -105,3 +144,49 @@ jobs:
           cache-to: type=gha,scope=${{ matrix.image }},mode=max
           provenance: mode=max
           sbom: true
+
+  release:
+    needs: publish
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify images and publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          revision=$(git rev-parse HEAD)
+          relay="ghcr.io/${OWNER,,}/airkeep-relay"
+          web="ghcr.io/${OWNER,,}/airkeep-web"
+          relay_digest=$(bash scripts/release-image-digest.sh "$relay" "$version" "$revision")
+          web_digest=$(bash scripts/release-image-digest.sh "$web" "$version" "$revision")
+          if gh release view "$GITHUB_REF_NAME" --json isDraft --jq '.isDraft' > "$RUNNER_TEMP/release-state" 2> "$RUNNER_TEMP/release-error"; then
+            if [[ $(cat "$RUNNER_TEMP/release-state") == false ]]; then
+              exit 0
+            fi
+            echo "A draft release already exists for $GITHUB_REF_NAME. Review it before publishing." >&2
+            exit 1
+          elif ! grep -qi 'release not found' "$RUNNER_TEMP/release-error"; then
+            cat "$RUNNER_TEMP/release-error" >&2
+            exit 1
+          fi
+          {
+            printf 'Both container images were built from commit `%s`.\n\n' "$revision"
+            printf '| Service | Image tag | Image index digest |\n| --- | --- | --- |\n'
+            printf '| Relay | `%s:%s` | `%s` |\n' "$relay" "$version" "$relay_digest"
+            printf '| Dashboard | `%s:%s` | `%s` |\n\n' "$web" "$version" "$web_digest"
+            printf 'Set `AIRKEEP_IMAGE_TAG=%s` to deploy both images together. See the [upgrade and rollback guide](https://github.com/%s/blob/%s/docs/docker-deployment.md#updates-and-rollback).\n' "$version" "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME"
+          } > "$RUNNER_TEMP/release-notes.md"
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "Airkeep $version" \
+            --generate-notes --notes-file "$RUNNER_TEMP/release-notes.md"

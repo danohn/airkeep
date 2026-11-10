@@ -1,0 +1,27 @@
+[tool.bumpversion]
+current_version = "0.4.0"
+commit = false
+tag = false
+
+[[tool.bumpversion.files]]
+filename = "server/pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "server/app.py"
+search = 'version="{current_version}"'
+replace = 'version="{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "web/package.json"
+search = '"version": "{current_version}"'
+replace = '"version": "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "apple/project.yml"
+search = "MARKETING_VERSION: '{current_version}'"
+replace = "MARKETING_VERSION: '{new_version}'"
+
+[[tool.bumpversion.files]]
+filename = "firmware/version.txt"

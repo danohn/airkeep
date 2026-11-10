@@ -84,7 +84,7 @@ docker compose -f compose.http.yml pull
 docker compose -f compose.http.yml up -d --wait --remove-orphans
 ```
 
-Use the same file selection you used to start Airkeep. To pin or roll back both images, set `AIRKEEP_IMAGE_TAG` to a release tag or `sha-<full commit SHA>`. Restore the matching database backup if the update changed the schema. Use the Compose `down` subcommand to stop the stack and keep the `airkeep-data` database volume.
+Use the same file selection you used to start Airkeep. To pin or roll back both images, set `AIRKEEP_IMAGE_TAG` to a numbered image tag such as `0.4.0`, or to `sha-<full commit SHA>`. Restore the matching database backup if the update changed the schema. Use the Compose `down` subcommand to stop the stack and keep the `airkeep-data` database volume.
 
 <details>
 <summary>Build the images locally</summary>
