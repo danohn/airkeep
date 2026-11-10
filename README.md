@@ -110,4 +110,26 @@ scripts/check.sh
 
 The script runs relay, web and Apple tests, builds the browser assets, and builds the iOS, Mac and Watch apps without signing. The [firmware guide](firmware/README.md#host-rendering-and-tests) covers LVGL host tests.
 
+### Release a version
+
+On a clean release branch, run the version bump and regenerate the lockfiles and Xcode project. Use `patch`, `minor`, or `major` for the intended bump. Assign Apple build numbers separately when preparing app builds.
+
+```sh
+uvx bump-my-version==1.8.1 bump minor
+uv lock --directory server
+npm install --prefix web --package-lock-only --ignore-scripts
+xcodegen generate --spec apple/project.yml
+uv run --no-project python scripts/check-version.py
+```
+
+Commit the version changes and merge the PR. Tag the merged commit with `v` followed by the exact version in `.bumpversion.toml`. For example, for `0.4.0`, replace `<merge-commit>` with the SHA shown on the merged PR.
+
+```sh
+git fetch origin main
+git tag -a v0.4.0 <merge-commit> -m 'Airkeep 0.4.0'
+git push origin v0.4.0
+```
+
+GitHub Actions publishes `airkeep-relay:0.4.0` and `airkeep-web:0.4.0` to GHCR, verifies both images, then creates the GitHub Release with their digests. The numbered tags pin a matching pair. The rolling `latest` tags track successful builds from `main`.
+
 [Brand assets](design/brand/README.md) contain the editable logos, GitHub artwork and native app icon. Airkeep is available under the [MIT license](LICENSE).
