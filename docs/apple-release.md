@@ -44,12 +44,18 @@ Signing uses a temporary runner Keychain. The preparation script writes private 
 
 The workflow uses OpenID Connect for GitHub attestations. Repository settings and the GitHub plan must support artifact attestations. The build job grants `id-token` and `attestations` write access. Publishing the DMG uses a separate job with `contents` write access. [GitHub artifact attestations](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations)
 
-## Run a release
+## Publish a coordinated release
+
+1. Merge the version bump to `main`, tag that commit `vX.Y.Z`, and push the tag. Wait for **Container images** on that tag to publish both versioned images.
+2. Run **Publish Airkeep release** on the version tag and supply an unused macOS build number from 1 through 9999. For example, run `gh workflow run release.yml --ref v0.5.2 -f build_number=8`. The workflow checks that the tag is on `main` and that the registry images were built from its commit.
+3. The workflow builds the ESP32 firmware and the Developer ID DMG from the tag. It checks the firmware and DMG checksums and verifies the DMG attestation before uploading the files to a draft release. It publishes the draft after all uploads succeed, then dispatches the web installer deployment. If publication fails, rerun the failed jobs to resume the workflow's draft.
+
+## Build for TestFlight or publish a Mac rebuild
 
 1. Merge the intended release source to `main`, update the coordinated repository version and create the corresponding stable `vX.Y.Z` tag. The workflow verifies that the tag resolves to the checked-out commit, is an ancestor of `main`, and matches all versioned source files through `scripts/check-version.py`.
 2. Dispatch **Apple signed release** from `main`. Enter the existing tag and an unused build number from 1 through 9999. Select `all`, `store` or `mac-direct`. Every target in the selected archive receives the supplied marketing version and build number.
 3. Enable `upload_testflight` to upload the Store archives to App Store Connect. Apple must process an uploaded build before it appears for TestFlight testing. Manage tester groups and release review in App Store Connect. [Apple build uploads](https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds)
-4. Enable `publish_dmg` to create a macOS GitHub release at `apple-vX.Y.Z-buildN` from the same source commit. This requires a channel containing `mac-direct`. The workflow uploads the DMG, checksum and attestation bundle to a draft before publishing it. This supports immutable releases and keeps the coordinated repository release marked as latest.
+4. For a Mac rebuild, select `mac-direct` and enable `publish_dmg`. The workflow publishes the signed DMG, checksum and attestation under `apple-vX.Y.Z-buildN` and keeps the coordinated release marked as latest.
 5. Download the Actions artifacts and verify their checksums. For the DMG, verify its provenance with `gh attestation verify Airkeep-X.Y.Z-buildN.dmg --repo danohn/airkeep`. The attested digest covers the distributed DMG after stapling. [Verifying attestations](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations)
 
 The Store export uses Xcode's `app-store-connect` method and manual profile mappings. The optional upload uses `xcodebuild -exportArchive` with `destination=upload` and the API key. Build-number management is disabled so the requested build number remains in the uploaded archive. Inspect the installed Xcode version's supported keys with `xcodebuild -help`. [Xcode archive export files](https://help.apple.com/xcode/mac/current/en.lproj/deva1f2ab5a2.html)

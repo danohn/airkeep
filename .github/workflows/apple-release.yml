@@ -21,7 +21,7 @@ on:
         type: boolean
         default: false
       publish_dmg:
-        description: Publish the notarized DMG as a GitHub release
+        description: Publish a separate macOS release for this build
         type: boolean
         default: false
 
@@ -33,108 +33,39 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  validate:
+  prepare:
     runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.channels.outputs.matrix }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ inputs.tag }}
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
-        with:
-          version: '0.11.15'
-          python-version: '3.14'
-      - name: Validate source tag, version and build number
+      - name: Validate standalone release options
         env:
-          RELEASE_TAG: ${{ inputs.tag }}
-          BUILD_NUMBER: ${{ inputs.build_number }}
-          WORKFLOW_REF: ${{ github.ref }}
           CHANNEL: ${{ inputs.channel }}
           PUBLISH_DMG: ${{ inputs.publish_dmg }}
         run: |
-          [[ "$WORKFLOW_REF" == refs/heads/main ]]
-          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
-          [[ "$BUILD_NUMBER" =~ ^[1-9][0-9]{0,3}$ ]]
+          [[ "$GITHUB_REF" == refs/heads/main ]]
           [[ "$CHANNEL" != store || "$PUBLISH_DMG" != true ]]
-          test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
-          git merge-base --is-ancestor HEAD origin/main
-          uv run --no-project python scripts/check-version.py --tag "$RELEASE_TAG"
-          uv run --no-project python scripts/test-apple-release.py
-      - name: Select channels
-        id: channels
-        env:
-          CHANNEL: ${{ inputs.channel }}
-        run: |
-          uv run --no-project python - <<'PY' >> "$GITHUB_OUTPUT"
-          import json, os
-          channels = {"all": ["ios-store", "mac-store", "mac-direct"], "store": ["ios-store", "mac-store"], "mac-direct": ["mac-direct"]}
-          print("matrix=" + json.dumps({"mode": channels[os.environ["CHANNEL"]]}))
-          PY
 
   build:
-    needs: validate
-    runs-on: macos-26
-    environment: apple-release
-    timeout-minutes: 240
+    needs: prepare
+    uses: ./.github/workflows/apple-build.yml
     permissions:
       contents: read
       id-token: write
       attestations: write
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.validate.outputs.matrix) }}
-    env:
-      RELEASE_TAG: ${{ inputs.tag }}
-      BUILD_NUMBER: ${{ inputs.build_number }}
-      UPLOAD_TESTFLIGHT: ${{ inputs.upload_testflight }}
-      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
-      APPLE_BUNDLE_ID_PREFIX: ${{ vars.APPLE_BUNDLE_ID_PREFIX }}
-      APPLE_APP_GROUP: ${{ vars.APPLE_APP_GROUP }}
+    with:
+      tag: ${{ inputs.tag }}
+      build_number: ${{ inputs.build_number }}
+      channel: ${{ inputs.channel }}
+      upload_testflight: ${{ inputs.upload_testflight }}
+    secrets:
       APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
       APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
       APP_STORE_CONNECT_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_BASE64 }}
-      CERTIFICATE_BASE64: ${{ matrix.mode == 'mac-direct' && secrets.APPLE_DEVELOPER_ID_CERTIFICATE_BASE64 || secrets.APPLE_STORE_CERTIFICATES_BASE64 }}
-      CERTIFICATE_PASSWORD: ${{ matrix.mode == 'mac-direct' && secrets.APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD || secrets.APPLE_STORE_CERTIFICATES_PASSWORD }}
-      PROFILES_BASE64: ${{ matrix.mode == 'mac-direct' && secrets.APPLE_DEVELOPER_ID_PROFILES_BASE64 || secrets.APPLE_STORE_PROFILES_BASE64 }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ inputs.tag }}
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
-        with:
-          version: '0.11.15'
-          python-version: '3.14'
-      - name: Check Xcode SDKs
-        run: |
-          xcodebuild -version
-          xcodebuild -showsdks
-      - name: Test shared Apple code
-        run: xcodebuild -project apple/Airkeep.xcodeproj -scheme AirkeepNotificationsTests -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO test
-      - name: Archive, sign and export
-        env:
-          RELEASE_MODE: ${{ matrix.mode }}
-        run: bash scripts/apple-release.sh "$RELEASE_MODE"
-      - name: Attest final stapled DMG
-        if: matrix.mode == 'mac-direct'
-        id: attest
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
-        with:
-          subject-path: ${{ runner.temp }}/airkeep-release-mac-direct/output/*.dmg
-      - name: Save DMG attestation bundle
-        if: matrix.mode == 'mac-direct'
-        env:
-          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
-        run: cp "$BUNDLE_PATH" "$RUNNER_TEMP/airkeep-release-mac-direct/output/attestation.json"
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: apple-${{ matrix.mode }}-${{ inputs.tag }}-build${{ inputs.build_number }}
-          path: ${{ runner.temp }}/airkeep-release-${{ matrix.mode }}/output/
-          if-no-files-found: error
-          retention-days: 30
+      APPLE_DEVELOPER_ID_CERTIFICATE_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE_BASE64 }}
+      APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+      APPLE_DEVELOPER_ID_PROFILES_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_PROFILES_BASE64 }}
+      APPLE_STORE_CERTIFICATES_BASE64: ${{ secrets.APPLE_STORE_CERTIFICATES_BASE64 }}
+      APPLE_STORE_CERTIFICATES_PASSWORD: ${{ secrets.APPLE_STORE_CERTIFICATES_PASSWORD }}
+      APPLE_STORE_PROFILES_BASE64: ${{ secrets.APPLE_STORE_PROFILES_BASE64 }}
 
   publish-dmg:
     needs: build
@@ -154,15 +85,17 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.tag }}
           BUILD_NUMBER: ${{ inputs.build_number }}
+          REVISION: ${{ needs.build.outputs.revision }}
         run: |
           cd release
           sha256sum --check SHA256SUMS.txt
           version=${RELEASE_TAG#v}
           asset="Airkeep-$version-build$BUILD_NUMBER"
           mac_tag="apple-$RELEASE_TAG-build$BUILD_NUMBER"
-          gh attestation verify "$asset.dmg" --repo "$GH_REPO" \
-            --signer-workflow "$GH_REPO/.github/workflows/apple-release.yml"
+          gh attestation verify "$asset.dmg" --repo "$GH_REPO" --bundle attestation.json \
+            --signer-workflow "$GH_REPO/.github/workflows/apple-build.yml"
           commit=$(gh api "repos/$GH_REPO/commits/$RELEASE_TAG" --jq .sha)
+          [[ "$commit" == "$REVISION" ]]
           mv SHA256SUMS.txt "$asset-SHA256SUMS.txt"
           mv attestation.json "$asset-attestation.json"
           gh release create "$mac_tag" --draft --latest=false --target "$commit" \

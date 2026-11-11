@@ -1,0 +1,127 @@
+name: Publish Airkeep release
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: Unused macOS build number for this version
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      relay: ${{ steps.images.outputs.relay }}
+      relay_digest: ${{ steps.images.outputs.relay_digest }}
+      web: ${{ steps.images.outputs.web }}
+      web_digest: ${{ steps.images.outputs.web_digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: '0.11.15'
+          python-version: '3.14'
+      - name: Validate the release tag and build number
+        env:
+          BUILD_NUMBER: ${{ inputs.build_number }}
+        run: |
+          if [[ "$GITHUB_REF_TYPE" != tag ]]; then
+            echo "Run this workflow on the stable version tag, such as v0.5.2." >&2
+            exit 1
+          fi
+          [[ "$BUILD_NUMBER" =~ ^[1-9][0-9]{0,3}$ ]]
+          git merge-base --is-ancestor HEAD origin/main
+          uv run --no-project python scripts/check-version.py --tag "$GITHUB_REF_NAME"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify the versioned container images
+        id: images
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          revision=$(git rev-parse HEAD)
+          relay="ghcr.io/${OWNER,,}/airkeep-relay"
+          web="ghcr.io/${OWNER,,}/airkeep-web"
+          relay_digest=$(bash scripts/release-image-digest.sh "$relay" "$version" "$revision")
+          web_digest=$(bash scripts/release-image-digest.sh "$web" "$version" "$revision")
+          printf '%s\n' "relay=$relay" "relay_digest=$relay_digest" "web=$web" "web_digest=$web_digest" >> "$GITHUB_OUTPUT"
+
+  firmware:
+    needs: prepare
+    uses: ./.github/workflows/firmware.yml
+
+  mac:
+    needs: prepare
+    uses: ./.github/workflows/apple-build.yml
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    with:
+      tag: ${{ github.ref_name }}
+      build_number: ${{ inputs.build_number }}
+      channel: mac-direct
+    secrets:
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_BASE64 }}
+      APPLE_DEVELOPER_ID_CERTIFICATE_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE_BASE64 }}
+      APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+      APPLE_DEVELOPER_ID_PROFILES_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_PROFILES_BASE64 }}
+
+  publish:
+    needs: [prepare, firmware, mac]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: firmware-release
+          path: ${{ runner.temp }}/firmware-release
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: apple-mac-direct-${{ github.ref_name }}-build${{ inputs.build_number }}
+          path: ${{ runner.temp }}/mac-release
+      - name: Publish the verified Mac and ESP32 assets together
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_NUMBER: ${{ inputs.build_number }}
+          RELAY_IMAGE: ${{ needs.prepare.outputs.relay }}
+          RELAY_DIGEST: ${{ needs.prepare.outputs.relay_digest }}
+          WEB_IMAGE: ${{ needs.prepare.outputs.web }}
+          WEB_DIGEST: ${{ needs.prepare.outputs.web_digest }}
+        run: bash scripts/publish-release.sh
+
+  deploy-installer:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Request deployment of the released installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main --repo "$GITHUB_REPOSITORY"
