@@ -236,7 +236,8 @@ def hosted_admin(store, users, monkeypatch):
     monkeypatch.setenv('AIRKEEP_TWILIO_API_SECRET', 'test-secret')
     monkeypatch.setenv('AIRKEEP_EMAIL_FROM', 'noreply@example.com')
     settings = Settings(deployment='hosted', database_url=URL, jwt_signing_key=uuid4().hex,
-                        web_origin=ORIGIN, public_signup=False, _env_file=None)
+                        web_origin=ORIGIN, public_signup=False, ios_topic='io.airkeep', mac_topic='io.airkeep',
+                        _env_file=None)
     app = create_app(settings)
     oauth = app.state.hosted_accounts.oauth
     with store.transaction():
@@ -364,6 +365,25 @@ def test_hosted_admin_diagnostics_are_paginated_scoped_and_redacted(store, users
     }
     assert all(event['actorAccountID'] == users[0] and event['outcome'] == 'read' for event in events)
     assert not any(value in caplog.text for value in (token, 'member-only', 'private-ams', '@example.com'))
+
+
+def test_hosted_admin_distinguishes_ios_and_mac_with_shared_push_topic(store, users, hosted_admin):
+    client, app, browser = hosted_admin
+    oauth = app.state.hosted_accounts.oauth
+    sign_in(client, oauth, browser[0])
+
+    for user, platform, token in zip(users, ('ios', 'mac'), ('a'*64, 'b'*64)):
+        with store.transaction():
+            native = oauth.grant(user, f'apple-{platform}', 'shared-device')['access_token']
+        registration = client.put('/v2/devices/shared-device', headers={'Authorization': 'Bearer '+native},
+                                  json={'platform': platform, 'environment': 'production', 'token': token})
+        assert registration.status_code == 200
+
+    for user, platform in zip(users, ('ios', 'mac')):
+        devices = client.get(HOSTED_ADMIN+f'/accounts/{user}/devices').json()
+        assert [(device['id'], device['platform'], device['topic']) for device in devices] == [
+            ('shared-device', platform, 'io.airkeep'),
+        ]
 
 
 def test_hosted_admin_suspension_revokes_access_and_keeps_tenant_history(store, users, hosted_admin):

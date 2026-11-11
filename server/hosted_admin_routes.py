@@ -108,11 +108,19 @@ def install_hosted_admin(app, connection, accounts, settings):
 
     @router.get('/accounts/{user}/devices')
     def devices(user: AccountID, identity: Principal = Depends(admin)):
-        platforms = {settings.ios_topic: 'ios', settings.mac_topic: 'mac', settings.watch_topic: 'watch'}
+        grant_platforms = {'apple-ios': 'ios', 'apple-mac': 'mac', 'watch': 'watch'}
+        topic_platforms = {settings.ios_topic: 'ios', settings.mac_topic: 'mac', settings.watch_topic: 'watch'}
+        if settings.ios_topic == settings.mac_topic:
+            topic_platforms[settings.ios_topic] = 'unknown'
         with selected(user, identity, 'devices'):
-            rows = store.rows('''SELECT id,topic,environment,receive_alerts,created_at,registered_at
-                                 FROM devices ORDER BY registered_at DESC NULLS LAST,id''')
-        return [{'id': row['id'], 'platform': platforms.get(row['topic'], 'ios'), 'topic': row['topic'],
+            rows = store.rows('''SELECT d.id,d.topic,d.environment,d.receive_alerts,d.created_at,d.registered_at,g.client
+                                 FROM devices d
+                                 LEFT JOIN registration_owners o
+                                   ON o.kind='device' AND o.tenant_id=d.tenant_id AND o.id=d.id
+                                 LEFT JOIN oauth_grants g ON g.id=o.grant_id AND g."user"=d.tenant_id
+                                 ORDER BY d.registered_at DESC NULLS LAST,d.id''')
+        return [{'id': row['id'], 'platform': grant_platforms.get(row['client'], topic_platforms.get(row['topic'], 'unknown')),
+                 'topic': row['topic'],
                  'environment': row['environment'], 'receiveAlerts': bool(row['receive_alerts']),
                  'createdAt': row['created_at'], 'lastRegisteredAt': row['registered_at']} for row in rows]
 
