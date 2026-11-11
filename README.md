@@ -13,7 +13,7 @@ Both setups connect to one printer from an always-on computer on the same networ
 ### Use hosted Airkeep
 
 1. [Create an Airkeep account](https://dashboard.airkeep.io/signup) and follow the email link to verify your address and set a password.
-2. With [uv installed](https://docs.astral.sh/uv/getting-started/installation/), run `uvx airkeep` on the printer's network. Open the local setup link it prints and enter the printer details.
+2. Start the LAN agent on the printer's network. Run `uvx airkeep` with [uv installed](https://docs.astral.sh/uv/getting-started/installation/), or follow the [Docker setup for Linux](agent/README.md#docker-on-linux). Open the local setup page and enter the printer details.
 3. Follow the pairing link, sign in to the dashboard, and approve the code shown in setup.
 
 The [LAN agent](agent/README.md) sends readings to the hosted dashboard and keeps the printer credentials on your network. The hosted service checks alert rules while your apps are closed. Read the [hosted privacy notice](https://airkeep.io/privacy/) for details about account and printer data.
