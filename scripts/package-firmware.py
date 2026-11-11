@@ -23,9 +23,12 @@ def main():
     output = args.output.resolve()
     version = (ROOT / "firmware/version.txt").read_text().strip()
     config = (build / "config/sdkconfig.h").read_text()
-    for name in ("WIFI_SSID", "WIFI_PASSWORD", "RELAY_URL"):
+    for name in ("WIFI_SSID", "WIFI_PASSWORD"):
         if not re.search(rf'^#define CONFIG_AIRKEEP_{name} ""$', config, re.MULTILINE):
             parser.error(f"Public firmware requires a blank CONFIG_AIRKEEP_{name}.")
+    if not re.search(r'^#define CONFIG_AIRKEEP_RELAY_URL "(?:https://dashboard\.airkeep\.io)?"$',
+                     config, re.MULTILINE):
+        parser.error("Public firmware requires a blank or official hosted CONFIG_AIRKEEP_RELAY_URL.")
 
     flash = json.loads((build / "flasher_args.json").read_text())
     if flash["extra_esptool_args"]["chip"] != "esp32s3":
