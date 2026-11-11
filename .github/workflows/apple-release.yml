@@ -21,7 +21,7 @@ on:
         type: boolean
         default: false
       publish_dmg:
-        description: Attach the notarized DMG to the existing GitHub release
+        description: Publish the notarized DMG as a GitHub release
         type: boolean
         default: false
 
@@ -148,7 +148,7 @@ jobs:
         with:
           name: apple-mac-direct-${{ inputs.tag }}-build${{ inputs.build_number }}
           path: release
-      - name: Verify and attach final DMG to existing release
+      - name: Verify and publish the notarized DMG
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -157,9 +157,19 @@ jobs:
         run: |
           cd release
           sha256sum --check SHA256SUMS.txt
-          gh attestation verify ./*.dmg --repo "$GH_REPO"
-          gh release view "$RELEASE_TAG" --json tagName --jq .tagName
-          # A distinct checksum name preserves the firmware release's SHA256SUMS.txt.
-          mv SHA256SUMS.txt "Airkeep-${RELEASE_TAG#v}-build$BUILD_NUMBER-SHA256SUMS.txt"
-          mv attestation.json "Airkeep-${RELEASE_TAG#v}-build$BUILD_NUMBER-attestation.json"
-          gh release upload "$RELEASE_TAG" ./*.dmg ./*SHA256SUMS.txt ./*attestation.json
+          version=${RELEASE_TAG#v}
+          asset="Airkeep-$version-build$BUILD_NUMBER"
+          mac_tag="apple-$RELEASE_TAG-build$BUILD_NUMBER"
+          gh attestation verify "$asset.dmg" --repo "$GH_REPO" \
+            --signer-workflow "$GH_REPO/.github/workflows/apple-release.yml"
+          commit=$(gh api "repos/$GH_REPO/commits/$RELEASE_TAG" --jq .sha)
+          mv SHA256SUMS.txt "$asset-SHA256SUMS.txt"
+          mv attestation.json "$asset-attestation.json"
+          gh release create "$mac_tag" --draft --latest=false --target "$commit" \
+            --title "Airkeep $version for macOS (build $BUILD_NUMBER)" --notes-file - \
+            "$asset.dmg" "$asset-SHA256SUMS.txt" "$asset-attestation.json" <<EOF
+          Developer ID-signed and notarized Airkeep for Apple silicon and Intel Macs running macOS 26 or later.
+
+          [Build and notarization run](https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID) · [Airkeep $version source](https://github.com/$GH_REPO/tree/$RELEASE_TAG)
+          EOF
+          gh release edit "$mac_tag" --draft=false --latest=false
