@@ -2,11 +2,19 @@
 
 The firmware targets **Waveshare ESP32-S3-Touch-AMOLED-1.8 V2**: CO5300/CST820, 368×448, 16 MB flash and 8 MB octal PSRAM. The BSP is pinned to `2.0.3`. Keep the V2 BSP, even though its compatible touch package may use a CST816-family name. The board's touch controller is CST820.
 
+## Install from your browser
+
+Open the [Airkeep installer](https://airkeep.io/install/) in desktop Chrome or Edge. Connect the board using a USB data cable. The factory install replaces the current firmware and clears saved settings and pairing.
+
+Close the flasher when it finishes. Connect again in **Configure over USB** and enter your 2.4 GHz Wi-Fi settings, relay HTTPS URL, and AMS ID. The board saves them and restarts. When it connects, tap **Pair display** and approve it on your relay. To change Wi-Fi or relay settings, return to **Configure over USB**.
+
+The [flashing instructions](FLASHING.md) cover downloading and flashing a factory image with esptool.
+
 ## Build and configure
 
 From the repository root, run `scripts/idf.sh menuconfig`. Set Wi-Fi credentials, `AIRKEEP_RELAY_URL` (for example `https://airkeep.example.com:8443`) and the AMS ID. Then run `scripts/idf.sh build`.
 
-The wrapper needs an existing ESP-IDF v5.5.x installation. It resolves managed components using the checked-in `dependencies.lock`, but doesn't download a full SDK or flash the board automatically. Wi-Fi credentials and the relay token stay in ignored local configuration and compiled binaries. Keep those binaries private.
+The wrapper needs an existing ESP-IDF v5.5.x installation. It resolves managed components using the checked-in `dependencies.lock`, but doesn't download a full SDK or flash the board automatically. Saved USB settings take precedence over `menuconfig` defaults. Keep any binaries built with Wi-Fi credentials private.
 
 ## Readings and display
 

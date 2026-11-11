@@ -145,8 +145,12 @@ jobs:
           provenance: mode=max
           sbom: true
 
+  firmware:
+    if: github.ref_type == 'tag'
+    uses: ./.github/workflows/firmware.yml
+
   release:
-    needs: publish
+    needs: [publish, firmware]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
@@ -160,6 +164,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: firmware-release
+          path: ${{ runner.temp }}/firmware-release
       - name: Verify images and publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -171,11 +179,22 @@ jobs:
           web="ghcr.io/${OWNER,,}/airkeep-web"
           relay_digest=$(bash scripts/release-image-digest.sh "$relay" "$version" "$revision")
           web_digest=$(bash scripts/release-image-digest.sh "$web" "$version" "$revision")
-          if gh release view "$GITHUB_REF_NAME" --json isDraft --jq '.isDraft' > "$RUNNER_TEMP/release-state" 2> "$RUNNER_TEMP/release-error"; then
+          verify_firmware() (
+            cd "$1"
+            test -s FLASHING.md
+            test "$(sha256sum airkeep-factory.bin)" = "$(cat SHA256SUMS.txt)"
+          )
+          bundle="$RUNNER_TEMP/firmware-release"
+          verify_firmware "$bundle"
+          if gh release view "$GITHUB_REF_NAME" --json isDraft,isPrerelease --jq '.isDraft or .isPrerelease' > "$RUNNER_TEMP/release-state" 2> "$RUNNER_TEMP/release-error"; then
             if [[ $(cat "$RUNNER_TEMP/release-state") == false ]]; then
+              published="$RUNNER_TEMP/published-firmware"
+              gh release download "$GITHUB_REF_NAME" --dir "$published" \
+                --pattern airkeep-factory.bin --pattern SHA256SUMS.txt --pattern FLASHING.md
+              verify_firmware "$published"
               exit 0
             fi
-            echo "A draft release already exists for $GITHUB_REF_NAME. Review it before publishing." >&2
+            echo "A draft or prerelease already exists for $GITHUB_REF_NAME. Review it before publishing." >&2
             exit 1
           elif ! grep -qi 'release not found' "$RUNNER_TEMP/release-error"; then
             cat "$RUNNER_TEMP/release-error" >&2
@@ -186,7 +205,20 @@ jobs:
             printf '| Service | Image tag | Image index digest |\n| --- | --- | --- |\n'
             printf '| Relay | `%s:%s` | `%s` |\n' "$relay" "$version" "$relay_digest"
             printf '| Dashboard | `%s:%s` | `%s` |\n\n' "$web" "$version" "$web_digest"
-            printf 'Set `AIRKEEP_IMAGE_TAG=%s` to deploy both images together. See the [upgrade and rollback guide](https://github.com/%s/blob/%s/docs/docker-deployment.md#updates-and-rollback).\n' "$version" "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME"
+            printf 'Set `AIRKEEP_IMAGE_TAG=%s` to deploy both images together. See the [upgrade and rollback guide](https://github.com/%s/blob/%s/docs/docker-deployment.md#updates-and-rollback).\n\n' "$version" "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME"
+            printf 'The factory firmware supports the Waveshare ESP32-S3-Touch-AMOLED-1.8 V2. Use the [web installer](https://airkeep.io/install/) or the attached flashing instructions. Factory installation clears saved settings and pairing.\n'
           } > "$RUNNER_TEMP/release-notes.md"
           gh release create "$GITHUB_REF_NAME" --verify-tag --title "Airkeep $version" \
-            --generate-notes --notes-file "$RUNNER_TEMP/release-notes.md"
+            --generate-notes --notes-file "$RUNNER_TEMP/release-notes.md" \
+            "$bundle/airkeep-factory.bin" "$bundle/SHA256SUMS.txt" "$bundle/FLASHING.md"
+
+  deploy-installer:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Request deployment of the released installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main --repo "$GITHUB_REPOSITORY"

@@ -29,3 +29,5 @@ server/compose.override.yml
 web/node_modules/
 web/dist/
 web/*.tsbuildinfo
+site/node_modules/
+site/test-results/

@@ -25,6 +25,7 @@ typedef struct {
 static lv_obj_t *value, *temperature, *status, *bar, *chart, *chart_range, *details, *detail_text, *age, *brightness_text;
 static lv_chart_series_t *series;
 static airkeep_reading_t current;
+static const char *configured_relay_url, *configured_ams_id;
 static bool has_reading;
 static int64_t chart_at;
 static int history[120], history_count, history_write;
@@ -157,7 +158,7 @@ static void timer(lv_timer_t *timer)
     else snprintf(text,sizeof(text),"Updated %ds ago",seconds);
     lv_label_set_text(age,text);
     snprintf(text,sizeof(text),"Relay %s\nAMS ID %s\n\nAir humidity, not filament moisture.\n\nRaw humidity index: %d\n5 = dry end, 1 = wet end\n\nHistory collected since boot.",
-        CONFIG_AIRKEEP_RELAY_URL,CONFIG_AIRKEEP_AMS_ID,current.raw_index);
+        configured_relay_url,configured_ams_id,current.raw_index);
     lv_label_set_text(detail_text,text);
 }
 
@@ -182,8 +183,10 @@ airkeep_action_t airkeep_ui_action(void)
     return action;
 }
 
-void airkeep_ui_start(void)
+void airkeep_ui_start(const char *relay_url, const char *ams_id)
 {
+    configured_relay_url = relay_url;
+    configured_ams_id = ams_id;
     readings=xQueueCreate(1,sizeof(airkeep_reading_t)); statuses=xQueueCreate(1,80);
     pairing_updates = xQueueCreate(1, sizeof(pairing_update_t));
     actions = xQueueCreate(1, sizeof(airkeep_action_t));

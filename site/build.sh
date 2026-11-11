@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-  echo "Usage: bash site/build.sh OUTPUT_DIRECTORY" >&2
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+  echo "Usage: bash site/build.sh OUTPUT_DIRECTORY [RELEASE_BUNDLES_DIRECTORY]" >&2
   exit 2
 fi
 
@@ -20,3 +20,8 @@ cp -- "$repo/site/fonts/dm-serif-display-latin.woff2" "$repo/design/brand/fonts/
 cp -- "$repo/design/brand/logo/airkeep-mark-amber.svg" "$output/assets/mark.svg"
 cp -- "$repo/design/brand/github/social-preview.png" "$output/assets/"
 cp -- "$repo/docs/screenshots/"{web-dashboard,ios-simulator,macos-menubar,watch-dashboard,esp32-lvgl}.png "$output/assets/"
+mkdir -- "$output/install" "$output/vendor"
+cp -- "$repo/site/install/"{index.html,install.css,install.js,serial.js} "$output/install/"
+cp -R -- "$repo/site/node_modules/esp-web-tools/dist/web" "$output/vendor/esp-web-tools"
+cp -- "$repo/site/node_modules/esp-web-tools/LICENSE" "$output/vendor/esp-web-tools/LICENSE.txt"
+node "$repo/site/stage-firmware.mjs" "$output" "${2:-}"

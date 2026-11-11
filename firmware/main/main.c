@@ -11,6 +11,7 @@
 #include "nvs_flash.h"
 #include "ui.h"
 #include "display_relay.h"
+#include "setup.h"
 
 static EventGroupHandle_t network;
 static const char *TAG = "airkeep";
@@ -37,10 +38,10 @@ void app_main(void)
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase()); ESP_ERROR_CHECK(nvs_flash_init());
     } else ESP_ERROR_CHECK(err);
-    airkeep_ui_start();
-    if (!strlen(CONFIG_AIRKEEP_WIFI_SSID) ||
-        strncmp(CONFIG_AIRKEEP_RELAY_URL, "https://", 8) || strlen(CONFIG_AIRKEEP_RELAY_URL) > 480) {
-        airkeep_ui_status("Configure connection in menuconfig");
+    bool configured = airkeep_setup_start();
+    airkeep_ui_start(airkeep_config.relay_url, airkeep_config.ams_id);
+    if (!configured) {
+        airkeep_ui_status("Set up over USB at airkeep.io/install");
         return;
     }
     network = xEventGroupCreate();
@@ -49,11 +50,12 @@ void app_main(void)
     esp_netif_create_default_wifi_sta();
     wifi_init_config_t init = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&init));
+    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT,ESP_EVENT_ANY_ID,wifi_event,NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT,IP_EVENT_STA_GOT_IP,wifi_event,NULL));
     wifi_config_t config = {0};
-    strlcpy((char *)config.sta.ssid,CONFIG_AIRKEEP_WIFI_SSID,sizeof(config.sta.ssid));
-    strlcpy((char *)config.sta.password,CONFIG_AIRKEEP_WIFI_PASSWORD,sizeof(config.sta.password));
+    memcpy(config.sta.ssid, airkeep_config.ssid, strlen(airkeep_config.ssid));
+    memcpy(config.sta.password, airkeep_config.password, strlen(airkeep_config.password));
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA,&config));
     ESP_ERROR_CHECK(esp_wifi_start());
@@ -67,7 +69,7 @@ void app_main(void)
         ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&count, found));
         bool matched = false;
         for (int i = 0; i < count; i++)
-            if (!strcmp((char *)found[i].ssid, CONFIG_AIRKEEP_WIFI_SSID)) matched = true;
+            if (!strcmp((char *)found[i].ssid, airkeep_config.ssid)) matched = true;
         if (!matched) {
             ESP_LOGW(TAG, "Configured SSID not among nearby networks");
             for (int i = 0; i < count; i++)

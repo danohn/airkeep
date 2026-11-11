@@ -1,0 +1,49 @@
+.installer { max-width: 56rem; padding-block: clamp(2.75rem, 6vw, 5rem); }
+.installer-intro { max-width: 42rem; }
+.installer h1 { font-size: clamp(3rem, 7vw, 5rem); margin-bottom: 1rem; }
+.installer h2 { font-size: clamp(1.8rem, 4vw, 2.5rem); }
+.installer p { color: var(--muted); line-height: 1.55; margin-block: 0.65rem; }
+.installer strong { color: var(--ivory); }
+.installer [hidden] { display: none; }
+.install-steps { padding-left: 2rem; margin-block: 1.8rem; }
+.install-steps > li { border-top: 1px solid var(--line); padding: 1.4rem 0 1.6rem 0.45rem; }
+.install-steps > li::marker { color: var(--amber); font-weight: 700; }
+.installer p.erase-warning { color: var(--amber); }
+.installer-links { display: flex; flex-wrap: wrap; gap: 0 1rem; }
+.installer button { cursor: pointer; font-family: inherit; }
+.installer button:disabled { cursor: default; opacity: 0.5; }
+.installer .button, .outline-button { border: 1px solid transparent; }
+.outline-button {
+  min-height: 2.75rem;
+  padding: 0.65rem 0.9rem;
+  color: var(--ivory);
+  border-color: var(--line);
+  border-radius: 0.35rem;
+  background: var(--surface);
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+.outline-button:hover:enabled { border-color: var(--amber); }
+#setup-form { margin-top: 0.9rem; }
+#settings { padding: 0; margin: 0; border: 0; min-width: 0; }
+#settings:disabled label { opacity: 0.55; }
+.fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.8rem; }
+.fields label { display: grid; gap: 0.3rem; font-size: 0.9rem; font-weight: 550; }
+.fields input {
+  width: 100%;
+  min-height: 2.75rem;
+  background: var(--surface);
+  color: var(--ivory);
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+}
+.installer p.setup-status { color: var(--ivory); }
+.installer p.setup-status[data-error] { color: var(--amber); }
+.installer-help { border-top: 1px solid var(--line); padding-top: 1rem; }
+.installer-help summary { cursor: pointer; }
+@media (max-width: 580px) {
+  .install-steps { padding-left: 1.35rem; }
+  .fields { grid-template-columns: minmax(0, 1fr); }
+}
