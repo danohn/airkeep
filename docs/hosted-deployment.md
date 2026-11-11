@@ -12,7 +12,7 @@ uv run --no-project --python 3.14 python scripts/setup-hosted.py \
 
 dc=(docker compose --env-file server/.env.hosted -f server/compose.hosted.yml)
 "${dc[@]}" config --quiet
-"${dc[@]}" build migrate web
+"${dc[@]}" build api web
 "${dc[@]}" up -d --wait postgres
 "${dc[@]}" run --rm --no-deps migrate
 "${dc[@]}" up -d --wait api worker web ingress
