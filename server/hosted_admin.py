@@ -1,14 +1,70 @@
-"""Restricted operator commands, run on the server with runtime credentials."""
+"""Hosted account operations and restricted host commands."""
 import argparse
 import json
+import logging
 import math
 import time
 from uuid import uuid4
 
-from accounts import PASSWORD, digest, random_token, revoke_user
+from fastapi import HTTPException
+
+from accounts import PASSWORD, digest, lock_account, random_token, revoke_user
 from config import Settings
+from hosted_accounts import cancel_links, canonical_email
 from hosted_ingest import Batch, enroll_relay, save_batch
 from postgres import PostgresStore
+
+
+def audit(action, outcome, *, actor=None, target=None):
+    # Uvicorn configures this logger in the API. The CLI configures root logging.
+    logging.getLogger('uvicorn.error').info(json.dumps({
+        'event': 'hosted_admin', 'action': action, 'outcome': outcome, 'at': time.time(),
+        'source': 'dashboard' if actor else 'host', 'actorAccountID': actor, 'targetAccountID': target,
+    }))
+
+
+def member_account(store, user):
+    account = lock_account(store, user)
+    if not account:
+        raise HTTPException(404, 'Account not found.')
+    if account['role'] != 'member':
+        raise HTTPException(409, 'This action is available for member accounts only.')
+    return account
+
+
+def set_suspended(store, user, suspended):
+    account = member_account(store, user)
+    if bool(account['disabled']) == suspended:
+        return False
+    store.execute('UPDATE accounts SET disabled=?,version=version+1 WHERE id=?', (int(suspended), user))
+    if suspended:
+        revoke_user(store, user)
+        cancel_links(store.db, user)
+        store.execute('DELETE FROM oauth_requests WHERE user=?', (user,))
+        store.execute('DELETE FROM oauth_device_requests WHERE owner=?', (user,))
+    with store.tenant(user):
+        if suspended:
+            # Clear registrations and queued work even if they no longer have an owner grant.
+            for table in ('outbox', 'registration_owners', 'devices', 'activities', 'widget_installations'):
+                store.execute(f'DELETE FROM {table}')
+        store.execute('UPDATE printers SET heartbeat=NULL,connected=0')
+        store.execute("UPDATE alert_rules SET state=(state::jsonb || '{\"since\":null,\"last_observed\":null}'::jsonb)::text")
+    return True
+
+
+def set_hosted_role(store, email, role):
+    email = canonical_email(email)
+    with store.transaction() as db:
+        account = db.execute('SELECT id,role FROM accounts WHERE lower(username)=? AND disabled=0 FOR UPDATE',
+                             (email,)).fetchone()
+        if not account:
+            raise HTTPException(404, 'No active account has that email address.')
+        changed = account['role'] != role
+        if changed:
+            db.execute('UPDATE accounts SET role=? WHERE id=?', (role, account['id']))
+    audit('grant-admin' if role == 'admin' else 'revoke-admin', 'changed' if changed else 'unchanged',
+          target=account['id'])
+    return {'accountID': account['id'], 'role': role}
 
 
 def health(store, now):
@@ -60,6 +116,7 @@ def demo(store):
 
 
 def main():
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     commands.add_parser('health')
@@ -67,6 +124,9 @@ def main():
     commands.add_parser('deletion-ledger')
     suspend = commands.add_parser('suspend')
     suspend.add_argument('account_id')
+    for command in ('grant-admin', 'revoke-admin'):
+        role = commands.add_parser(command)
+        role.add_argument('email')
     arguments = parser.parse_args()
     settings = Settings()
     store = PostgresStore(settings.database_url.get_secret_value())
@@ -78,13 +138,15 @@ def main():
         elif arguments.command == 'deletion-ledger':
             rows = store.rows('SELECT account_id,deleted_at FROM account_deletions ORDER BY deleted_at,account_id')
             print(json.dumps([dict(row) for row in rows]))
+        elif arguments.command in ('grant-admin', 'revoke-admin'):
+            print(json.dumps(set_hosted_role(store, arguments.email, 'admin' if arguments.command == 'grant-admin' else 'member')))
         else:
-            with store.tenant(arguments.account_id), store.transaction():
-                result = store.execute('UPDATE accounts SET disabled=1,version=version+1 WHERE id=?',
-                                       (arguments.account_id,))
-                revoke_user(store, arguments.account_id)
-                store.execute('UPDATE relay_credentials SET revoked=1 WHERE "user"=?', (arguments.account_id,))
-            print(json.dumps({'suspended': result.rowcount == 1}))
+            with store.transaction():
+                changed = set_suspended(store, arguments.account_id, True)
+            audit('suspend', 'changed' if changed else 'unchanged', target=arguments.account_id)
+            print(json.dumps({'suspended': True}))
+    except HTTPException as error:
+        parser.error(error.detail)
     finally:
         store.close()
 
