@@ -1362,6 +1362,14 @@ function Admin({ page, hostedAccountId }: { page: Page; hostedAccountId?: string
   }, [base, hosted, hostedAccountId, page, refresh]);
   const overview = data?.overview as RecordRow | undefined;
   const health = data?.health as HostedHealth | undefined;
+  const relayState = {
+    unpaired: "Not paired",
+    relay_offline: "Relay offline",
+    printer_disconnected: "Printer disconnected",
+    waiting_for_ams: "Waiting for AMS readings",
+    stale_readings: "AMS readings are stale",
+    connected: "Connected",
+  }[String(overview?.relayStatus)];
   const title = {
     overview: "Overview",
     history: "History",
@@ -1405,7 +1413,7 @@ function Admin({ page, hostedAccountId }: { page: Page; hostedAccountId?: string
             {[
               [
                 "Printer",
-                overview.printerConnected ? "Connected" : "Reconnecting",
+                relayState ?? (overview.printerConnected ? "Connected" : "Reconnecting"),
               ],
               ...(hosted ? [] : [[
                 "Uptime",
