@@ -139,7 +139,7 @@ docker exec "$recovery_container" pg_dump -U airkeep_migration -d airkeep -Fc --
 "${rc[@]}" run --rm --no-deps migrate
 ```
 
-Before starting application containers, invalidate restored sessions, relay enrollments, password hashes and delivery queues. This prevents a backup from reactivating older credentials or retrying stale deliveries. Users will reset passwords through verified email and enroll their clients again. Configure the recovered service's sender and push keys from the operator secret store, keep signup closed, and test it through restricted staging access before switching ingress.
+Before starting application containers, invalidate restored sessions, relay enrollments, password hashes, passkeys, authenticator secrets, recovery codes, and delivery queues. This prevents a backup from reactivating older credentials or retrying stale deliveries. Users will reset passwords through verified email and enroll their sign-in methods and clients again. Configure the recovered service's sender and push keys from the operator secret store, keep signup closed, and test it through restricted staging access before switching ingress.
 
 ```bash
 "${rc[@]}" exec -T postgres psql -X --set=ON_ERROR_STOP=1 -U airkeep_migration -d airkeep <<'SQL'
@@ -149,6 +149,10 @@ UPDATE public.oauth_grants SET revoked=1;
 UPDATE public.relay_credentials SET revoked=1;
 DELETE FROM public.oauth_requests;
 DELETE FROM public.oauth_device_requests;
+DELETE FROM public.account_auth_challenges;
+DELETE FROM public.account_passkeys;
+DELETE FROM public.account_recovery_codes;
+DELETE FROM public.account_totp;
 UPDATE public.hosted_email_outbox SET sealed_secret=NULL,state='canceled',lease=NULL,lease_until=0;
 DELETE FROM public.hosted_account_links;
 DELETE FROM airkeep_data.outbox;

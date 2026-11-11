@@ -515,3 +515,32 @@ def test_hosted_admin_email_links_reuse_quotas_and_audit_without_secrets(store, 
     finally:
         store.execute('DELETE FROM accounts WHERE username=?', (email,))
         store.execute('DELETE FROM hosted_account_links WHERE email=?', (email,))
+
+
+def test_hosted_account_deletion_requires_and_removes_authenticator(store, users, monkeypatch):
+    from app import create_app
+    from cryptography.fernet import Fernet
+    import pyotp
+
+    monkeypatch.setenv('AIRKEEP_EMAIL_LINK_KEY', Fernet.generate_key().decode())
+    settings = Settings(deployment='hosted', database_url=URL, jwt_signing_key='x'*64,
+                        web_origin=ORIGIN, _env_file=None)
+    oauth = OAuth(store, settings)
+    user = users[0]
+    with store.transaction():
+        cookie = oauth.grant(user, 'dashboard', None)['access_token']
+    with TestClient(create_app(settings), base_url=ORIGIN, headers={'Origin': ORIGIN}) as client:
+        client.cookies.set(oauth.cookie_name, cookie, domain='dashboard.airkeep.io', path='/')
+        password = {'password': 'correct horse battery staple'}
+        assert client.post('/auth/security/passkeys/options', json=password).status_code == 200
+        setup = client.post('/auth/security/totp/setup', json=password)
+        assert setup.status_code == 200, setup.text
+        code = pyotp.TOTP(setup.json()['secret']).now()
+        enabled = client.post('/auth/security/totp', json={'code': code})
+        assert enabled.status_code == 200, enabled.text
+        deletion = {**password, 'confirmation': 'DELETE'}
+        assert client.request('DELETE', '/auth/account', json=deletion).status_code == 401
+        deletion['verification_code'] = enabled.json()['recovery_codes'][0]
+        assert client.request('DELETE', '/auth/account', json=deletion).status_code == 204
+    for table in ('account_totp', 'account_recovery_codes', 'account_auth_challenges'):
+        assert not store.rows(f'SELECT 1 FROM {table} WHERE account_id=?', (user,))

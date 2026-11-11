@@ -138,6 +138,8 @@ def install_web(app, store, settings, auth, authorize_user, collector, admin, oa
 
             configured = getattr(store, 'hosted', False) or bool(store.rows('SELECT 1 FROM accounts LIMIT 1'))
             result = {'authenticated': False, 'configured': configured, 'mode': 'oauth'}
+            if configured and oauth.factors.rp_id:
+                result['passkeys_available'] = True
             if getattr(store, 'hosted', False):
                 result.update(hosted=True, public_signup=settings.public_signup)
             if configured and settings.oidc_issuer:

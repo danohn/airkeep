@@ -3,6 +3,7 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 import base64
 import hashlib
+from pathlib import Path
 import re
 import secrets
 import time
@@ -65,6 +66,7 @@ def schema(store):
                 PRIMARY KEY(kind,id));
             CREATE INDEX IF NOT EXISTS registration_grant ON registration_owners(grant_id);
         """)
+        store.db.executescript((Path(__file__).parent / 'migrations/006_account_security.sql').read_text())
 
 
 def bootstrap(store, username, password_hash):
@@ -119,7 +121,7 @@ def revoke_user(store, user):
         revoke_grant(store, row['id'])
 
 
-def recover(store, username, password_hash):
+def recover(store, username, password_hash, *, clear_sign_in_methods=False):
     schema(store)
     with store.transaction():
         row = store.db.execute("SELECT id FROM accounts WHERE username=? AND role='admin'", (username,)).fetchone()
@@ -127,6 +129,9 @@ def recover(store, username, password_hash):
             raise ValueError('No administrator has that username.')
         store.db.execute('UPDATE accounts SET hash=?,disabled=0,temporary_until=NULL,version=version+1 WHERE id=?',
                          (password_hash, row['id']))
+        if clear_sign_in_methods:
+            for table in ('account_passkeys', 'account_totp', 'account_recovery_codes', 'account_auth_challenges'):
+                store.db.execute(f'DELETE FROM {table} WHERE account_id=?', (row['id'],))
         revoke_user(store, row['id'])
 
 
@@ -149,11 +154,15 @@ class Authorization(BaseModel):
     installation_id: str | None = Field(default=None, pattern=r'^[A-Za-z0-9_-]{1,128}$')
 
 
+VerificationCode = Annotated[str, Field(min_length=6, max_length=40)]
+
+
 class Credentials(BaseModel):
     transaction: str = Field(max_length=100)
     username: str = Field(max_length=254)
     password: str = Field(min_length=1, max_length=1024)
     new_password: str | None = Field(default=None, min_length=12, max_length=1024)
+    verification_code: VerificationCode | None = None
 
 
 class NewAccount(BaseModel):
@@ -169,6 +178,7 @@ class EditAccount(BaseModel):
 class PasswordChange(BaseModel):
     password: str = Field(min_length=1, max_length=1024)
     new_password: str = Field(min_length=12, max_length=1024)
+    verification_code: VerificationCode | None = None
 
 
 class WatchPair(BaseModel):
@@ -177,6 +187,8 @@ class WatchPair(BaseModel):
 
 class OAuth:
     def __init__(self, store, settings):
+        from account_security import AccountSecurity
+
         self.store = store
         self.origin = settings.web_origin.rstrip('/')
         self.key = settings.jwt_signing_key
@@ -184,6 +196,7 @@ class OAuth:
         self.cookie_name = '__Host-airkeep_session' if self.secure_cookie else 'airkeep_account_session'
         schema(store)
         self.dummy_hash = PASSWORD.hash(random_token())
+        self.factors = AccountSecurity(self)
 
     def active(self, grant_id):
         now = time.time()
@@ -234,13 +247,14 @@ class OAuth:
         if request.headers.get('origin') != self.origin:
             raise HTTPException(403, 'Open Airkeep at its configured address.')
 
-    def rate_limit(self, request, username):
+    def rate_limit(self, request, username, *, scope='login'):
         now = time.time()
         address = request.client.host if request.client else ''
         if getattr(self.store, 'hosted', False):
             from hosted_accounts import login_limit
-            return login_limit(self.store, self.key, username, address)
-        keys = ['account:' + username.lower(), 'ip:' + address]
+            return login_limit(self.store, self.key, username, address, scope=scope)
+        prefix = '' if scope == 'login' else scope + ':'
+        keys = [prefix + 'account:' + username.lower(), prefix + 'ip:' + address]
         with self.store.transaction():
             db = self.store.db
             db.execute('DELETE FROM oauth_attempts WHERE at<?', (now-300,))
@@ -295,10 +309,16 @@ class OAuth:
             current = lock_account(self.store, user['id'])
             if not tx or not current or current['disabled'] or current['version'] != user['version']:
                 raise HTTPException(400, 'Start sign-in again.')
-            version = user['version']
-            if user['temporary_until'] is not None:
+            if current['temporary_until'] is not None:
+                if current['temporary_until'] <= time.time():
+                    raise HTTPException(401, 'Check your username and password.')
                 if replacement is None:
-                    return {'passwordChangeRequired':True}
+                    return {'passwordChangeRequired': True}
+            if body.verification_code is None and self.factors.totp_enabled(db, user['id']):
+                return {'totpRequired': True}
+            self.factors.verify_totp(db, user['id'], body.verification_code)
+            version = user['version']
+            if replacement is not None:
                 version += 1
                 db.execute('UPDATE accounts SET hash=?,temporary_until=NULL,version=? WHERE id=?',
                            (replacement,version,user['id']))
@@ -391,15 +411,18 @@ class OAuth:
             for row in db.execute('SELECT id FROM oauth_grants WHERE revoked=0 AND (expires<=? OR idle_until<=?)', (now,now)).fetchall():
                 revoke_grant(self.store,row['id'])
             db.execute('DELETE FROM oauth_requests WHERE expires<=?',(now,))
+            db.execute('DELETE FROM account_auth_challenges WHERE expires<=?', (now,))
             db.execute('DELETE FROM oauth_refresh WHERE grant_id IN (SELECT id FROM oauth_grants WHERE expires<=? OR revoked=1)',(now,))
             db.execute('DELETE FROM oauth_grants WHERE expires<=? OR revoked=1',(now,))
 
 
 def install_accounts(app, oauth, principal, admin, connection):
+    from account_security import install_security
     from device_flow import GRANT, form_data, install_device_flow, oauth_error
 
     store = oauth.store
     devices = install_device_flow(app, oauth, principal)
+    install_security(app, oauth, principal)
 
     @app.get('/auth/authorize')
     def authorize_redirect(body: Annotated[Authorization, Query()]):
@@ -499,7 +522,10 @@ def install_accounts(app, oauth, principal, admin, connection):
         with PASSWORD_WORK:
             replacement = PASSWORD.hash(body.new_password)
         with store.transaction():
-            lock_account(store, identity.user)
+            current = lock_account(store, identity.user)
+            if not current or current['version'] != user['version'] or not oauth.active(identity.grant):
+                raise HTTPException(409, 'Your account changed. Sign in again.')
+            oauth.factors.verify_totp(store.db, identity.user, body.verification_code)
             changed = store.db.execute('UPDATE accounts SET hash=?,version=version+1 WHERE id=? AND version=? AND disabled=0',
                                        (replacement,identity.user,user['version']))
             if not changed.rowcount:
