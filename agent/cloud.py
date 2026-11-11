@@ -79,6 +79,7 @@ class Uploader:
         self.heartbeat_at = 0
         self.last_connected = None
         self.failures = 0
+        self.batch_limit = 100
         self.revoked = False
         self.status = 'connecting'
 
@@ -86,7 +87,7 @@ class Uploader:
         now = time.monotonic() if now is None else now
         if self.revoked or now < self.next_attempt:
             return
-        batch = self.spool.batch()
+        batch = self.spool.batch(limit=self.batch_limit)
         heartbeat = self.last_connected != connected or now >= self.heartbeat_at
         if not batch and not heartbeat:
             return
@@ -101,18 +102,32 @@ class Uploader:
         if status == 204:
             self.spool.acknowledge(batch)
             self.failures = 0
+            self.batch_limit = 100
             self.next_attempt = now
-            self.status = 'connected'
+            self.status = 'connected_with_quarantined_readings' if self.spool.quarantined_count() else 'connected'
             if heartbeat:
                 self.last_connected = connected
                 self.heartbeat_at = now + 30
             return
-        self.spool.mark_replay()
+        if status in (400, 422) and batch:
+            # Validation is atomic at the ingest endpoint. Narrow the batch
+            # until only the rejected event is quarantined, retaining valid
+            # live observations and backlog with their original event IDs.
+            if len(batch) > 1:
+                self.batch_limit = len(batch) // 2
+                self.status = 'isolating_invalid_reading'
+            else:
+                self.spool.quarantine(batch[0], status)
+                self.batch_limit = 100
+                self.status = 'invalid_reading_quarantined'
+            self.next_attempt = now
+            return
+        self.spool.mark_replay(batch)
         if status in (401, 403):
             self.revoked = True
             self.status = 'enrollment_required'
             return
-        self.status = 'retrying'
+        self.status = 'ingest_rejected' if status in (400, 422) else 'retrying'
         self.failures = min(self.failures + 1, 8)
         delay = min(300, 2 ** self.failures) * random.uniform(0.8, 1.2)
         if status == 429:

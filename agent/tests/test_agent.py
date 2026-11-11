@@ -40,11 +40,12 @@ def test_persistent_sampling_ordering_pruning_and_identity(tmp_path):
     first.save_reading(sample(now - 10))
     batch = first.batch(now)
     assert len(batch) == 3
-    assert [x['observedAt'] for x in batch] == [now - 50, now - 40, now - 10]
+    assert [x['observedAt'] for x in batch] == [now - 10, now - 50, now - 40]
     identities = [x['eventID'] for x in batch]
     first.close()
     restored = Spool(path)
-    assert [x['eventID'] for x in restored.batch(now)] == identities
+    assert {x['eventID'] for x in restored.batch(now)} == set(identities)
+    assert [x['observedAt'] for x in restored.batch(now)] == [now - 50, now - 40, now - 10]
     assert all(x['replay'] for x in restored.batch(now))
     restored.save_reading(sample(now + 10))
     assert len(restored.batch(now)) == 3
@@ -96,7 +97,7 @@ def test_fresh_samples_after_success_and_replay_after_failure(spool):
     cloud.close()
 
 
-@pytest.mark.parametrize('status', [301, 302, 307, 400, 401, 403, 429, 500])
+@pytest.mark.parametrize('status', [301, 302, 307, 401, 403, 429, 500])
 def test_upload_errors_preserve_outbox_and_never_follow_redirects(spool, status):
     spool.save_reading(sample())
     requests = []
@@ -333,3 +334,151 @@ def test_cli_first_run_keeps_setup_secret_out_of_process_output(tmp_path):
         if process.poll() is None:
             process.kill()
             process.communicate()
+
+
+def test_new_live_observation_precedes_backlog_after_outage(spool, monkeypatch):
+    clock = [100000.0]
+    monkeypatch.setattr('agent.spool.time.time', lambda: clock[0])
+    for index in range(110):
+        spool.save_reading(sample(clock[0] - 5000 + index * 30))
+    spool.save_reading(sample(clock[0]))
+    requests = []
+    responses = iter([503, 204])
+    def handle(request):
+        requests.append(json.loads(request.content))
+        return httpx.Response(next(responses))
+    cloud = Cloud('https://dashboard.example', httpx.Client(transport=httpx.MockTransport(handle)))
+    uploader = Uploader(cloud, spool, 'opaque-token')
+    uploader.step(True, 100)
+    assert requests[0]['readings'][0]['replay'] is False
+    failed_id = requests[0]['readings'][0]['eventID']
+    clock[0] += 31
+    spool.save_reading(sample(clock[0]))
+    new_live = spool.batch()[0]
+    assert new_live['replay'] is False
+    assert new_live['eventID'] != failed_id
+    uploader.step(True, 200)
+    delivered = requests[1]['readings']
+    assert delivered[0] == new_live
+    assert all(item['replay'] for item in delivered[1:])
+    assert len(delivered) == 100
+    assert all(item['eventID'] != new_live['eventID'] for item in spool.batch())
+    assert any(item['eventID'] == failed_id for item in spool.batch())
+    cloud.close()
+
+
+def test_only_non_replay_observations_within_30_seconds_are_live(spool, monkeypatch):
+    now = 100000.0
+    monkeypatch.setattr('agent.spool.time.time', lambda: now)
+    for index, age in enumerate([0, 5, 30, 30.001, -1]):
+        spool.save_reading(sample(now - age, str(index)))
+    batch = spool.batch()
+    assert [item['amsID'] for item in batch] == ['0', '1', '2', '3', '4']
+    assert [item['replay'] for item in batch] == [False, False, False, True, True]
+    spool.mark_replay()
+    spool.save_reading(sample(now, '5'))
+    assert spool.batch()[0]['amsID'] == '5'
+    assert spool.batch()[0]['replay'] is False
+    assert all(item['replay'] for item in spool.batch()[1:])
+
+
+@pytest.mark.parametrize('status', [400, 422])
+def test_permanent_rejection_quarantines_only_invalid_row_and_delivers_valid_history(spool, status):
+    from uuid import UUID
+    now = time.time()
+    for index in range(8):
+        reading = sample(now - 1000 + index * 30)
+        if index == 3:
+            reading = reading.model_copy(update={'humidity': 101})
+        spool.save_reading(reading)
+    original = spool.batch()
+    assert all(str(UUID(item['eventID'])) == item['eventID'] for item in original)
+    invalid = next(item for item in original if item['humidity'] == 101)
+    valid_ids = {item['eventID'] for item in original} - {invalid['eventID']}
+    delivered = []
+    def handle(request):
+        readings = json.loads(request.content)['readings']
+        if any(item['humidity'] == 101 for item in readings):
+            return httpx.Response(status, json={'detail': 'private upstream error body'})
+        delivered.extend(readings)
+        return httpx.Response(204)
+    cloud = Cloud('https://dashboard.example', httpx.Client(transport=httpx.MockTransport(handle)))
+    uploader = Uploader(cloud, spool, 'opaque-token')
+    statuses = []
+    for attempt in range(30):
+        uploader.step(True, 100 + attempt)
+        statuses.append(uploader.status)
+        if not spool.batch():
+            break
+    assert spool.batch() == []
+    assert {item['eventID'] for item in delivered} == valid_ids
+    assert len(delivered) == len(valid_ids)
+    assert spool.quarantined_count() == 1
+    quarantined = spool.db.execute('SELECT * FROM quarantine').fetchone()
+    assert quarantined['event_id'] == invalid['eventID']
+    assert quarantined['status'] == status
+    assert json.loads(quarantined['data']) == invalid
+    assert 'invalid_reading_quarantined' in statuses
+    assert uploader.status == 'connected_with_quarantined_readings'
+    assert all('private' not in value for value in statuses)
+    cloud.close()
+
+
+def test_rejected_clock_skew_does_not_block_subsequent_live_readings(spool, monkeypatch):
+    clock = [100000.0]
+    monkeypatch.setattr('agent.spool.time.time', lambda: clock[0])
+    spool.save_reading(sample(clock[0] + 1000))
+    future_id = spool.batch()[0]['eventID']
+    spool.save_reading(sample(clock[0]))
+    current = spool.batch()[0]
+    assert current['replay'] is False
+    delivered = []
+    def handle(request):
+        rows = json.loads(request.content)['readings']
+        if any(item['observedAt'] > clock[0] + 90 for item in rows):
+            return httpx.Response(400)
+        delivered.extend(rows)
+        return httpx.Response(204)
+    cloud = Cloud('https://dashboard.example', httpx.Client(transport=httpx.MockTransport(handle)))
+    uploader = Uploader(cloud, spool, 'opaque-token')
+    for attempt in range(10):
+        uploader.step(True, 100 + attempt)
+        if not spool.batch():
+            break
+    assert delivered == [current]
+    assert spool.db.execute('SELECT event_id FROM quarantine').fetchone()[0] == future_id
+    clock[0] += 30
+    spool.save_reading(sample(clock[0]))
+    assert spool.batch()[0]['replay'] is False
+    cloud.close()
+
+
+def test_quarantine_is_bounded_and_expires_after_24_hours(spool, monkeypatch):
+    now = 100000.0
+    monkeypatch.setattr('agent.spool.time.time', lambda: now)
+    for index in range(105):
+        row = dict(sample(now).model_dump(), eventID=str(index), replay=True)
+        spool.quarantine(row, 422, now=now + index)
+    assert spool.quarantined_count() == 100
+    spool.batch(now + 86400 + 106)
+    assert spool.quarantined_count() == 0
+    spool.quarantine(dict(sample(now).model_dump(), eventID='private-event', replay=True), 400)
+    spool.configure({'token': 'new-account'})
+    assert spool.quarantined_count() == 0
+
+
+def test_observation_arriving_during_failed_request_remains_live(spool):
+    spool.save_reading(sample(ams='0'))
+    original_id = spool.batch()[0]['eventID']
+    def handle(request):
+        spool.save_reading(sample(ams='1'))
+        return httpx.Response(503)
+    cloud = Cloud('https://dashboard.example', httpx.Client(transport=httpx.MockTransport(handle)))
+    uploader = Uploader(cloud, spool, 'opaque-token')
+    uploader.step(True, 100)
+    batch = spool.batch()
+    assert batch[0]['amsID'] == '1'
+    assert batch[0]['replay'] is False
+    assert batch[1]['eventID'] == original_id
+    assert batch[1]['replay'] is True
+    cloud.close()
