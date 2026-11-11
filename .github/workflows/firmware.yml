@@ -14,6 +14,8 @@ permissions:
 jobs:
   firmware:
     runs-on: ubuntu-latest
+    env:
+      ESP_IDF_VERSION: v5.5.2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -22,13 +24,23 @@ jobs:
         with:
           version: '0.11.15'
           python-version: '3.14'
+      - name: Cache ESP32-S3 compiler outputs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .local/firmware-ci/ccache
+          key: esp32s3-ccache-${{ runner.os }}-${{ runner.arch }}-${{ env.ESP_IDF_VERSION }}-${{ hashFiles('firmware/**') }}
+          restore-keys: esp32s3-ccache-${{ runner.os }}-${{ runner.arch }}-${{ env.ESP_IDF_VERSION }}-
       - name: Build clean ESP32-S3 firmware
         run: |
-          mkdir -p .local/firmware-ci
+          mkdir -p .local/firmware-ci/ccache
           docker run --rm -e IDF_GIT_SAFE_DIR=/project \
+            -e CCACHE_DIR=/project/.local/firmware-ci/ccache \
+            -e CCACHE_MAXSIZE=250M -e CCACHE_UMASK=022 \
             -v "$GITHUB_WORKSPACE:/project" -w /project/firmware \
-            espressif/idf:v5.5.2 bash -ec '
+            "espressif/idf:$ESP_IDF_VERSION" bash -ec '
+              ccache --zero-stats
               idf.py build
+              ccache --show-stats
               cp -R "$IDF_PATH/components/json/cJSON" /project/.local/firmware-ci/cjson
             '
       - name: Run firmware host tests
