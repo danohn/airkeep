@@ -92,7 +92,8 @@ struct DashboardView: View {
                 if !model.demo {
                     if TokenStore.read().isEmpty {
                         Button("Sign in to Airkeep") { model.settingsSection = .relay; model.showSettings = true }
-                    } else if let url = URL(string: SharedConfiguration.endpoint + "/") {
+                    } else if SharedConfiguration.endpoint == SharedConfiguration.hostedEndpoint,
+                              let url = URL(string: SharedConfiguration.hostedEndpoint + "/setup") {
                         Link("Add Printer", destination: url)
                     }
                 }

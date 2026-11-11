@@ -213,7 +213,8 @@ struct RelaySettingsView: View {
                             .textSelection(.enabled).multilineTextAlignment(.trailing)
                     }
                 }
-                if let url = URL(string: SharedConfiguration.endpoint + "/") {
+                if SharedConfiguration.endpoint == SharedConfiguration.hostedEndpoint,
+                   let url = URL(string: SharedConfiguration.hostedEndpoint + "/setup") {
                     Link("Add Printer", destination: url)
                 }
                 Button("Edit connection") { editConnection = true }.disabled(model.demo)
