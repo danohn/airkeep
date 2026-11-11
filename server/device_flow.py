@@ -8,7 +8,7 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from accounts import Principal, digest, random_token
+from accounts import Principal, digest, random_token, lock_account
 
 CLIENT = 'esp32'
 RELAY_CLIENT = 'airkeep-relay'
@@ -143,9 +143,9 @@ class DeviceFlow:
                 db.execute('UPDATE oauth_device_requests SET next_poll=? WHERE device_hash=?',
                            (now + row['poll_interval'], row['device_hash']))
                 return oauth_error('authorization_pending')
-            owner = db.execute('SELECT version FROM accounts WHERE id=? AND disabled=0', (row['owner'],)).fetchone()
+            owner = lock_account(self.store, row['owner'])
             db.execute("UPDATE oauth_device_requests SET decision='used' WHERE device_hash=?", (row['device_hash'],))
-            if not owner or owner['version'] != row['owner_version']:
+            if not owner or owner['disabled'] or owner['version'] != row['owner_version']:
                 return oauth_error('access_denied')
             if client == RELAY_CLIENT:
                 from hosted_ingest import enroll_relay

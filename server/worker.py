@@ -56,8 +56,7 @@ async def run():
                     election.execute('SELECT pg_advisory_unlock(734912605)')
     finally:
         await push.close()
-        if accounts.client:
-            await accounts.client.aclose()
+        await accounts.close()
         store.close()
         health.unlink(missing_ok=True)
 
