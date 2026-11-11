@@ -54,7 +54,7 @@ type Page =
   | "queue"
   | "accounts"
   | "password";
-type Session = { authenticated: boolean; configured: boolean; csrf?: string; mode?: "oauth"; account?: Account; oidc_label?: string; hosted?: boolean };
+type Session = { authenticated: boolean; configured: boolean; csrf?: string; mode?: "oauth"; account?: Account; oidc_label?: string; hosted?: boolean; public_signup?: boolean };
 type RecordRow = Record<string, unknown>;
 const userPages = [
   ["overview", "Overview", House],
@@ -86,7 +86,7 @@ export function App() {
   const [tick, setTick] = useState(Date.now() / 1000);
   const [sessionError, setSessionError] = useState("");
   const loggedOut = () => {
-    setSession((current) => ({ authenticated: false, configured: true, mode: current?.mode, oidc_label: current?.oidc_label, hosted: current?.hosted }));
+    setSession((current) => ({ authenticated: false, configured: true, mode: current?.mode, oidc_label: current?.oidc_label, hosted: current?.hosted, public_signup: current?.public_signup }));
     setMode("user");
     setPage("overview");
     if (location.pathname !== "/device") history.replaceState(null, "", "/");
@@ -229,7 +229,7 @@ export function App() {
   const effectivePage = !canAdmin && (adminPage || page === "accounts") ? "overview" : page;
   if (session?.hosted && hostedAccountPaths.includes(location.pathname)) return <HostedAccountFlow />;
   if (!session?.authenticated && oauth)
-    return <AccountLogin configured={session.configured} error={sessionError} oidcLabel={session.oidc_label} hosted={session.hosted} />;
+    return <AccountLogin configured={session.configured} error={sessionError} oidcLabel={session.oidc_label} hosted={session.hosted} publicSignup={session.public_signup} />;
   if (!session?.authenticated)
     return (
       <Login
@@ -343,7 +343,7 @@ export function App() {
                 : stale
                   ? "Waiting for fresh data"
                   : snapshot?.printerConnected
-                    ? "Connected locally"
+                    ? session.hosted ? "Connected through relay" : "Connected locally"
                     : "Printer reconnecting"}
             </span>
           </div>

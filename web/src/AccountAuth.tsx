@@ -21,8 +21,8 @@ export async function startOIDC(transaction: string, invitation?: string) {
   location.assign(destination.href);
 }
 
-export function AccountLogin({ native = false, invite = false, configured = true, error = "", oidcLabel, hosted = false }: {
-  native?: boolean; invite?: boolean; configured?: boolean; error?: string; oidcLabel?: string; hosted?: boolean;
+export function AccountLogin({ native = false, invite = false, configured = true, error = "", oidcLabel, hosted = false, publicSignup = false }: {
+  native?: boolean; invite?: boolean; configured?: boolean; error?: string; oidcLabel?: string; hosted?: boolean; publicSignup?: boolean;
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -32,6 +32,7 @@ export function AccountLogin({ native = false, invite = false, configured = true
   const [invitation] = useState(() => invite ? location.hash.slice(1) : "");
   const [provider, setProvider] = useState("");
   const [hostedMode, setHostedMode] = useState(hosted);
+  const [signupOpen, setSignupOpen] = useState(publicSignup);
   const [message, setMessage] = useState(() => new URLSearchParams(location.search).get("sso_error") ?? "");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -40,8 +41,8 @@ export function AccountLogin({ native = false, invite = false, configured = true
     }
     if (!native && !invite) return;
     let active = true;
-    api<{ oidc_label?: string; hosted?: boolean }>("/auth/session").then((status) => {
-      if (active) { setProvider(status.oidc_label ?? ""); setHostedMode(status.hosted ?? false); }
+    api<{ oidc_label?: string; hosted?: boolean; public_signup?: boolean }>("/auth/session").then((status) => {
+      if (active) { setProvider(status.oidc_label ?? ""); setHostedMode(status.hosted ?? false); setSignupOpen(status.public_signup ?? false); }
     }).catch(() => { if (active) setMessage("Could not check single sign-on availability."); });
     return () => { active = false; };
   }, [native, invite]);
@@ -104,7 +105,7 @@ export function AccountLogin({ native = false, invite = false, configured = true
       <button type="button" disabled={busy} onClick={() => void signInWithOIDC()}>
         Sign in with {oidcLabel || provider}
       </button>}
-    {hostedMode && !invite && <><a href="/signup">Create an account</a><a href="/forgot-password">Forgot password?</a></>}
+    {hostedMode && !invite && <>{signupOpen && <a href="/signup">Create an account</a>}<a href="/forgot-password">Forgot password?</a></>}
     {invite && !invitation && <p>Open the original invitation link to try again.</p>}
     {(message || error) && <p className="error" role="alert">{message || error}</p>}
   </form></div>;

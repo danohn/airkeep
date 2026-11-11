@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "./api";
 
 export const hostedAccountPaths = ["/signup", "/signup/complete", "/forgot-password", "/reset-password"];
@@ -15,7 +15,9 @@ export function HostedAccountFlow() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   // Keep one-use secrets out of the address bar and subsequent navigation.
-  if (location.hash) history.replaceState(null, "", location.pathname);
+  useEffect(() => {
+    if (location.hash) history.replaceState(null, "", location.pathname);
+  }, []);
   async function submit() {
     setBusy(true);
     setError("");

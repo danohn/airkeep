@@ -215,7 +215,7 @@ class OAuth:
         if request.method not in ('GET', 'HEAD', 'OPTIONS'):
             self.same_origin(request)
         expected = request.headers.get('x-airkeep-account')
-        if expected is not None and not secrets.compare_digest(expected, identity.user):
+        if expected is not None and not secrets.compare_digest(expected.encode(), identity.user.encode()):
             raise HTTPException(409, 'Your signed-in account changed. Reload Airkeep.',
                                 headers={'X-Airkeep-Account-Changed': '1'})
         return identity
@@ -301,7 +301,8 @@ class OAuth:
                 db.execute('UPDATE accounts SET hash=?,temporary_until=NULL,version=? WHERE id=?',
                            (replacement,version,user['id']))
                 revoke_user(self.store,user['id'])
-            db.execute('DELETE FROM oauth_attempts WHERE bucket=?', ('account:'+user['username'].lower(),))
+            if not getattr(self.store, 'hosted', False):
+                db.execute('DELETE FROM oauth_attempts WHERE bucket=?', ('account:'+user['username'].lower(),))
             return {'redirect': self.complete(db, tx, user['id'], version)}
 
     def complete(self, db, transaction, user_id, version):
@@ -353,7 +354,7 @@ class OAuth:
                     WHERE r.code=? AND r.expires>? AND a.disabled=0 AND a.version=r.version""",
                     (digest(data.get('code','')),time.time())).fetchone()
                 if row:
-                    current = lock_account(self.store, row['user'])
+                    lock_account(self.store, row['user'])
                     row = db.execute("""SELECT r.* FROM oauth_requests r JOIN accounts a ON a.id=r.user
                         WHERE r.code=? AND r.expires>? AND a.disabled=0 AND a.version=r.version""",
                         (digest(data.get('code','')),time.time())).fetchone()
@@ -468,6 +469,7 @@ def install_accounts(app, oauth, principal, admin, connection):
         if identity.client != 'apple-ios':
             raise HTTPException(403,'Pair Apple Watch from your iPhone.')
         with store.transaction():
+            lock_account(store, identity.user)
             parent = oauth.active(identity.grant)
             if parent is None:
                 raise HTTPException(401,'Sign in to Airkeep.')
@@ -488,8 +490,9 @@ def install_accounts(app, oauth, principal, admin, connection):
         if identity.client != 'dashboard':
             raise HTTPException(403,'Change your password in the dashboard.')
         oauth.rate_limit(request,identity.user)
-        user = store.rows('SELECT hash,version FROM accounts WHERE id=?',(identity.user,))[0]
-        if not oauth.verify(body.password,user['hash']):
+        users = store.rows('SELECT hash,version FROM accounts WHERE id=?',(identity.user,))
+        user = users[0] if users else None
+        if not oauth.verify(body.password,user['hash'] if user else ''):
             raise HTTPException(401,'Check your current password.')
         with PASSWORD_WORK:
             replacement = PASSWORD.hash(body.new_password)

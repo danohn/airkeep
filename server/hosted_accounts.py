@@ -197,7 +197,7 @@ class HostedAccounts:
             db.execute('DELETE FROM accounts WHERE id=?', (identity.user,))
         self.oauth.clear_browser_cookie(response)
 
-    def claim(self):
+    def claim(self, enabled=True):
         now = time.time()
         with self.store.transaction() as db:
             db.execute('''UPDATE hosted_email_outbox SET sealed_secret=NULL,state='expired',lease=NULL,lease_until=0
@@ -206,6 +206,8 @@ class HostedAccounts:
             db.execute('DELETE FROM hosted_account_links WHERE expires<=?', (now,))
             db.execute('DELETE FROM hosted_account_limits WHERE expires<=?', (now,))
             db.execute('DELETE FROM hosted_email_outbox WHERE updated<?', (now - 7*DAY,))
+            if not enabled:
+                return None
             suffix = ' FOR UPDATE OF o SKIP LOCKED' if getattr(self.store, 'hosted', False) else ''
             row = db.execute('''SELECT o.*,l.email,l.kind,l.expires FROM hosted_email_outbox o
                 LEFT JOIN hosted_account_links l ON l.hash=o.link_hash
@@ -232,9 +234,7 @@ class HostedAccounts:
 
     async def tick(self):
         # HTTP submission and polling run outside database transactions.
-        if not self.configured:
-            return
-        row = await run_in_threadpool(self.claim)
+        row = await run_in_threadpool(self.claim, self.configured)
         if not row:
             return
         owned_client = self.client is None
