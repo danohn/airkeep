@@ -23,12 +23,13 @@ class ReleaseProfileTests(unittest.TestCase):
             "UUID": "12345678-1234-1234-1234-123456789ABC",
             "TeamIdentifier": ["ABCD123456"],
             "ExpirationDate": datetime.now() + timedelta(days=30),
-            "Entitlements": {"application-identifier": "ABCD123456.io.airkeep.mac",
+            "Platform": ["OSX"],
+            "Entitlements": {"application-identifier": "ABCD123456.io.airkeep",
                              "com.apple.security.application-groups": ["group.io.airkeep"]},
         }
 
     def check(self, profile, direct=False):
-        return release.validate_profile(profile, "ABCD123456", "io.airkeep.mac", "group.io.airkeep", direct)
+        return release.validate_profile(profile, "ABCD123456", "io.airkeep", "group.io.airkeep", direct)
 
     def test_store_and_developer_id_profiles(self):
         self.assertEqual(self.check(self.profile), self.profile["UUID"])
@@ -57,13 +58,17 @@ class ReleaseProfileTests(unittest.TestCase):
             archive = io.BytesIO()
             metadata = {}
             with zipfile.ZipFile(archive, "w") as profiles:
-                for index, suffix in enumerate([".mac", ".mac.widgets"]):
+                for index, suffix in enumerate(["", ".macwidgets"]):
                     profile = deepcopy(self.profile)
                     profile["UUID"] = f"12345678-1234-1234-1234-{index:012d}"
                     profile["Entitlements"]["application-identifier"] = "ABCD123456.io.airkeep" + suffix
                     name = str(index) + ".provisionprofile"
                     profiles.writestr("nested/" + name, name)
                     metadata[name.encode()] = plistlib.dumps(profile)
+                ios_profile = deepcopy(self.profile)
+                ios_profile["Platform"] = ["iOS"]
+                profiles.writestr("nested/ios.mobileprovision", "ios")
+                metadata[b"ios"] = plistlib.dumps(ios_profile)
             environment = {
                 "APPLE_TEAM_ID": "ABCD123456", "APPLE_BUNDLE_ID_PREFIX": "io.airkeep",
                 "CERTIFICATE_BASE64": base64.b64encode(b"synthetic-p12").decode(),
@@ -82,7 +87,7 @@ class ReleaseProfileTests(unittest.TestCase):
             self.assertEqual(options["method"], "app-store-connect")
             self.assertEqual(options["destination"], "export")
             self.assertFalse(options["manageAppVersionAndBuildNumber"])
-            self.assertEqual(set(options["provisioningProfiles"]), {"io.airkeep.mac", "io.airkeep.mac.widgets"})
+            self.assertEqual(set(options["provisioningProfiles"]), {"io.airkeep", "io.airkeep.macwidgets"})
             self.assertIn("AIRKEEP_PROFILE_MAC_WIDGETS=", (private / "build-settings.txt").read_text())
             self.assertEqual((private / "AuthKey.p8").stat().st_mode & 0o777, 0o600)
             self.assertEqual(len((private / "installed-profiles.txt").read_text().splitlines()), 2)
