@@ -14,6 +14,10 @@ dependencies = [
     "python-dotenv>=1.2.4,<2",
     "psycopg[binary,pool]>=3.2,<4",
     "cryptography>=46,<51",
+    "webauthn>=2.7,<3",
+    "pyotp>=2.9,<3",
+    "qrcode>=8.2,<9",
+    "pypng>=0.20220715.0,<1",
 ]
 
 [tool.uv.sources]

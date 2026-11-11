@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
+import { VerificationCodeField } from "./AccountSecurity";
 
 export const hostedAccountPaths = ["/signup", "/signup/complete", "/forgot-password", "/reset-password"];
 
@@ -77,9 +78,10 @@ export function HostedAccountFlow({ publicSignup = false }: { publicSignup?: boo
   </form></main>;
 }
 
-export function DeleteHostedAccount({ signedOut }: { signedOut: () => void }) {
+export function DeleteHostedAccount({ signedOut, totpEnabled = false }: { signedOut: () => void; totpEnabled?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -91,7 +93,9 @@ export function DeleteHostedAccount({ signedOut }: { signedOut: () => void }) {
       setBusy(true);
       setError("");
       try {
-        await api("/auth/account", { method: "DELETE", body: JSON.stringify({ password, confirmation }) });
+        await api("/auth/account", {
+          method: "DELETE", body: JSON.stringify({ password, confirmation, ...(totpEnabled ? { verification_code: code.trim() } : {}) }),
+        });
         signedOut();
       } catch (e) { setError((e as Error).message); }
       finally { setBusy(false); }
@@ -99,11 +103,12 @@ export function DeleteHostedAccount({ signedOut }: { signedOut: () => void }) {
       <label htmlFor="delete-password">Current password</label>
       <input id="delete-password" type="password" autoComplete="current-password" required value={password}
         onChange={(e) => setPassword(e.target.value)} />
+      {totpEnabled && <VerificationCodeField id="delete-verification" value={code} onChange={setCode} />}
       <label htmlFor="delete-confirmation">Type DELETE to confirm</label>
       <input id="delete-confirmation" autoComplete="off" required pattern="DELETE" value={confirmation}
         onChange={(e) => setConfirmation(e.target.value)} />
       <button disabled={busy || confirmation !== "DELETE"}>Permanently delete account</button>
-      <button type="button" disabled={busy} onClick={() => { setExpanded(false); setPassword(""); setConfirmation(""); }}>Cancel</button>
+      <button type="button" disabled={busy} onClick={() => { setExpanded(false); setPassword(""); setCode(""); setConfirmation(""); }}>Cancel</button>
     </form> : <button onClick={() => setExpanded(true)}>Delete my account</button>}
     {error && <p className="error" role="alert">{error}</p>}
   </section>;

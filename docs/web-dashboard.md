@@ -10,6 +10,15 @@ For Docker, follow the [account setup instructions](docker-deployment.md#account
 
 The dashboard stays signed in across reloads in the same tab for up to eight hours. Sign in again when opening another tab. Use **My account** to update your password or sign out a connected app. An administrator can reset your password and give you a temporary password that expires after 24 hours.
 
+### Passkeys and authenticator apps
+
+Open **My account → Sign-in methods** to add a passkey or set up an authenticator app. These settings are available to Airkeep accounts with a password.
+
+- **Passkeys** let you sign in with your device or a security key. Open Airkeep on its configured HTTPS hostname, then choose **Sign in with a passkey** on the dashboard or on the browser sign-in screen opened by the Apple app. Passkeys belong to that hostname. If you move the relay to another hostname, sign in with your password and add a new passkey there.
+- **Authenticator apps** add a six-digit code to password sign-in. Scan the QR code or enter the setup key, then confirm with a code. Save the eight recovery codes somewhere safe. Each works once in place of an authenticator code. You can replace the set in **My account** while you still have a working authenticator or an unused recovery code.
+
+A passkey signs you in on its own. An external single sign-on provider applies its own authentication requirements. Airkeep asks for your current password and, if configured, a fresh authenticator code or a recovery code when you change sign-in methods. A hosted email password reset keeps enrolled sign-in methods.
+
 ### Optional single sign-on
 
 Airkeep supports one OpenID Connect provider for the dashboard and Apple apps. Set up a local administrator first, then create a confidential OIDC client with authorization code and S256 PKCE enabled. Register the exact HTTPS redirect URI, including the port if you use one. For example, use `https://airkeep.example.com/auth/oidc/callback`.
@@ -84,6 +93,7 @@ npm run dev --prefix web -- --host 127.0.0.1 --port 4173 --strictPort
 ```
 
 For this loopback setup only, set `AIRKEEP_WEB_ORIGIN=http://127.0.0.1:4173` and `AIRKEEP_ALLOW_HTTP_LOOPBACK=true` in your ignored development environment. Production browser access uses HTTPS.
+To test passkeys locally, set the origin to `http://localhost:4173` and open that URL in the browser.
 
 ## Relay interfaces
 
@@ -95,7 +105,9 @@ Apple apps and paired ESP32 displays use bearer JWTs and rotating refresh tokens
 | --- | --- |
 | `GET /auth/session` | Account setup status and the current dashboard account, if signed in |
 | `GET/POST /auth/authorize` | Start a PKCE authorization request |
-| `POST /auth/credentials` | Verify username and password and complete first-sign-in password change |
+| `POST /auth/credentials` | Verify password and any required authenticator or recovery code, and complete first-sign-in password change |
+| `POST /auth/passkey/options` and `POST /auth/passkey/verify` | Start and verify passkey sign-in for an active PKCE request |
+| `GET /auth/security` | List the dashboard account’s passkeys and authenticator status |
 | `POST /auth/token` | Exchange a code for a dashboard JWT cookie or device tokens, or rotate a device refresh token |
 | `POST /auth/device/code` | Start ESP32 pairing |
 | `POST /auth/device/verify` and `POST /auth/device/decision` | Review a pairing code and approve or deny it from a signed-in dashboard |

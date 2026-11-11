@@ -55,7 +55,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
               : "Please try again.";
     if (
       response.status === 401 &&
-      !["/auth/login", "/auth/credentials", "/auth/password", "/auth/account"].includes(path) &&
+      !["/auth/login", "/auth/credentials", "/auth/password", "/auth/account", "/auth/passkey/verify"].includes(path) &&
       requestGeneration === sessionGeneration
     )
       window.dispatchEvent(new Event("airkeep:session-ended"));

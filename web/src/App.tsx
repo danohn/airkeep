@@ -55,7 +55,7 @@ type Page =
   | "queue"
   | "accounts"
   | "password";
-type Session = { authenticated: boolean; configured: boolean; csrf?: string; mode?: "oauth"; account?: Account; oidc_label?: string; hosted?: boolean; public_signup?: boolean };
+type Session = { authenticated: boolean; configured: boolean; csrf?: string; mode?: "oauth"; account?: Account; oidc_label?: string; hosted?: boolean; public_signup?: boolean; passkeys_available?: boolean };
 type RecordRow = Record<string, unknown>;
 const userPages = [
   ["overview", "Overview", House],
@@ -87,7 +87,10 @@ export function App() {
   const [tick, setTick] = useState(Date.now() / 1000);
   const [sessionError, setSessionError] = useState("");
   const loggedOut = () => {
-    setSession((current) => ({ authenticated: false, configured: true, mode: current?.mode, oidc_label: current?.oidc_label, hosted: current?.hosted, public_signup: current?.public_signup }));
+    setSession((current) => ({
+      authenticated: false, configured: true, mode: current?.mode, oidc_label: current?.oidc_label,
+      hosted: current?.hosted, public_signup: current?.public_signup, passkeys_available: current?.passkeys_available,
+    }));
     setMode("user");
     setPage("overview");
     if (location.pathname !== "/device") history.replaceState(null, "", "/");
@@ -241,7 +244,8 @@ export function App() {
   const effectivePage = !canAdmin && (adminPage || page === "accounts") ? "overview" : page;
   if (publicAccountFlow) return <HostedAccountFlow publicSignup={session?.public_signup} />;
   if (!session?.authenticated && oauth)
-    return <AccountLogin configured={session.configured} error={sessionError} oidcLabel={session.oidc_label} hosted={session.hosted} publicSignup={session.public_signup} />;
+    return <AccountLogin configured={session.configured} error={sessionError} oidcLabel={session.oidc_label}
+      hosted={session.hosted} publicSignup={session.public_signup} passkeysAvailable={session.passkeys_available} />;
   if (!session?.authenticated)
     return (
       <Login

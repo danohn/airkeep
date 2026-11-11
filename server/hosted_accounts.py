@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.concurrency import run_in_threadpool
 
-from accounts import DAY, PASSWORD, PASSWORD_WORK, Principal, digest, lock_account, random_token, revoke_user
+from accounts import DAY, PASSWORD, PASSWORD_WORK, Principal, VerificationCode, digest, lock_account, random_token, revoke_user
 
 EMAIL = re.compile(r"[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,63}")
 GENERIC = {'message': 'If this email address can receive an Airkeep link, check your inbox shortly.'}
@@ -41,6 +41,7 @@ class CompleteLink(BaseModel):
 class DeleteAccount(BaseModel):
     password: str = Field(min_length=1, max_length=1024)
     confirmation: str = Field(max_length=50)
+    verification_code: VerificationCode | None = None
 
 
 def canonical_email(value, *, strict=True):
@@ -68,11 +69,11 @@ def limited(db, key, scope, value, capacity, window, now):
     return row is not None
 
 
-def login_limit(store, key, username, address):
+def login_limit(store, key, username, address, *, scope='login'):
     now = time.time()
     with store.transaction() as db:
-        ip_ok = limited(db, key, 'login-ip', address, 30, 300, now)
-        user_ok = limited(db, key, 'login-account', username.lower(), 5, 300, now)
+        ip_ok = limited(db, key, scope + '-ip', address, 30, 300, now)
+        user_ok = limited(db, key, scope + '-account', username.lower(), 5, 300, now)
     if not ip_ok or not user_ok:
         raise HTTPException(429, 'Please wait before trying again.', headers={'Retry-After': '300'})
 
@@ -193,6 +194,7 @@ class HostedAccounts:
             current = lock_account(self.store, identity.user)
             if not current or current['version'] != account['version'] or not self.oauth.active(identity.grant):
                 raise HTTPException(409, 'Your account changed. Sign in again.')
+            self.oauth.factors.verify_totp(db, identity.user, body.verification_code)
             db.execute('INSERT INTO account_deletions(account_id,deleted_at) VALUES(?,?) ON CONFLICT DO NOTHING',
                        (identity.user, time.time()))
             revoke_user(self.store, identity.user)

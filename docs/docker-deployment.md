@@ -62,12 +62,16 @@ docker compose -f compose.http.yml up -d --wait
 
 Open your HTTPS URL with `/health` appended to check the connection. Then open the dashboard and sign in. Check for a recent printer reading. Add users under **Admin → Accounts**. To connect an ESP32 display, tap **Pair display** and approve the code in the dashboard. After upgrading the relay, displays using the old shared token need new firmware and pairing.
 
-For an external sign-in provider, see [optional single sign-on](web-dashboard.md#optional-single-sign-on).
+See [passkeys and authenticator apps](web-dashboard.md#passkeys-and-authenticator-apps) and [optional single sign-on](web-dashboard.md#optional-single-sign-on).
 
 <details>
 <summary>Recover an administrator account</summary>
 
 Run `docker compose -f compose.http.yml run --rm --no-deps airkeep-relay python manage_accounts.py recover owner` with the administrator’s username and your usual Compose file selection.
+
+If the administrator also lost their authenticator and recovery codes, append `--clear-sign-in-methods` to remove their passkeys, authenticator, and recovery codes during recovery. Set up new sign-in methods after signing in.
+
+Authenticator secrets are encrypted with a key derived from `AIRKEEP_JWT_SIGNING_KEY`. Keep that key with the relay’s backup. If you replace it, users with an authenticator can use a saved recovery code to sign in and another unused code to turn off the old authenticator before setting it up again.
 
 </details>
 

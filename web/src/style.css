@@ -1247,6 +1247,66 @@ tbody tr:hover {
   overflow-wrap: anywhere;
   user-select: all;
 }
+.security-settings {
+  gap: 18px;
+  padding-block: 20px;
+  border-block: 1px solid var(--line);
+}
+.security-method,
+.security-settings .security-form {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+.security-settings h3,
+.security-settings p {
+  margin: 0;
+}
+.security-settings p {
+  display: block;
+}
+.security-settings .security-form {
+  max-width: 440px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.security-form input {
+  width: 100%;
+}
+.security-passkey {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: min(100%, 440px);
+  padding-block: 6px;
+}
+.security-passkey small {
+  display: block;
+}
+.security-passkey strong {
+  overflow-wrap: anywhere;
+}
+.security-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.security-qr {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.security-recovery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17ch, 1fr));
+  gap: 6px 12px;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
 .hosted-setup {
   padding: 24px;
   margin: 24px 32px;
