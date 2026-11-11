@@ -71,7 +71,8 @@ def test_database_policies_and_connection_reuse_fail_closed(store, users):
 def test_identical_ams_ids_are_isolated_and_replay_is_history_only(store, users):
     first, second = users
     a, b = enroll(store, first), enroll(store, second)
-    recent = time.time()-2
+    # Keep both live observations in the previous 30-second history bucket.
+    recent = int(time.time() // 30) * 30 - 5
     save_batch(store, a, Batch(printerConnected=True, readings=[observation(40, when=recent)]))
     save_batch(store, b, Batch(printerConnected=True, readings=[observation(70, when=recent)]))
     with store.tenant(first):
@@ -86,7 +87,7 @@ def test_identical_ams_ids_are_isolated_and_replay_is_history_only(store, users)
     with store.tenant(first):
         assert store.readings()[0].humidity == 40
         assert len(store.rows('SELECT * FROM ingest_events')) == 3
-        assert len(store.history('0', recent-7200)) == 2
+        assert [sample['humidity'] for sample in store.history('0', recent-7200)] == [80, 40]
 
 
 def test_heartbeat_does_not_refresh_sensor_and_reenrollment_revokes_old_token(store, users):
