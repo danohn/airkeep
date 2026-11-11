@@ -3,7 +3,9 @@ RUN pip install --no-cache-dir uv==0.11.15
 ENV UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never UV_COMPILE_BYTECODE=1
 WORKDIR /app
 COPY server/pyproject.toml server/uv.lock ./
-RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-install-project
+COPY agent/pyproject.toml agent/README.md agent/LICENSE /agent/
+COPY agent/src /agent/src
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-install-project --no-editable
 
 FROM python:3.14-slim-bookworm
 LABEL org.opencontainers.image.title="Airkeep relay" \
@@ -13,7 +15,8 @@ RUN groupadd --gid 10001 airkeep && useradd --uid 10001 --gid 10001 --no-create-
     && mkdir /data && chown 10001:10001 /data
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
-COPY server/*.py server/bambu-ca.pem ./
+COPY server/*.py ./
+COPY server/migrations ./migrations
 COPY LICENSE /usr/share/licenses/airkeep/LICENSE
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 AIRKEEP_DB_PATH=/data/airkeep.sqlite3
 USER 10001:10001

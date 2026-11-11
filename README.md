@@ -6,7 +6,7 @@
 
 Airkeep tracks humidity and temperature inside a Bambu Lab P2S's AMS. Check readings and history on your Apple devices, in a browser or on a Waveshare AMOLED desk display. Shared humidity alerts and iPhone Live Activities help you keep an eye on it while the app is closed.
 
-An always-on, self-hosted relay connects to one printer over local MQTT, stores seven days of history and serves readings to every client over authenticated HTTPS. It keeps collecting data and checking alert rules when the clients are closed. See the [architecture guide](docs/architecture.md) for the data flow and relay interfaces.
+Airkeep collects readings from one P2S over local MQTT and keeps seven days of history. Use a [self-hosted relay](docs/docker-deployment.md) for a private dashboard and API, or run a [LAN agent](agent/README.md) to send readings to the hosted service. The relay or hosted worker checks alert rules while the clients are closed. See the [architecture guide](docs/architecture.md) and [hosted deployment runbook](docs/hosted-deployment.md).
 
 AMS humidity describes the air around the filament.
 

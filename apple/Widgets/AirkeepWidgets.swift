@@ -21,16 +21,19 @@ struct Provider: AppIntentTimelineProvider {
         context.isPreview ? placeholder(in: context) : .init(date: .now, reading: SharedConfiguration.cached)
     }
     func timeline(for configuration: AMSConfigurationIntent, in context: Context) async -> Timeline<AirkeepEntry> {
+        let client = RelayClient()
         var reading = SharedConfiguration.cached
         if reading?.amsID != configuration.amsID { reading = nil }
         var history: [Reading] = []
         do {
-            let client = RelayClient()
             let snapshot = try await client.snapshot()
+            guard client.isCurrent else { return Timeline(entries: [.init(date: .now, reading: nil)], policy: .atEnd) }
             reading = snapshot.readings.first { $0.amsID == configuration.amsID }
             history = try await client.history(amsID: configuration.amsID, hours: 1)
-            if configuration.amsID == SharedConfiguration.amsID { SharedConfiguration.cached = reading }
+            guard client.isCurrent else { return Timeline(entries: [.init(date: .now, reading: nil)], policy: .atEnd) }
+            if configuration.amsID == SharedConfiguration.amsID { SharedConfiguration.cacheReading(reading, endpoint: client.endpoint, token: client.token) }
         } catch { /* Retain original timestamp: offline data becomes stale. */ }
+        if !client.isCurrent { reading = nil; history = [] }
         let now = Date.now
         let entry = AirkeepEntry(date: now, reading: reading, history: history)
         let staleAt = reading?.date.addingTimeInterval(91) ?? now

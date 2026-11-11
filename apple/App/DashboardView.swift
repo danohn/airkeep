@@ -89,7 +89,15 @@ struct DashboardView: View {
                 if let error = model.error {
                     Text(error).font(.caption).foregroundStyle(AirkeepTheme.amber).textSelection(.enabled)
                 }
-                if model.reading == nil && SharedConfiguration.endpoint.isEmpty {
+                if !model.demo {
+                    if TokenStore.read().isEmpty {
+                        Button("Sign in to Airkeep") { model.settingsSection = .relay; model.showSettings = true }
+                    } else if SharedConfiguration.endpoint == SharedConfiguration.hostedEndpoint,
+                              let url = URL(string: SharedConfiguration.hostedEndpoint + "/setup") {
+                        Link("Add Printer", destination: url)
+                    }
+                }
+                if model.reading == nil && TokenStore.read().isEmpty {
                     Button("Preview sample data") {
                         model.demo = true
                         model.reading = PreviewData.reading
@@ -104,7 +112,7 @@ struct DashboardView: View {
                             Text(reading.date, style: .relative)
                             Text("ago\(reading.isStale(now: context.date) && !model.demo ? " · stale" : "")")
                         }
-                    } else { Text("Add your relay connection to begin") }
+                    } else { Text("Sign in to Airkeep to begin") }
                 }.font(.caption).foregroundStyle(AirkeepTheme.secondary).frame(maxWidth: .infinity)
             }.padding(24)
         }

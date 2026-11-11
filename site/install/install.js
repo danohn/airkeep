@@ -12,6 +12,13 @@ const serialMessage = window.isSecureContext
   ? "Open this page in desktop Chrome or Edge to use USB."
   : "USB installation and setup require HTTPS.";
 let display;
+let customRelay = "";
+byId("service").addEventListener("change", () => {
+  const hosted = byId("service").value === "hosted";
+  if (hosted) customRelay = form.elements.relayUrl.value;
+  form.elements.relayUrl.value = hosted ? "https://dashboard.airkeep.io" : customRelay;
+  byId("relay-url-field").hidden = hosted;
+});
 
 function showStatus(message, error = false) {
   status.textContent = message;

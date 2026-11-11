@@ -27,7 +27,7 @@ struct WatchHumidityProvider: AppIntentTimelineProvider {
         await WatchWidgetRegistration.live.sync()
         if let connection = try? WatchStorage.live.connection(),
            let snapshot = try? await connection.client.snapshot() {
-            try? WatchStorage.live.cache(snapshot, endpoint: connection.endpoint)
+            _ = try? WatchStorage.live.cache(snapshot, endpoint: connection.endpoint, connection: connection)
         }
         let entry = cached(configuration)
         var entries = [entry]

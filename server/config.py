@@ -1,4 +1,5 @@
 from pathlib import Path
+from airkeep.collector import BAMBU_CA
 from typing import Literal
 from pydantic import Field, SecretStr, model_validator
 from urllib.parse import urlsplit
@@ -11,7 +12,10 @@ class Settings(BaseSettings):
     printer_serial: str = ""
     printer_code: str = ""
     db_path: Path = Path(".local/airkeep.sqlite3")
-    ca_path: Path = Path(__file__).parent / "bambu-ca.pem"
+    deployment: Literal["self-hosted", "hosted"] = "self-hosted"
+    database_url: SecretStr = SecretStr("")
+    public_signup: bool = False
+    ca_path: Path = BAMBU_CA
     mqtt_enabled: bool = True
     stale_seconds: int = 90
     apns_team_id: str = ""
@@ -41,6 +45,12 @@ class Settings(BaseSettings):
 
     @model_validator(mode='after')
     def browser_settings(self):
+        if self.deployment == 'hosted':
+            if not self.database_url.get_secret_value() or not self.jwt_signing_key or not self.web_origin.startswith('https://'):
+                raise ValueError('Hosted mode requires PostgreSQL, a signing key and an HTTPS origin.')
+            self.mqtt_enabled = False
+            if self.oidc_issuer or self.web_password_hash:
+                raise ValueError('Hosted mode uses individual email accounts.')
         if self.web_origin:
             value = urlsplit(self.web_origin)
             if value.username or value.password or value.query or value.fragment or value.path not in ('','/') or not value.hostname:

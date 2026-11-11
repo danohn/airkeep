@@ -52,7 +52,11 @@
             <div class="fields">
               <label>Wi-Fi name <input name="ssid" required></label>
               <label>Wi-Fi password <input name="password" type="password"></label>
-              <label>Relay HTTPS URL <input name="relayUrl" type="url" placeholder="https://airkeep.example.com" required></label>
+              <label>Airkeep service <select name="service" id="service">
+                <option value="hosted">Airkeep hosted</option>
+                <option value="custom">Self-hosted relay</option>
+              </select></label>
+              <label id="relay-url-field" hidden>Relay HTTPS URL <input name="relayUrl" type="url" value="https://dashboard.airkeep.io" placeholder="https://airkeep.example.com" required></label>
               <label>AMS ID <input name="amsId" value="0" inputmode="numeric" pattern="[0-9]+" maxlength="32" required></label>
             </div>
             <p>Use a 2.4 GHz network. Leave the password blank for an open network.</p>
@@ -62,8 +66,8 @@
         <p id="setup-status" class="setup-status" role="status"></p>
       </li>
       <li>
-        <h2>Pair with your relay</h2>
-        <p>When the display connects, tap <strong>Pair display</strong>. Scan the QR code or visit <code>/device</code> on your relay and enter the displayed code. Sign in to the relay and approve the display to start seeing readings.</p>
+        <h2>Pair your display</h2>
+        <p>When the display connects, tap <strong>Pair display</strong>. Scan the QR code or visit <a href="https://dashboard.airkeep.io/device">dashboard.airkeep.io/device</a> and enter the displayed code. Sign in and approve the display to start seeing readings. For a self-hosted relay, use its <code>/device</code> page.</p>
       </li>
     </ol>
     <details class="installer-help">

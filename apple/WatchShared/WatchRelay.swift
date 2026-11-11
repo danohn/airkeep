@@ -221,13 +221,13 @@ actor WatchWidgetRegistration {
         do {
             let value = try JSONDecoder().decode(Snapshot.self, from: await fetch(.snapshot, connection: current, ams: selectedAMS, hours: hours))
             guard id == requestID, current == (try? storage.connection()) else { return }
-            try storage.cache(value, endpoint: current.endpoint)
+            try storage.cache(value, endpoint: current.endpoint, connection: current)
             snapshot = (try storage.read()).snapshot[current.endpoint]?.snapshot
             connected = true; error = nil
             do {
                 let loaded = try JSONDecoder().decode([ManagedAlertRule].self, from: await fetch(.alerts, connection: current, ams: selectedAMS, hours: hours))
                 guard id == requestID, current == (try? storage.connection()) else { return }
-                try storage.cache(rules: loaded, endpoint: current.endpoint)
+                try storage.cache(rules: loaded, endpoint: current.endpoint, connection: current)
                 rules = loaded; rulesSyncedAt = .now
             } catch { /* Keep the last shared rule list available while offline. */ }
             if historyVisible { await refreshHistory() }
@@ -247,7 +247,7 @@ actor WatchWidgetRegistration {
         do {
             let loaded = try JSONDecoder().decode([Reading].self, from: await fetch(.history, connection: current, ams: ams, hours: range))
             guard id == historyRequestID, current == (try? storage.connection()), ams == selectedAMS, range == hours else { return }
-            try storage.cache(history: loaded, endpoint: current.endpoint, ams: ams, hours: range)
+            try storage.cache(history: loaded, endpoint: current.endpoint, ams: ams, hours: range, connection: current)
             history = loaded; lastHistory = .now; historyError = nil
         } catch {
             guard id == historyRequestID, current == (try? storage.connection()), !Task.isCancelled else { return }

@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, setCsrf, amsName, age } from "./api";
+import { api, ApiError, setCsrf, setAccount, amsName, age } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
   setCsrf("");
+  setAccount("");
 });
 describe("browser API boundary", () => {
   it("keeps credentials in cookies and sends CSRF only in its header", async () => {
@@ -91,5 +92,40 @@ describe("browser API boundary", () => {
     expect(amsName("2")).toBe("AMS 3");
     expect(age(1000, 1120)).toBe("2 min. ago");
     expect(age(1000, 5000)).toBe("1 hr. ago");
+  });
+});
+
+describe("account-bound browser requests", () => {
+  it("sends the expected account on private requests and allows session discovery", async () => {
+    const fetch = vi.fn().mockImplementation(async () => new Response("{}"));
+    vi.stubGlobal("fetch", fetch);
+    setAccount("tenant-a");
+    await api("/v2/alerts");
+    await api("/auth/session");
+    expect(fetch.mock.calls[0][1].headers["X-Airkeep-Account"]).toBe("tenant-a");
+    expect(fetch.mock.calls[1][1].headers["X-Airkeep-Account"]).toBeUndefined();
+  });
+  it("requests a fresh page when the cookie belongs to a different account", async () => {
+    const dispatchEvent = vi.fn();
+    vi.stubGlobal("window", { dispatchEvent });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", {
+      status: 409, headers: { "X-Airkeep-Account-Changed": "1" },
+    })));
+    setAccount("tenant-a");
+    await expect(api("/v2/alerts")).rejects.toMatchObject({ status: 409 });
+    expect(dispatchEvent.mock.calls[0][0].type).toBe("airkeep:account-changed");
+  });
+  it("discards data when an account changes while its response body is decoding", async () => {
+    let finish!: (value: unknown) => void;
+    const decoding = new Promise((resolve) => { finish = resolve; });
+    const response = new Response("{}");
+    vi.spyOn(response, "json").mockImplementation(() => decoding);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
+    setAccount("tenant-a");
+    const pending = api("/v2/alerts");
+    await Promise.resolve();
+    setAccount("tenant-b");
+    finish([{ id: "private-alert" }]);
+    await expect(pending).rejects.toMatchObject({ status: 409 });
   });
 });

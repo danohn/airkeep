@@ -213,23 +213,32 @@ struct RelaySettingsView: View {
                             .textSelection(.enabled).multilineTextAlignment(.trailing)
                     }
                 }
+                if SharedConfiguration.endpoint == SharedConfiguration.hostedEndpoint,
+                   let url = URL(string: SharedConfiguration.hostedEndpoint + "/setup") {
+                    Link("Add Printer", destination: url)
+                }
                 Button("Edit connection") { editConnection = true }.disabled(model.demo)
                 if TokenStore.read().hasPrefix("oauth:") {
                     Button("Sign out", role: .destructive) {
                         Task {
                             let relay = RelayClient()
+                            // Clear local state even if the relay is unreachable.
                             do {
-                                do { _ = try await relay.request("auth/revoke", method: "POST") }
-                                catch RelayClient.RelayError.http(401) { }
-                                #if os(iOS)
-                                await LiveMonitor.shared.stopAll(relay: relay)
-                                WatchCompanion.shared.clearConnection()
-                                #endif
                                 SharedConfiguration.clearAccountData(endpoint: relay.endpoint)
-                                try TokenStore.delete(account: relay.token)
                                 try TokenStore.delete(account: "bearer-token")
                                 model.connectionChanged()
+                                #if os(iOS)
+                                WatchCompanion.shared.clearConnection()
+                                await LiveMonitor.shared.stopAll(relay: relay)
+                                #endif
+                                let bearer = relay.token.hasPrefix("oauth:")
+                                    ? try? await RelayOAuth.access(endpoint: relay.endpoint, marker: relay.token) : relay.token
+                                try TokenStore.delete(account: relay.token)
                                 await model.alertRules.refresh()
+                                await notifications.refresh()
+                                if let bearer {
+                                    _ = try? await RelayClient(endpoint: relay.endpoint, token: bearer).request("auth/revoke", method: "POST")
+                                }
                             } catch { model.error = error.localizedDescription }
                         }
                     }
@@ -250,6 +259,10 @@ struct RelaySettingsView: View {
             WatchCompanionSettings(amsID: model.selectedAMS, demo: model.demo)
             #endif
             Section("Privacy") {
+                if SharedConfiguration.endpoint == SharedConfiguration.hostedEndpoint,
+                   let url = URL(string: SharedConfiguration.hostedEndpoint + "/account") {
+                    Link("Manage or delete account", destination: url)
+                }
                 Text("Airkeep keeps your sign-in in Keychain.")
                     .font(.caption).foregroundStyle(.secondary)
             }

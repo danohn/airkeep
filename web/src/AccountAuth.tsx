@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "./api";
 import { dashboardAuthorization, type Account } from "./auth";
 import { OIDCSettings } from "./OIDCSettings";
+import { DeleteHostedAccount } from "./HostedAccounts";
 
 export async function beginDashboardSignIn() {
   const fields = await dashboardAuthorization();
@@ -20,8 +21,8 @@ export async function startOIDC(transaction: string, invitation?: string) {
   location.assign(destination.href);
 }
 
-export function AccountLogin({ native = false, invite = false, configured = true, error = "", oidcLabel }: {
-  native?: boolean; invite?: boolean; configured?: boolean; error?: string; oidcLabel?: string;
+export function AccountLogin({ native = false, invite = false, configured = true, error = "", oidcLabel, hosted = false, publicSignup = false }: {
+  native?: boolean; invite?: boolean; configured?: boolean; error?: string; oidcLabel?: string; hosted?: boolean; publicSignup?: boolean;
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -30,6 +31,8 @@ export function AccountLogin({ native = false, invite = false, configured = true
   const [change, setChange] = useState(false);
   const [invitation] = useState(() => invite ? location.hash.slice(1) : "");
   const [provider, setProvider] = useState("");
+  const [hostedMode, setHostedMode] = useState(hosted);
+  const [signupOpen, setSignupOpen] = useState(publicSignup);
   const [message, setMessage] = useState(() => new URLSearchParams(location.search).get("sso_error") ?? "");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -38,8 +41,8 @@ export function AccountLogin({ native = false, invite = false, configured = true
     }
     if (!native && !invite) return;
     let active = true;
-    api<{ oidc_label?: string }>("/auth/session").then((status) => {
-      if (active) setProvider(status.oidc_label ?? "");
+    api<{ oidc_label?: string; hosted?: boolean; public_signup?: boolean }>("/auth/session").then((status) => {
+      if (active) { setProvider(status.oidc_label ?? ""); setHostedMode(status.hosted ?? false); setSignupOpen(status.public_signup ?? false); }
     }).catch(() => { if (active) setMessage("Could not check single sign-on availability."); });
     return () => { active = false; };
   }, [native, invite]);
@@ -86,10 +89,10 @@ export function AccountLogin({ native = false, invite = false, configured = true
   }}>
     <img src="/brand/mark.svg" alt="" />
     <h1>{invite ? "Airkeep invitation" : native ? "Connect to Airkeep" : "Airkeep"}</h1>
-    <p>{invite ? "Use single sign-on to accept your invitation." : change ? "Choose your own password." : "Sign in to your relay."}</p>
+    <p>{invite ? "Use single sign-on to accept your invitation." : change ? "Choose your own password." : hostedMode ? "Sign in to your Airkeep account." : "Sign in to your relay."}</p>
     {invite ? <a href="/">Go to Airkeep sign-in</a> : configured ? <>
-      <label htmlFor="username">Username</label>
-      <input id="username" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+      <label htmlFor="username">{hostedMode ? "Email address" : "Username"}</label>
+      <input id="username" type={hostedMode ? "email" : "text"} maxLength={hostedMode ? 254 : 64} autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
       <label htmlFor="password">{change ? "Temporary password" : "Password"}</label>
       <input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
       {change && <>
@@ -102,6 +105,7 @@ export function AccountLogin({ native = false, invite = false, configured = true
       <button type="button" disabled={busy} onClick={() => void signInWithOIDC()}>
         Sign in with {oidcLabel || provider}
       </button>}
+    {hostedMode && !invite && <>{signupOpen && <a href="/signup">Create an account</a>}<a href="/forgot-password">Forgot password?</a></>}
     {invite && !invitation && <p>Open the original invitation link to try again.</p>}
     {(message || error) && <p className="error" role="alert">{message || error}</p>}
   </form></div>;
@@ -109,11 +113,11 @@ export function AccountLogin({ native = false, invite = false, configured = true
 
 type Connection = { id: string; client: string; expires: number; current: boolean; display_suffix?: string };
 const clientLabels: Record<string, string> = {
-  dashboard: "Web dashboard", "apple-ios": "iPhone or iPad", "apple-mac": "Mac", watch: "Apple Watch", esp32: "ESP32 display",
+  dashboard: "Web dashboard", "apple-ios": "iPhone or iPad", "apple-mac": "Mac", watch: "Apple Watch", esp32: "ESP32 display", "airkeep-relay": "Printer relay",
 };
 
-export function AccountSettings({ admin, signedOut, oidcLabel, localPassword = true }: {
-  admin: boolean; signedOut: () => void; oidcLabel?: string; localPassword?: boolean;
+export function AccountSettings({ admin, signedOut, oidcLabel, localPassword = true, hosted = false }: {
+  admin: boolean; signedOut: () => void; oidcLabel?: string; localPassword?: boolean; hosted?: boolean;
 }) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -204,6 +208,7 @@ export function AccountSettings({ admin, signedOut, oidcLabel, localPassword = t
       })}>Sign out</button>
     </p>)}
     </>}
+    {hosted && <DeleteHostedAccount signedOut={signedOut} />}
     {error && <p className="error" role="alert">{error}</p>}
   </section>;
 }

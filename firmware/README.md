@@ -4,7 +4,7 @@ The firmware targets **Waveshare ESP32-S3-Touch-AMOLED-1.8 V2**: CO5300/CST820, 
 
 ## Install from your browser
 
-Open the [Airkeep installer](https://airkeep.io/install/) in desktop Chrome or Edge. Connect the board using a USB data cable. The factory install replaces the current firmware and clears saved settings and pairing.
+Open the [Airkeep installer](https://airkeep.io/install/) in desktop Chrome or Edge. Connect the board using a USB data cable. The factory install replaces the current firmware and clears saved settings and pairing. Choose **Airkeep hosted** to use `https://dashboard.airkeep.io`, or **Self-hosted relay** to enter your own HTTPS origin.
 
 Close the flasher when it finishes. Connect again in **Configure over USB** and enter your 2.4 GHz Wi-Fi settings, relay HTTPS URL, and AMS ID. The board saves them and restarts. When it connects, tap **Pair display** and approve it on your relay. To change Wi-Fi or relay settings, return to **Configure over USB**.
 

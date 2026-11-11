@@ -7,7 +7,7 @@ export type Account = {
   local_password?: boolean;
 };
 
-type Pending = { verifier: string; state: string; redirect: string; deviceCode?: string };
+type Pending = { verifier: string; state: string; redirect: string; deviceCode?: string; returnPath?: "/account" | "/setup" };
 
 const pendingKey = "airkeep.oauth.pending";
 
@@ -44,6 +44,7 @@ export async function dashboardAuthorization() {
   const redirect = location.origin + "/auth/callback";
   const pending: Pending = { verifier, state, redirect };
   if (location.pathname === "/device") pending.deviceCode = devicePairingCode();
+  if (location.pathname === "/account" || location.pathname === "/setup") pending.returnPath = location.pathname;
   sessionStorage.setItem(pendingKey, JSON.stringify(pending));
   return {
     client_id: "dashboard", redirect_uri: redirect, state, code_challenge: challenge,
@@ -64,7 +65,8 @@ export function finishDashboardAuthorization() {
       throw new Error("Start sign-in again.");
     }
     const pending = JSON.parse(raw) as Pending;
-    history.replaceState(null, "", pending.deviceCode === undefined ? "/" : devicePairingPath(pending.deviceCode));
+    const returnPath = pending.returnPath === "/account" || pending.returnPath === "/setup" ? pending.returnPath : "/";
+    history.replaceState(null, "", pending.deviceCode === undefined ? returnPath : devicePairingPath(pending.deviceCode));
     const code = query.get("code");
     if (!code || pending.state !== query.get("state")) throw new Error("Start sign-in again.");
     const response = await fetch("/auth/token", {

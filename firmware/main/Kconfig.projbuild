@@ -11,9 +11,10 @@ config AIRKEEP_WIFI_PASSWORD
     default ""
 config AIRKEEP_RELAY_URL
     string "Airkeep relay HTTPS URL (including port, if needed)"
-    default ""
+    default "https://dashboard.airkeep.io"
     help
-        For example https://airkeep.example.com:8443. The server certificate
+        Defaults to Airkeep hosted. For self-hosting, use your relay origin,
+        for example https://airkeep.example.com:8443. The server certificate
         and hostname are verified with the ESP-IDF public CA bundle.
 config AIRKEEP_AMS_ID
     string "AMS identifier"

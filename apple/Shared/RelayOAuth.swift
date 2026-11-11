@@ -97,6 +97,9 @@ enum RelayOAuth {
         let tokens = try await token(endpoint: origin, clientID: grant.clientID,
                                      fields: ["grant_type": "refresh_token", "refresh_token": grant.tokens.refresh_token])
         guard tokens.grant_id == grant.tokens.grant_id else { throw RelayClient.RelayError.transport }
+        guard Data(TokenStore.read(account: marker).utf8) == data else {
+            throw RelayClient.RelayError.connectionChanged
+        }
         try save(tokens, endpoint: origin, clientID: grant.clientID)
         return tokens.access_token
     }

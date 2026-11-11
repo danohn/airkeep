@@ -55,3 +55,17 @@ describe("display pairing sign-in return", () => {
     expect(auth.devicePairingCode()).toBe("");
   });
 });
+
+describe("hosted account deep links", () => {
+  afterEach(() => history.replaceState(null, "", "/"));
+
+  it.each(["/account", "/setup"])("returns to %s after browser sign-in", async (path) => {
+    history.replaceState(null, "", path);
+    const auth = await import("./auth");
+    const authorization = await auth.dashboardAuthorization();
+    history.replaceState(null, "", "/auth/callback?code=example&state=" + authorization.state);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response('{}')));
+    expect(await auth.finishDashboardAuthorization()).toBe(true);
+    expect(location.pathname).toBe(path);
+  });
+});

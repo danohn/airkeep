@@ -1,0 +1,125 @@
+name: airkeep-hosted
+x-backend: &backend
+  image: ghcr.io/danohn/airkeep-relay:${AIRKEEP_IMAGE_TAG:-hosted-staging}
+  environment:
+    AIRKEEP_DEPLOYMENT: hosted
+    AIRKEEP_DATABASE_URL: postgresql://airkeep_runtime:${AIRKEEP_RUNTIME_PASSWORD:?Generate .env.hosted first}@postgres/airkeep
+    AIRKEEP_WEB_ORIGIN: ${AIRKEEP_WEB_ORIGIN:-https://dashboard.airkeep.io}
+    AIRKEEP_JWT_SIGNING_KEY: ${AIRKEEP_JWT_SIGNING_KEY:?Generate .env.hosted first}
+    AIRKEEP_PUBLIC_SIGNUP: ${AIRKEEP_PUBLIC_SIGNUP:-false}
+    AIRKEEP_EMAIL_LINK_KEY: ${AIRKEEP_EMAIL_LINK_KEY:?Generate .env.hosted first}
+    AIRKEEP_TWILIO_API_KEY: ${AIRKEEP_TWILIO_API_KEY:-}
+    AIRKEEP_TWILIO_API_SECRET: ${AIRKEEP_TWILIO_API_SECRET:-}
+    AIRKEEP_EMAIL_FROM: ${AIRKEEP_EMAIL_FROM:-}
+    AIRKEEP_EMAIL_FROM_NAME: ${AIRKEEP_EMAIL_FROM_NAME:-Airkeep}
+    AIRKEEP_APNS_TEAM_ID: ${AIRKEEP_APNS_TEAM_ID:-}
+    AIRKEEP_APNS_KEY_ID: ${AIRKEEP_APNS_KEY_ID:-}
+    AIRKEEP_APNS_KEY_PATH: ${AIRKEEP_APNS_KEY_PATH:-}
+    AIRKEEP_APNS_PRODUCTION_KEY_ID: ${AIRKEEP_APNS_PRODUCTION_KEY_ID:-}
+    AIRKEEP_APNS_PRODUCTION_KEY_PATH: ${AIRKEEP_APNS_PRODUCTION_KEY_PATH:-}
+    AIRKEEP_WATCH_APNS_USE_SHARED_CREDENTIALS: ${AIRKEEP_WATCH_APNS_USE_SHARED_CREDENTIALS:-false}
+    AIRKEEP_WATCH_APNS_KEY_ID: ${AIRKEEP_WATCH_APNS_KEY_ID:-}
+    AIRKEEP_WATCH_APNS_KEY_PATH: ${AIRKEEP_WATCH_APNS_KEY_PATH:-}
+    AIRKEEP_WATCH_APNS_PRODUCTION_KEY_ID: ${AIRKEEP_WATCH_APNS_PRODUCTION_KEY_ID:-}
+    AIRKEEP_WATCH_APNS_PRODUCTION_KEY_PATH: ${AIRKEEP_WATCH_APNS_PRODUCTION_KEY_PATH:-}
+    AIRKEEP_IOS_TOPIC: ${AIRKEEP_IOS_TOPIC:-io.airkeep}
+    AIRKEEP_MAC_TOPIC: ${AIRKEEP_MAC_TOPIC:-io.airkeep.mac}
+    AIRKEEP_WATCH_TOPIC: ${AIRKEEP_WATCH_TOPIC:-io.airkeep.watch}
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs: ['/tmp:rw,noexec,nosuid,size=32m']
+  init: true
+  restart: unless-stopped
+  volumes:
+    - ./private/apns:/run/keys:ro
+  logging:
+    driver: json-file
+    options: {max-size: 10m, max-file: '3'}
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: airkeep_migration
+      POSTGRES_DB: airkeep
+      POSTGRES_PASSWORD: ${AIRKEEP_MIGRATION_PASSWORD:?Generate .env.hosted first}
+      AIRKEEP_RUNTIME_PASSWORD: ${AIRKEEP_RUNTIME_PASSWORD:?Generate .env.hosted first}
+    volumes:
+      - database:/var/lib/postgresql
+      - ./hosted/init-db.sh:/docker-entrypoint-initdb.d/airkeep.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U airkeep_migration -d airkeep']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+  migrate:
+    <<: *backend
+    restart: 'no'
+    environment:
+      AIRKEEP_MIGRATION_DATABASE_URL: postgresql://airkeep_migration:${AIRKEEP_MIGRATION_PASSWORD}@postgres/airkeep
+    command: [python, migrate.py]
+    healthcheck: {disable: true}
+    depends_on:
+      postgres: {condition: service_healthy}
+  api:
+    <<: *backend
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    command: [uvicorn, 'app:create_app', --factory, --host, 0.0.0.0, --port, '8787', --no-access-log, --proxy-headers, '--forwarded-allow-ips=*']
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    networks:
+      default:
+        aliases: [airkeep]
+  worker:
+    <<: *backend
+    command: [python, worker.py]
+    healthcheck:
+      test: [CMD, python, -c, 'import pathlib,time; assert time.time()-pathlib.Path("/tmp/airkeep-worker-health").stat().st_mtime<120']
+      interval: 30s
+      start_period: 30s
+      timeout: 3s
+      retries: 3
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+  web:
+    image: ghcr.io/danohn/airkeep-web:${AIRKEEP_IMAGE_TAG:-hosted-staging}
+    build:
+      context: ..
+      dockerfile: web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      api: {condition: service_healthy}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=32m']
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+  ingress:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      AIRKEEP_HOST: ${AIRKEEP_HOST:-dashboard.airkeep.io}
+    ports: ['80:80', '443:443', '443:443/udp']
+    volumes:
+      - ./hosted/Caddyfile:/etc/caddy/Caddyfile:ro
+      - certificates:/data
+      - caddy-config:/config
+    depends_on:
+      web: {condition: service_started}
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+
+volumes:
+  database:
+  certificates:
+  caddy-config:

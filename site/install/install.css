@@ -29,7 +29,7 @@
 #settings:disabled label { opacity: 0.55; }
 .fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.8rem; }
 .fields label { display: grid; gap: 0.3rem; font-size: 0.9rem; font-weight: 550; }
-.fields input {
+.fields input, .fields select {
   width: 100%;
   min-height: 2.75rem;
   background: var(--surface);

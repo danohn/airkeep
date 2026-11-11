@@ -1,0 +1,7 @@
+{$AIRKEEP_HOST:dashboard.airkeep.io} {
+    encode zstd gzip
+    reverse_proxy web:8080 {
+        header_up X-Forwarded-For {remote_host}
+    }
+    header Strict-Transport-Security "max-age=31536000"
+}

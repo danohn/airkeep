@@ -1,56 +1,12 @@
 """Telemetry parsing and alert rules used by HTTP, MQTT and APNs."""
 from dataclasses import dataclass
-import math
-import time
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+from airkeep.telemetry import Reading as Reading, parse_readings as parse_readings
 
 LIVE_ACTIVITY_DURATION_SECONDS = 8 * 3600
 LIVE_ACTIVITY_UPDATE_SECONDS = 300
 LIVE_ACTIVITY_DELIVERY_GRACE_SECONDS = 60
-
-
-class Reading(BaseModel):
-    amsID: str
-    humidity: float
-    temperature: float | None
-    rawIndex: int | None
-    observedAt: float
-
-
-def parse_readings(payload: dict, now: float | None = None) -> list[Reading]:
-    now = time.time() if now is None else now
-    values = []
-    units = ((payload.get("print") or {}).get("ams") or {}).get("ams") or []
-    if not isinstance(units, list):
-        return []
-    for unit in units:
-        if not isinstance(unit, dict):
-            continue
-        try:
-            # Missing humidity_raw is a delta update, never a zero reading.
-            humidity = float(unit["humidity_raw"])
-            if not math.isfinite(humidity) or not 1 <= humidity <= 100:
-                continue  # Zero is a known boot/sensor fault; do not label it dry.
-            temperature = None
-            if "temp" in unit:
-                try:
-                    temp = float(unit["temp"])
-                    if math.isfinite(temp) and 0 <= temp <= 100:
-                        temperature = temp
-                except (ValueError, TypeError):
-                    pass
-            index = None
-            try:
-                raw = int(unit.get("humidity", 0))
-                if 1 <= raw <= 5:
-                    index = raw
-            except (ValueError, TypeError):
-                pass
-            values.append(Reading(amsID=str(unit["id"]), humidity=humidity,
-                                  temperature=temperature, rawIndex=index, observedAt=now))
-        except (KeyError, ValueError, TypeError):
-            continue
-    return values
 
 
 class AlertRule(BaseModel):
@@ -80,15 +36,21 @@ class NamedAlertInput(AlertRule):
 class AlertState:
     since: float | None = None
     active: bool = False
+    last_observed: float | None = None
 
-    def evaluate(self, rule: AlertRule, reading: Reading | None, now: float, stale: int) -> str | None:
+    def evaluate(self, rule: AlertRule, reading: Reading | None, now: float, stale: int, *, require_continuity=False) -> str | None:
         if not rule.enabled:
             self.since, self.active = None, False
+            self.last_observed = None
             return None
         if reading is None or now - reading.observedAt > stale:
             # An interrupted stream cannot satisfy a continuous hold.
             self.since = None
+            self.last_observed = None
             return None
+        if require_continuity and self.last_observed is not None and reading.observedAt-self.last_observed > stale:
+            self.since = None
+        self.last_observed = reading.observedAt
         if self.active:
             if reading.humidity <= rule.threshold - rule.hysteresis:
                 self.active, self.since = False, None

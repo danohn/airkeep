@@ -26,7 +26,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { api, ApiError, setCsrf, amsName, when, age } from "./api";
+import { api, ApiError, setCsrf, setAccount, amsName, when, age } from "./api";
 import type {
   AlertEvent,
   EventPage,
@@ -37,6 +37,8 @@ import type {
 } from "./api";
 import { AccountLogin, AccountSettings, beginDashboardSignIn, startOIDC } from "./AccountAuth";
 import { clearLegacyBrowserCredentials, finishDashboardAuthorization, type Account } from "./auth";
+import { HostedAccountFlow, hostedAccountPaths } from "./HostedAccounts";
+import { HostedSetup } from "./HostedSetup";
 import { DevicePairing } from "./DevicePairing";
 import "@fontsource/quicksand/latin-700.css";
 import "./style.css";
@@ -52,7 +54,7 @@ type Page =
   | "queue"
   | "accounts"
   | "password";
-type Session = { authenticated: boolean; configured: boolean; csrf?: string; mode?: "oauth"; account?: Account; oidc_label?: string };
+type Session = { authenticated: boolean; configured: boolean; csrf?: string; mode?: "oauth"; account?: Account; oidc_label?: string; hosted?: boolean; public_signup?: boolean };
 type RecordRow = Record<string, unknown>;
 const userPages = [
   ["overview", "Overview", House],
@@ -84,11 +86,15 @@ export function App() {
   const [tick, setTick] = useState(Date.now() / 1000);
   const [sessionError, setSessionError] = useState("");
   const loggedOut = () => {
-    setSession((current) => ({ authenticated: false, configured: true, mode: current?.mode, oidc_label: current?.oidc_label }));
+    setSession((current) => ({ authenticated: false, configured: true, mode: current?.mode, oidc_label: current?.oidc_label, hosted: current?.hosted, public_signup: current?.public_signup }));
     setMode("user");
     setPage("overview");
     if (location.pathname !== "/device") history.replaceState(null, "", "/");
     setCsrf("");
+    setAccount("");
+    setAms("0");
+    setConnectionError("");
+    setRulesError("");
     setSnapshot(null);
     setRules([]);
     setRulesSynced(null);
@@ -97,6 +103,7 @@ export function App() {
   useEffect(() => {
     let mounted = true;
     clearLegacyBrowserCredentials();
+    const accountChanged = () => { loggedOut(); location.reload(); };
     api<Session>("/auth/session")
       .then(async (initial) => {
         if (!mounted) return;
@@ -104,14 +111,19 @@ export function App() {
         if (launchSSO) history.replaceState(null, "", "/");
         let next = initial;
         if (initial.mode === "oauth") {
-          if (mounted) setSession(initial);
-          if (initial.configured && await finishDashboardAuthorization()) {
-            next = await api<Session>("/auth/session");
-          } else if (mounted && launchSSO && initial.configured && initial.oidc_label && !initial.authenticated) {
-            await startOIDC(await beginDashboardSignIn());
+          try {
+            if (initial.configured && await finishDashboardAuthorization()) {
+              next = await api<Session>("/auth/session");
+              if (mounted && location.pathname === "/account") setPage("password");
+            } else if (mounted && launchSSO && initial.configured && initial.oidc_label && !initial.authenticated) {
+              await startOIDC(await beginDashboardSignIn());
+            }
+          } catch (error) {
+            if (mounted) setSessionError((error as Error).message);
           }
         }
         if (mounted) {
+          setAccount(next.account?.id ?? "");
           setSession(next);
           setCsrf(next.csrf || "");
         }
@@ -122,9 +134,11 @@ export function App() {
         }
       });
     window.addEventListener("airkeep:session-ended", loggedOut);
+    window.addEventListener("airkeep:account-changed", accountChanged);
     return () => {
       mounted = false;
       window.removeEventListener("airkeep:session-ended", loggedOut);
+      window.removeEventListener("airkeep:account-changed", accountChanged);
     };
   }, []);
   useEffect(() => {
@@ -140,11 +154,22 @@ export function App() {
       setRulesError((e as Error).message);
     }
   };
+  const publicAccountFlow = session?.hosted && hostedAccountPaths.includes(location.pathname);
   useEffect(() => {
-    if (!session?.authenticated) return;
+    if (!session?.authenticated || publicAccountFlow) return;
     let active = true;
     const load = async () => {
       if (document.hidden) return;
+      if (session.mode === "oauth") {
+        try {
+          const latest = await api<Session>("/auth/session");
+          if (!active) return;
+          if (!latest.authenticated || latest.account?.id !== session.account?.id) {
+            window.dispatchEvent(new Event("airkeep:account-changed"));
+            return;
+          }
+        } catch { return; }
+      }
       try {
         const value = await api<Snapshot>("/v1/snapshot");
         if (active) {
@@ -169,12 +194,14 @@ export function App() {
     void load();
     const t = setInterval(load, 5000);
     document.addEventListener("visibilitychange", load);
+    window.addEventListener("focus", load);
     return () => {
       active = false;
       clearInterval(t);
       document.removeEventListener("visibilitychange", load);
+      window.removeEventListener("focus", load);
     };
-  }, [session?.authenticated]);
+  }, [session?.authenticated, session?.account?.id, publicAccountFlow]);
   const enabledAlerts = rules.filter((rule) => rule.enabled).length;
   const reading = snapshot?.readings.find((r) => r.amsID === ams);
   const stale =
@@ -192,7 +219,7 @@ export function App() {
   };
   useEffect(() => {
     const sync = () => {
-      const value = location.hash.slice(1) as Page;
+      const value = (location.hash.slice(1) || (location.pathname === "/account" ? "password" : "")) as Page;
       if (value === "password" || value === "accounts" || [...userPages, ...adminPages].some((p) => p[0] === value)) {
         setPage(value);
         setMode(value === "accounts" || adminPages.some((p) => p[0] === value) ? "admin" : "user");
@@ -203,12 +230,13 @@ export function App() {
     return () => window.removeEventListener("hashchange", sync);
   }, []);
   const oauth = session?.mode === "oauth";
-  const canAdmin = !oauth || session.account?.role === "admin";
+  const canAdmin = !session?.hosted && (!oauth || session.account?.role === "admin");
   const effectiveMode = canAdmin ? mode : "user";
   const adminPage = adminPages.some(([key]) => key === page);
   const effectivePage = !canAdmin && (adminPage || page === "accounts") ? "overview" : page;
+  if (publicAccountFlow) return <HostedAccountFlow />;
   if (!session?.authenticated && oauth)
-    return <AccountLogin configured={session.configured} error={sessionError} oidcLabel={session.oidc_label} />;
+    return <AccountLogin configured={session.configured} error={sessionError} oidcLabel={session.oidc_label} hosted={session.hosted} publicSignup={session.public_signup} />;
   if (!session?.authenticated)
     return (
       <Login
@@ -226,7 +254,7 @@ export function App() {
       <main className="login"><p>Set up an Airkeep account to pair your display. <a href="/">Back to Airkeep</a></p></main>;
   }
   return (
-    <div className="shell">
+    <div className="shell" key={session.account?.id ?? "local"}>
       <aside className="sidebar">
         <a
           className="brand"
@@ -322,7 +350,7 @@ export function App() {
                 : stale
                   ? "Waiting for fresh data"
                   : snapshot?.printerConnected
-                    ? "Connected locally"
+                    ? session.hosted ? "Connected through relay" : "Connected locally"
                     : "Printer reconnecting"}
             </span>
           </div>
@@ -349,9 +377,10 @@ export function App() {
             {connectionError}
           </p>
         )}
+        {session.hosted && effectivePage === "overview" && <HostedSetup />}
         {oauth && (effectivePage === "password" || effectivePage === "accounts") ? (
           <AccountSettings key={effectivePage} admin={effectivePage === "accounts"} signedOut={loggedOut}
-            oidcLabel={session.oidc_label} localPassword={session.account?.local_password} />
+            oidcLabel={session.oidc_label} localPassword={session.account?.local_password} hosted={session.hosted} />
         ) : effectiveMode === "user" ? (
           <>
             {effectivePage === "overview" && (

@@ -7,6 +7,7 @@ import time
 from typing import Literal
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security.utils import get_authorization_scheme_param
 from pydantic import BaseModel, Field
 
 from accounts import OAuth, install_accounts
@@ -50,6 +51,7 @@ class ActivityRegistration(BaseModel):
 
 
 async def tick(store: Store, settings: Settings, push: APNs, now: float, multiuser=False):
+    hosted = getattr(store, 'hosted', False)
     readings = {r.amsID:r for r in store.readings()}
     store.evaluate_alerts(now,settings.stale_seconds,multiuser)
     # Do not deliver yesterday's threshold event after a long outage/configuration delay.
@@ -61,10 +63,14 @@ async def tick(store: Store, settings: Settings, push: APNs, now: float, multius
     for job in store.rows('''SELECT o.*,d.token,d.topic,d.environment,d.registered_at FROM outbox o
         JOIN devices d ON d.id=o.device JOIN alert_rules r ON r.id=o.rule_id
         WHERE o.next<=? AND d.receive_alerts=1 AND json_extract(r.json,'$.enabled')=1''' + outbox_filter + " LIMIT 25",(now,)):
-        if not store.rows('SELECT 1 FROM outbox o JOIN devices d ON d.id=o.device WHERE o.id=? AND d.receive_alerts=1',(job['id'],)):
-            continue
         if not settings.apns_credentials(job['environment'],job['topic']):
             continue
+        with store.transaction():
+            current = store.rows('''SELECT 1 FROM outbox o JOIN devices d ON d.id=o.device
+                WHERE o.id=? AND d.receive_alerts=1 AND d.token=? AND d.registered_at IS ?''',
+                (job['id'], job['token'], job['registered_at']))
+            if not current or (hosted and not store.claim_delivery('outbox', job['id'])):
+                continue
         result = await send_recorded(store,push,job['token'],job['topic'],job['environment'],json.loads(job['json']),
                                      now=now,kind='alert',destination=job['device'])
         status = result.status or 503
@@ -78,7 +84,8 @@ async def tick(store: Store, settings: Settings, push: APNs, now: float, multius
                             and current['registered_at']==job['registered_at']):
                         store.delete_device(job['device'])
         else:
-            store.execute("UPDATE outbox SET attempts=attempts+1,next=? WHERE id=?",(now+max(min(3600,30*2**job["attempts"]),result.retry_after_seconds or 0),job["id"]))
+            release = ',lease_until=0' if hosted else ''
+            store.execute(f"UPDATE outbox SET attempts=attempts+1,next=?{release} WHERE id=?",(now+max(min(3600,30*2**job["attempts"]),result.retry_after_seconds or 0),job["id"]))
     activity_filter = (" WHERE EXISTS (SELECT 1 FROM registration_owners o WHERE o.kind='activity' AND o.id=activities.id)"
                        if multiuser else "")
     for activity in store.rows("SELECT * FROM activities" + activity_filter):
@@ -87,6 +94,13 @@ async def tick(store: Store, settings: Settings, push: APNs, now: float, multius
             continue
         if not settings.apns_credentials(activity['environment'],settings.ios_topic):
             continue
+        if hosted:
+            with store.transaction():
+                current = store.rows('''SELECT 1 FROM activities WHERE id=? AND token=?
+                    AND registered_at IS ? AND expires=?''',
+                    (activity['id'], activity['token'], activity['registered_at'], activity['expires']))
+                if not current or not store.claim_delivery('activities', activity['id']):
+                    continue
         result = await send_recorded(store,push,activity['token'],settings.ios_topic,activity['environment'],
             activity_payload(readings.get(activity['ams']),now,settings.stale_seconds,end=end,expires_at=activity['expires']),
             now=now,kind='liveactivity',destination=activity['id'])
@@ -94,14 +108,20 @@ async def tick(store: Store, settings: Settings, push: APNs, now: float, multius
         if status == 410 or (status == 200 and end):
             store.execute("DELETE FROM activities WHERE id=? AND token=? AND environment=? AND registered_at IS ?",(activity["id"],activity["token"],activity["environment"],activity["registered_at"]))
         elif status == 200:
-            store.execute("UPDATE activities SET last_sent=? WHERE id=? AND token=? AND environment=? AND registered_at IS ?",(now,activity["id"],activity["token"],activity["environment"],activity["registered_at"]))
+            release = ',lease_until=0' if hosted else ''
+            store.execute(f"UPDATE activities SET last_sent=?{release} WHERE id=? AND token=? AND environment=? AND registered_at IS ?",(now,activity["id"],activity["token"],activity["environment"],activity["registered_at"]))
 
     await tick_widgets(store,settings,push,now,send_recorded,multiuser)
     maintain(store,now)
 
 def create_app(settings: Settings | None = None):
     settings = settings or Settings()
-    store = Store(settings.db_path)
+    hosted = settings.deployment == 'hosted'
+    if hosted:
+        from postgres import PostgresStore
+        store = PostgresStore(settings.database_url.get_secret_value())
+    else:
+        store = Store(settings.db_path)
     if not settings.jwt_signing_key and store.rows("SELECT 1 FROM config WHERE id='accounts_enabled'"):
         store.close()
         raise RuntimeError('Set the JWT signing key to start a relay with accounts.')
@@ -127,13 +147,14 @@ def create_app(settings: Settings | None = None):
             if not settings.printer_ip or not settings.printer_serial or not settings.printer_code:
                 raise RuntimeError("Set printer IP, serial and LAN access code in .env")
             collector.start()
-        task = asyncio.create_task(monitor())
+        task = None if hosted else asyncio.create_task(monitor())
         yield
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
         if collector:
             collector.stop()
         await push.close()
@@ -144,18 +165,46 @@ def create_app(settings: Settings | None = None):
     security = HTTPBearer(auto_error=False)
     browser = BrowserAuth(store,settings)
 
-    def connection(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)):
+    def resolve_connection(request):
         if not oauth:
             raise HTTPException(401, 'Sign in to Airkeep.')
         if 'authorization' in request.headers:
-            if credentials is None:
+            scheme, token = get_authorization_scheme_param(request.headers['authorization'])
+            if scheme.lower() != 'bearer' or not token:
                 raise HTTPException(401, 'Sign in to Airkeep.')
-            return oauth.authenticate(credentials.credentials)
+            return oauth.authenticate(token)
         return oauth.browser_session(request)
+
+    if hosted:
+        from postgres import tenant_id
+        from starlette.concurrency import run_in_threadpool
+
+        @app.middleware('http')
+        async def tenant_scope(request: Request, call_next):
+            context = tenant_id.set('')
+            try:
+                try:
+                    identity = await run_in_threadpool(resolve_connection, request)
+                except HTTPException as error:
+                    request.state.airkeep_identity = error
+                else:
+                    request.state.airkeep_identity = identity
+                    tenant_id.set(identity.user)
+                return await call_next(request)
+            finally:
+                tenant_id.reset(context)
+
+    def connection(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)):
+        if hosted:
+            identity = request.state.airkeep_identity
+            if isinstance(identity, HTTPException):
+                raise identity
+            return identity
+        return resolve_connection(request)
 
     def principal(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)):
         identity = connection(request, credentials)
-        if identity.client == 'esp32':
+        if identity.client not in ('dashboard', 'apple-ios', 'apple-mac', 'watch'):
             raise HTTPException(403, 'This display connection is limited to live readings.')
         return identity
 
@@ -171,6 +220,8 @@ def create_app(settings: Settings | None = None):
         return authorize_user(request, credentials)
 
     def admin(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)):
+        if hosted:
+            raise HTTPException(403, 'Use the hosted operator command for platform administration.')
         if not oauth:
             return browser.require(request)
         identity = principal(request, credentials)
@@ -234,6 +285,11 @@ def create_app(settings: Settings | None = None):
         install_accounts(app,oauth,principal,admin,connection)
         if settings.oidc_issuer:
             install_oidc(app, oauth, settings, admin)
+    if hosted:
+        from hosted_accounts import install_hosted_accounts
+        from hosted_ingest import install_ingest
+        app.state.hosted_accounts = install_hosted_accounts(app, oauth, settings, principal)
+        install_ingest(app, store, principal)
 
     @app.put('/v2/widgets/{installation_id}')
     def register_widgets(installation_id: str, body: WidgetRegistration, identity=Depends(watch)):
@@ -256,13 +312,18 @@ def create_app(settings: Settings | None = None):
 
     @app.get("/health")
     def health():
+        if hosted:
+            store.rows('SELECT 1')
         return {"ok":True}
 
     @app.get("/v1/snapshot")
     def snapshot(identity=Depends(snapshot_access)):
         now = time.time()
+        connected = bool(collector and collector.connected)
+        if hosted:
+            connected = store.printer_connected(now)
         value = {"serverTime":now,"staleAfter":settings.stale_seconds,
-                 "printerConnected":bool(collector and collector.connected),
+                 "printerConnected":connected,
                  "readings":store.readings()}
         if not oauth:
             value.update(pushConfigured=settings.apns_ready,alertRule=store.rule(),alertActive=store.alert().active)

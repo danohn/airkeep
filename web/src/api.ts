@@ -8,6 +8,11 @@ export class ApiError extends Error {
 }
 let csrf = "";
 let sessionGeneration = 0;
+let account = "";
+export function setAccount(value: string) {
+  if (account !== value) sessionGeneration++;
+  account = value;
+}
 export function setCsrf(value: string) {
   sessionGeneration++;
   csrf = value;
@@ -23,6 +28,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
       headers: {
         "Content-Type": "application/json",
         ...(csrf ? { "X-Airkeep-CSRF": csrf } : {}),
+        ...(account && path !== "/auth/session" ? { "X-Airkeep-Account": account } : {}),
         ...init.headers,
       },
     });
@@ -31,6 +37,9 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
       0,
       "Could not reach your relay. Reconnect and try again.",
     );
+  }
+  if (response.headers.get("X-Airkeep-Account-Changed") === "1" && requestGeneration === sessionGeneration) {
+    window.dispatchEvent(new Event("airkeep:account-changed"));
   }
   if (!response.ok) {
     const detail = await response.json().catch(() => ({}));
@@ -46,7 +55,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
               : "Please try again.";
     if (
       response.status === 401 &&
-      !["/auth/login", "/auth/credentials", "/auth/password"].includes(path) &&
+      !["/auth/login", "/auth/credentials", "/auth/password", "/auth/account"].includes(path) &&
       requestGeneration === sessionGeneration
     )
       window.dispatchEvent(new Event("airkeep:session-ended"));
@@ -55,7 +64,11 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (requestGeneration !== sessionGeneration) {
     throw new ApiError(409, "The connection changed. Reload before continuing.");
   }
-  return response.status === 204 ? (undefined as T) : response.json();
+  const value = response.status === 204 ? (undefined as T) : await response.json();
+  if (requestGeneration !== sessionGeneration) {
+    throw new ApiError(409, "The connection changed. Reload before continuing.");
+  }
+  return value;
 }
 export type Reading = {
   amsID: string;

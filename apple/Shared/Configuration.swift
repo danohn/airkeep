@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import Security
 import LocalAuthentication
 
@@ -9,13 +10,18 @@ enum SharedConfiguration {
         return value
     }
     static var defaults: UserDefaults { UserDefaults(suiteName: group) ?? .standard }
+    static let hostedEndpoint = "https://dashboard.airkeep.io"
     static var endpoint: String {
-        get { defaults.string(forKey: "relayURL") ?? "" }
+        get { defaults.string(forKey: "relayURL") ?? hostedEndpoint }
         set { defaults.set(newValue, forKey: "relayURL") }
     }
+    // Credential identity separates accounts that sign in at the same relay origin.
+    static func accountKey(endpoint: String, token: String = TokenStore.read()) -> String {
+        SHA256.hash(data: Data("\(endpoint)\n\(token)".utf8)).map { String(format: "%02x", $0) }.joined()
+    }
     static var amsID: String {
-        get { defaults.string(forKey: "amsID") ?? "0" }
-        set { defaults.set(newValue, forKey: "amsID") }
+        get { defaults.string(forKey: "amsID.\(accountKey(endpoint: endpoint))") ?? "0" }
+        set { defaults.set(newValue, forKey: "amsID.\(accountKey(endpoint: endpoint))") }
     }
     static var environment: String {
         #if DEBUG
@@ -34,30 +40,39 @@ enum SharedConfiguration {
         set { defaults.set(newValue, forKey: "deviceID") }
     }
     static func cachedRules(endpoint: String) -> AlertRulesCache? {
-        guard let data = defaults.data(forKey: "alertRules.\(endpoint)") else { return nil }
+        guard let data = defaults.data(forKey: "alertRules.\(accountKey(endpoint: endpoint))") else { return nil }
         return try? JSONDecoder().decode(AlertRulesCache.self, from: data)
     }
     static func cacheRules(_ cache: AlertRulesCache, endpoint: String) {
-        if let data = try? JSONEncoder().encode(cache) { defaults.set(data, forKey: "alertRules.\(endpoint)") }
+        if let data = try? JSONEncoder().encode(cache) { defaults.set(data, forKey: "alertRules.\(accountKey(endpoint: endpoint))") }
     }
     static func receiveAlertsIntent(endpoint: String) -> Bool? {
-        defaults.object(forKey: "receiveAlerts.\(endpoint)") as? Bool
+        defaults.object(forKey: "receiveAlerts.\(accountKey(endpoint: endpoint))") as? Bool
     }
     static func saveReceiveAlertsIntent(_ enabled: Bool, endpoint: String) {
-        defaults.set(enabled, forKey: "receiveAlerts.\(endpoint)")
+        defaults.set(enabled, forKey: "receiveAlerts.\(accountKey(endpoint: endpoint))")
     }
     static func clearAccountData(endpoint: String) {
+        defaults.removeObject(forKey: "cachedReading.\(accountKey(endpoint: endpoint))")
+        defaults.removeObject(forKey: "amsID.\(accountKey(endpoint: endpoint))")
+        // Remove unscoped data from releases predating account isolation.
+        defaults.removeObject(forKey: "cachedReading")
+        defaults.removeObject(forKey: "amsID")
         defaults.removeObject(forKey: "alertRules.\(endpoint)")
         defaults.removeObject(forKey: "receiveAlerts.\(endpoint)")
+        defaults.removeObject(forKey: "alertRules.\(accountKey(endpoint: endpoint))")
+        defaults.removeObject(forKey: "receiveAlerts.\(accountKey(endpoint: endpoint))")
     }
     static var cached: Reading? {
         get {
-            guard let data = defaults.data(forKey: "cachedReading") else { return nil }
+            guard let data = defaults.data(forKey: "cachedReading.\(accountKey(endpoint: endpoint))") else { return nil }
             return try? JSONDecoder().decode(Reading.self, from: data)
         }
-        set {
-            defaults.set(try? JSONEncoder().encode(newValue), forKey: "cachedReading")
-        }
+        set { cacheReading(newValue, endpoint: endpoint, token: TokenStore.read()) }
+    }
+    static func cacheReading(_ reading: Reading?, endpoint: String, token: String) {
+        let key = "cachedReading.\(accountKey(endpoint: endpoint, token: token))"
+        defaults.set(try? JSONEncoder().encode(reading), forKey: key)
     }
 }
 

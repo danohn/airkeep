@@ -7,6 +7,7 @@ struct RelayClient: Sendable {
         self.endpoint = endpoint
         self.token = token
     }
+    var isCurrent: Bool { endpoint == SharedConfiguration.endpoint && token == TokenStore.read() }
     func request(_ path: String, method: String = "GET", body: Data? = nil, revision: Int? = nil) async throws -> Data {
         let (data, http) = try await response(path, method: method, body: body, revision: revision)
         guard (200..<300).contains(http.statusCode) else { throw RelayError.http(http.statusCode) }

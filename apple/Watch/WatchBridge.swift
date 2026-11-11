@@ -25,7 +25,7 @@ extension Notification.Name { static let airkeepWatchChanged = Notification.Name
         }
         if let snapshot, let current = try? storage.connection(), current.linkID == linkID,
            let value = try? JSONDecoder().decode(Snapshot.self, from: snapshot) {
-            try? storage.cache(value, endpoint: current.endpoint)
+            _ = try? storage.cache(value, endpoint: current.endpoint, connection: current)
         }
         WidgetCenter.shared.reloadAllTimelines()
         NotificationCenter.default.post(name: .airkeepWatchChanged, object: nil)

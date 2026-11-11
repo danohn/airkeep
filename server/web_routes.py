@@ -39,7 +39,8 @@ async def send_recorded(store, push, token, topic, environment, payload, *, now,
 
 
 def maintain(store, now):
-    store.execute('DELETE FROM web_sessions WHERE expires<=?', (now,))
+    if not getattr(store, 'hosted', False):
+        store.execute('DELETE FROM web_sessions WHERE expires<=?', (now,))
     store.execute('DELETE FROM alert_events WHERE at<?', (now-7*86400,))
     store.execute('DELETE FROM push_attempts WHERE at<?', (now-7*86400,))
     store.execute('DELETE FROM push_attempts WHERE id NOT IN (SELECT id FROM push_attempts ORDER BY id DESC LIMIT 10000)')
@@ -93,7 +94,7 @@ def events_page(store, *, ams=None, rule_id=None, cursor=None, limit=50,owner=No
         next_cursor = base64.urlsafe_b64encode(json.dumps([last['at'],last['id']]).encode()).decode()
     current={rule['id']:rule for rule in store.rules(owner)}
     known={identifier:{'id':identifier,'name':rule['name'],'deleted':False} for identifier,rule in current.items()}
-    event_rules=store.rows("SELECT rule_id,json_extract(json,'$.name') AS name,MAX(at) FROM alert_events WHERE at>=? AND owner_id IS ? GROUP BY rule_id",(time.time()-7*86400,owner))
+    event_rules=store.rows("SELECT rule_id,json_extract(json,'$.name') AS name FROM alert_events WHERE at>=? AND owner_id IS ? ORDER BY at DESC",(time.time()-7*86400,owner))
     for row in event_rules:
         known.setdefault(row['rule_id'],{'id':row['rule_id'],'name':row['name'],'deleted':True})
     units={reading.amsID for reading in store.readings()} | {rule['amsID'] for rule in current.values()}
@@ -125,8 +126,10 @@ def install_web(app, store, settings, auth, authorize_user, collector, admin, oa
         def status(request: Request):
             from accounts import account_details
 
-            configured = bool(store.rows('SELECT 1 FROM accounts LIMIT 1'))
+            configured = getattr(store, 'hosted', False) or bool(store.rows('SELECT 1 FROM accounts LIMIT 1'))
             result = {'authenticated': False, 'configured': configured, 'mode': 'oauth'}
+            if getattr(store, 'hosted', False):
+                result.update(hosted=True, public_signup=settings.public_signup)
             if configured and settings.oidc_issuer:
                 result['oidc_label'] = settings.oidc_label
             try:

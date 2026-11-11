@@ -96,8 +96,17 @@ int main(int argc,char **argv)
         return 0;
     }
     if (argc > 1 && !strcmp(argv[1], "--test-pairing")) {
+        airkeep_reading_t previous = {.humidity=75, .temperature=30, .sampled_us=now_us};
+        airkeep_ui_reading(&previous);
+        lv_tick_inc(1000); lv_timer_handler();
+        assert(has_label(lv_screen_active(), "75"));
+        airkeep_ui_reading(&previous); // Queued telemetry from the former account.
+        airkeep_ui_status("Old account status");
         airkeep_ui_pairing(AIRKEEP_UNPAIRED, "Pair this display", NULL, NULL, NULL);
         lv_tick_inc(1000); lv_timer_handler();
+        assert(!has_label(lv_screen_active(), "75"));
+        assert(!has_label(lv_screen_active(), "Old account status"));
+        assert(has_label(lv_screen_active(), "Waiting for readings"));
         lv_indev_t *input = lv_indev_create();
         lv_indev_set_type(input, LV_INDEV_TYPE_POINTER);
         lv_indev_set_read_cb(input, read_pointer);

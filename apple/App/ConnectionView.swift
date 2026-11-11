@@ -5,6 +5,7 @@ struct ConnectionView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var endpoint = SharedConfiguration.endpoint
     @State private var initialEndpoint = SharedConfiguration.endpoint
+    @State private var hosted = SharedConfiguration.endpoint == SharedConfiguration.hostedEndpoint
     @State private var error: String?
     @State private var saving = false
     @State private var discard = false
@@ -12,13 +13,20 @@ struct ConnectionView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Airkeep relay") {
+                Section("Airkeep connection") {
+                    Toggle("Use Airkeep hosted service", isOn: $hosted)
+                        .onChange(of: hosted) { _, enabled in
+                            if enabled { endpoint = SharedConfiguration.hostedEndpoint }
+                            else if endpoint == SharedConfiguration.hostedEndpoint { endpoint = "" }
+                        }
+                    if !hosted {
                     TextField("Relay URL", text: $endpoint).textContentType(.URL)
                         #if os(iOS)
                         .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                         #endif
                     Text("Enter your relay's HTTPS address, such as https://airkeep.example.com.")
                         .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
                 Section("Privacy") {
                     Text("Airkeep keeps your sign-in in Keychain.")
@@ -49,10 +57,7 @@ struct ConnectionView: View {
                                 let tokens = try await signIn.signIn(endpoint: url, installation: installation)
                                 let marker = RelayOAuth.marker(tokens.grant_id)
                                 _ = try await RelayClient(endpoint: url, token: marker).snapshot()
-                                if previous.token.hasPrefix("oauth:"), previous.token != marker {
-                                    _ = try? await previous.request("auth/revoke", method: "POST")
-                                    try? TokenStore.delete(account: previous.token)
-                                }
+                                guard previous.isCurrent else { throw RelayClient.RelayError.connectionChanged }
                                 SharedConfiguration.clearAccountData(endpoint: previous.endpoint)
                                 try TokenStore.save(marker)
                                 SharedConfiguration.deviceID = installation
@@ -60,9 +65,13 @@ struct ConnectionView: View {
                                 model.demo = false
                                 model.connectionChanged()
                                 #if os(iOS)
-                                if previous.token != marker { await LiveMonitor.shared.stopAll(relay: previous) }
                                 WatchCompanion.shared.clearConnection()
+                                await LiveMonitor.shared.stopAll(relay: previous)
                                 #endif
+                                if previous.token.hasPrefix("oauth:"), previous.token != marker {
+                                    _ = try? await previous.request("auth/revoke", method: "POST")
+                                    try? TokenStore.delete(account: previous.token)
+                                }
                                 await model.refresh(forceHistory: true)
                                 await model.alertRules.refresh()
                                 await NotificationManager.shared.refresh()

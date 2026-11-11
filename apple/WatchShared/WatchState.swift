@@ -200,10 +200,15 @@ final class WatchStorage: @unchecked Sendable {
                 }
                 if let old = state.endpoint {
                     if old != connection.endpoint { suspend(endpoint: old, state: &state) }
-                    if let previous = try credentials.read(old), previous.token != connection.token {
+                    if let previous = try credentials.read(old), previous != connection {
                         state.rules.removeValue(forKey: old)
                         state.snapshot.removeValue(forKey: old)
-                        if previous.token.hasPrefix("oauth:") { try? TokenStore.delete(account: previous.token) }
+                        state.history = state.history.filter { !$0.key.hasPrefix(old + "|") }
+                        state.selectedAMS = message.amsID
+                        if old == connection.endpoint {
+                            state.registrations.removeValue(forKey: old)
+                            if previous.token.hasPrefix("oauth:") { try? TokenStore.delete(account: previous.token) }
+                        }
                     }
                 }
                 try credentials.save(connection)
@@ -217,6 +222,7 @@ final class WatchStorage: @unchecked Sendable {
                     }
                     state.rules.removeValue(forKey: endpoint)
                     state.snapshot.removeValue(forKey: endpoint)
+                    state.history = state.history.filter { !$0.key.hasPrefix(endpoint + "|") }
                     suspend(endpoint: endpoint, state: &state)
                 }
                 state.endpoint = nil
@@ -308,8 +314,11 @@ final class WatchStorage: @unchecked Sendable {
         }
     }
     func selectAMS(_ amsID: String) throws { try transaction { $0.selectedAMS = amsID } }
-    @discardableResult func cache(_ snapshot: Snapshot, endpoint: String) throws -> Bool {
+    @discardableResult func cache(_ snapshot: Snapshot, endpoint: String, connection: WatchConnection? = nil) throws -> Bool {
         let changed = try transaction { state in
+            if let connection {
+                guard state.endpoint == endpoint, try credentials.read(endpoint) == connection else { return false }
+            }
             if let previous = state.snapshot[endpoint], previous.snapshot.serverTime > snapshot.serverTime { return false }
             let previousIDs = Set(state.snapshot[endpoint]?.snapshot.readings.map(\.amsID) ?? [])
             state.snapshot[endpoint] = .init(snapshot: snapshot, fetchedAt: .now)
@@ -320,12 +329,22 @@ final class WatchStorage: @unchecked Sendable {
         #endif
         return changed
     }
-    func cache(rules: [ManagedAlertRule], endpoint: String) throws {
-        try transaction { $0.rules[endpoint] = .init(rules: rules, syncedAt: .now) }
+    func cache(rules: [ManagedAlertRule], endpoint: String, connection: WatchConnection? = nil) throws {
+        try transaction { state in
+            if let connection {
+                guard state.endpoint == endpoint, try credentials.read(endpoint) == connection else { return }
+            }
+            state.rules[endpoint] = .init(rules: rules, syncedAt: .now)
+        }
     }
     static func historyKey(endpoint: String, ams: String, hours: Int) -> String { "\(endpoint)|\(ams)|\(hours)" }
-    func cache(history: [Reading], endpoint: String, ams: String, hours: Int) throws {
-        try transaction { $0.history[Self.historyKey(endpoint: endpoint, ams: ams, hours: hours)] = .init(readings: history, fetchedAt: .now) }
+    func cache(history: [Reading], endpoint: String, ams: String, hours: Int, connection: WatchConnection? = nil) throws {
+        try transaction { state in
+            if let connection {
+                guard state.endpoint == endpoint, try credentials.read(endpoint) == connection else { return }
+            }
+            state.history[Self.historyKey(endpoint: endpoint, ams: ams, hours: hours)] = .init(readings: history, fetchedAt: .now)
+        }
     }
 }
 
