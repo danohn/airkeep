@@ -12,6 +12,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     commands.add_parser('health')
+    commands.add_parser('deletion-ledger')
     suspend = commands.add_parser('suspend')
     suspend.add_argument('account_id')
     arguments = parser.parse_args()
@@ -23,6 +24,9 @@ def main():
                       for name in ('accounts', 'relay_credentials', 'hosted_email_outbox')}
             counts['serverTime'] = time.time()
             print(json.dumps(counts))
+        elif arguments.command == 'deletion-ledger':
+            rows = store.rows('SELECT account_id,deleted_at FROM account_deletions ORDER BY deleted_at,account_id')
+            print(json.dumps([dict(row) for row in rows]))
         else:
             with store.tenant(arguments.account_id), store.transaction():
                 result = store.execute('UPDATE accounts SET disabled=1,version=version+1 WHERE id=?',

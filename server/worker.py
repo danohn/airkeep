@@ -42,13 +42,19 @@ async def run():
                         now = time.time()
                         try:
                             oauth.maintain(now)
+                            failed = False
                             for row in store.rows('SELECT id FROM accounts WHERE disabled=0 ORDER BY id'):
-                                with store.tenant(row['id']):
-                                    await tick(store, settings, push, now, True)
-                                    store.execute('DELETE FROM samples WHERE at<?', (now-7*86400,))
-                                    store.execute('DELETE FROM ingest_events WHERE at<?', (now-7*86400,))
+                                try:
+                                    with store.tenant(row['id']):
+                                        await tick(store, settings, push, now, True)
+                                        store.execute('DELETE FROM samples WHERE at<?', (now-7*86400,))
+                                        store.execute('DELETE FROM ingest_events WHERE at<?', (now-7*86400,))
+                                except Exception:
+                                    failed = True
+                                    log.exception('Tenant background iteration failed')
                             await accounts.tick()
-                            health.touch()
+                            if not failed:
+                                health.touch()
                         except Exception:
                             log.exception('Hosted worker iteration failed')
                         await asyncio.sleep(5)

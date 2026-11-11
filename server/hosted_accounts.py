@@ -183,6 +183,8 @@ class HostedAccounts:
             current = lock_account(self.store, identity.user)
             if not current or current['version'] != account['version'] or not self.oauth.active(identity.grant):
                 raise HTTPException(409, 'Your account changed. Sign in again.')
+            db.execute('INSERT INTO account_deletions(account_id,deleted_at) VALUES(?,?) ON CONFLICT DO NOTHING',
+                       (identity.user, time.time()))
             revoke_user(self.store, identity.user)
             cancel_links(db, identity.user)
             with self.store.tenant(identity.user):

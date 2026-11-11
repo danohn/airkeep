@@ -12,6 +12,8 @@
 !server/pyproject.toml
 !server/uv.lock
 !server/bambu-ca.pem
+!server/migrations/
+!server/migrations/*.sql
 !web/
 !web/Dockerfile
 !web/nginx/

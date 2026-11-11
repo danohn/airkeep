@@ -39,7 +39,8 @@ async def send_recorded(store, push, token, topic, environment, payload, *, now,
 
 
 def maintain(store, now):
-    store.execute('DELETE FROM web_sessions WHERE expires<=?', (now,))
+    if not getattr(store, 'hosted', False):
+        store.execute('DELETE FROM web_sessions WHERE expires<=?', (now,))
     store.execute('DELETE FROM alert_events WHERE at<?', (now-7*86400,))
     store.execute('DELETE FROM push_attempts WHERE at<?', (now-7*86400,))
     store.execute('DELETE FROM push_attempts WHERE id NOT IN (SELECT id FROM push_attempts ORDER BY id DESC LIMIT 10000)')
