@@ -81,17 +81,28 @@ DO $$ BEGIN
         RAISE EXCEPTION 'A restored tenant table lacks forced row security';
     END IF;
 END $$;
+-- Exercise the policy even if the backup has no observations. Roll back the probe and grants.
+BEGIN;
+SELECT set_config('airkeep.restore_probe', gen_random_uuid()::text, true) AS probe \gset
+INSERT INTO public.accounts(id,username,hash) VALUES (:'probe', :'probe' || '@example.invalid', '!');
+INSERT INTO airkeep_data.printers(tenant_id,id) VALUES (:'probe', 'restore-probe');
+INSERT INTO airkeep_data.samples(tenant_id,printer_id,ams,at,json)
+VALUES (:'probe', 'restore-probe', '0', 0, '{}');
 GRANT USAGE ON SCHEMA airkeep_data TO airkeep_runtime;
 GRANT SELECT ON airkeep_data.samples TO airkeep_runtime;
-SET ROLE airkeep_runtime;
+SET LOCAL ROLE airkeep_runtime;
 DO $$ BEGIN
     IF EXISTS (SELECT FROM airkeep_data.samples) THEN
         RAISE EXCEPTION 'Unscoped runtime role can read restored samples';
     END IF;
+    PERFORM set_config('airkeep.tenant_id', current_setting('airkeep.restore_probe'), true);
+    IF (SELECT count(*) FROM airkeep_data.samples) <> 1 THEN
+        RAISE EXCEPTION 'Scoped runtime role could not read exactly its probe sample';
+    END IF;
 END $$;
-RESET ROLE;
+ROLLBACK;
 SQL
-printf 'Verified isolated restore, deletion state, and unscoped runtime sample visibility.\n'
+printf 'Verified isolated restore, deletion state, and scoped runtime sample visibility.\n'
 if [[ "$keep" == true ]]; then
   retain=true
   printf 'Isolated recovery container: %s\nRecovery volume: %s\n' "$container" "$volume"

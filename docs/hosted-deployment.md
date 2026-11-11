@@ -105,7 +105,7 @@ Account deletion removes live records and commits an account ID and deletion tim
 
 ## Isolated restore and recovery
 
-On the recovery VPS, use the encrypted dump, the latest verified ledger and the private identity. The restore script starts a fresh PostgreSQL 18 container with networking disabled and a temporary volume. It replays the supplied ledger, verifies that deleted accounts are absent, checks forced row security, and verifies that an unscoped runtime role cannot read samples. It removes the temporary container and volume at the end. There is no API, worker, ingress or external notification delivery in the drill. [PostgreSQL restore options](https://www.postgresql.org/docs/18/app-pgrestore.html)
+On the recovery VPS, use the encrypted dump, the latest verified ledger and the private identity. The restore script starts a fresh PostgreSQL 18 container with networking disabled and a temporary volume. It replays the supplied ledger, verifies that deleted accounts are absent, checks forced row security, and verifies scoped and unscoped runtime reads using a sample that is rolled back after the check. It removes the temporary container and volume at the end. There is no API, worker, ingress or external notification delivery in the drill. [PostgreSQL restore options](https://www.postgresql.org/docs/18/app-pgrestore.html)
 
 ```bash
 scripts/restore-hosted.sh "$archive" "$age_identity" --deletions "$latest_ledger"
