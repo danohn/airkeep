@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0e0f0f">
+  <title>Privacy notice — Airkeep</title>
+  <meta name="description" content="How hosted Airkeep uses, retains, and deletes account and printer data.">
+  <link rel="canonical" href="https://airkeep.io/privacy/">
+  <link rel="icon" href="../assets/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="../">
+        <img src="../assets/mark.svg" width="33" height="33" alt="">
+        <span>Airkeep</span>
+      </a>
+      <nav aria-label="Main navigation">
+        <a href="https://dashboard.airkeep.io/">Sign in</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="container privacy-notice" tabindex="-1">
+    <h1>Privacy notice</h1>
+    <p>Airkeep operates the hosted service at dashboard.airkeep.io and this website. For privacy questions or requests about your data, email <a href="mailto:hello@airkeep.io">hello@airkeep.io</a>.</p>
+
+    <section aria-labelledby="collection-title">
+      <h2 id="collection-title">Data Airkeep collects</h2>
+      <ul>
+        <li><strong>Account data.</strong> Airkeep stores your email address, account ID and a password hash to sign you in, verify your email and reset your password.</li>
+        <li><strong>Printer data.</strong> Your LAN agent sends AMS identifiers, humidity and temperature readings, the humidity index, observation times and printer connectivity status. Airkeep uses this data to show your readings and history and evaluate your alert rules. The printer’s local IP address, serial number, LAN access code and raw MQTT messages stay on your network.</li>
+        <li><strong>Connection and security data.</strong> Airkeep uses installation IDs, pairing and session records, and security metadata to manage access and limit abusive requests. Rate limits for hosted email and sign-in use keyed hashes of the relevant email address or IP address.</li>
+      </ul>
+      <p>Authorized Airkeep administrators can access account and service diagnostic data on the hosting server to operate the service, investigate faults and resolve support issues.</p>
+      <p>The public landing page uses Plausible Analytics to count visits and understand how people reach the site.</p>
+    </section>
+
+    <section aria-labelledby="delivery-title">
+      <h2 id="delivery-title">Email and optional Apple push</h2>
+      <p>Twilio Email receives your email address and the one-time verification or password-reset link when Airkeep sends an account email.</p>
+      <p>If you enable push features on an Apple device, Airkeep stores its push token and sends it to Apple Push Notification service along with the information needed to deliver alerts, Live Activity updates or Watch widget refreshes. Hosted humidity alerts use generic notification text. You can turn off push features in the app or in your device settings.</p>
+    </section>
+
+    <section aria-labelledby="retention-title">
+      <h2 id="retention-title">Retention and deletion</h2>
+      <p>Airkeep keeps hosted history and alert events for seven days. The latest reading can remain visible with its original timestamp until it is replaced or you remove the printer connection or account. The LAN agent can keep readings waiting to upload for up to 24 hours on your computer.</p>
+      <p>To delete your account, sign in to <a href="https://dashboard.airkeep.io/account">account settings</a> and confirm deletion with your password. Airkeep revokes connected sessions and device access and removes your account and printer data from the live service.</p>
+      <p>Airkeep keeps encrypted backups on the hosting server for up to 30 days. Deleted data can remain in a backup until it expires. Airkeep keeps a record of the deleted account ID and time of deletion for up to 31 days and reapplies recorded deletions when restoring a backup.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <a class="brand" href="../">
+        <img src="../assets/mark.svg" width="26" height="26" alt="">
+        <span>Airkeep</span>
+      </a>
+      <div>
+        <a href="https://github.com/danohn/airkeep">GitHub</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

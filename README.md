@@ -2,13 +2,27 @@
 
 ![Airkeep. Care for every spool.](design/brand/github/readme-banner.png)
 
-[Visit the Airkeep website](https://airkeep.io/).
+[Create an Airkeep account](https://dashboard.airkeep.io/signup) · [Sign in](https://dashboard.airkeep.io/) · [Airkeep website](https://airkeep.io/)
 
-Airkeep tracks humidity and temperature inside a Bambu Lab P2S's AMS. Check readings and history on your Apple devices, in a browser or on a Waveshare AMOLED desk display. Shared humidity alerts and iPhone Live Activities help you keep an eye on it while the app is closed.
+Airkeep tracks humidity and temperature inside a Bambu Lab P2S's AMS. Check live readings and seven days of history in a browser, see readings on your Apple devices or on a Waveshare AMOLED desk display, and get alerts when humidity stays high.
 
-Airkeep collects readings from one P2S over local MQTT and keeps seven days of history. Use a [self-hosted relay](docs/docker-deployment.md) for a private dashboard and API, or run a [LAN agent](agent/README.md) to send readings to the hosted service. The relay or hosted worker checks alert rules while the clients are closed. See the [architecture guide](docs/architecture.md) and [hosted deployment runbook](docs/hosted-deployment.md).
+## Set up Airkeep
 
-AMS humidity describes the air around the filament.
+Both setups connect to one printer from an always-on computer on the same network. Have the printer's LAN IP address, serial number and LAN access code ready.
+
+### Use hosted Airkeep
+
+1. [Create an Airkeep account](https://dashboard.airkeep.io/signup) and follow the email link to verify your address and set a password.
+2. With [uv installed](https://docs.astral.sh/uv/getting-started/installation/), run `uvx airkeep` on the printer's network. Open the local setup link it prints and enter the printer details.
+3. Follow the pairing link, sign in to the dashboard, and approve the code shown in setup.
+
+The [LAN agent](agent/README.md) sends readings to the hosted dashboard and keeps the printer credentials on your network. The hosted service checks alert rules while your apps are closed. Read the [hosted privacy notice](https://airkeep.io/privacy/) for details about account and printer data.
+
+### Self-host with Docker
+
+Follow [Docker deployment](docs/docker-deployment.md) to run your own dashboard and relay. The relay collects readings over local MQTT, stores history, and evaluates alerts. The guide covers account setup, persistent storage, HTTPS and optional APNs keys. Clients on other devices need a reachable HTTPS address with a trusted certificate. Keep the printer's MQTT port private.
+
+See the [architecture guide](docs/architecture.md) and [hosted deployment runbook](docs/hosted-deployment.md) for how the two setups work.
 
 ## Where to use it
 
@@ -22,6 +36,8 @@ AMS humidity describes the air around the filament.
 
 ## Screenshots
 
+![Airkeep web dashboard with AMS humidity, temperature and seven-day history](docs/screenshots/web-dashboard.png)
+
 | iPhone app | Mac app |
 | --- | --- |
 | <img src="docs/screenshots/ios-simulator.png" alt="Airkeep iPhone dashboard with AMS humidity and history" width="300"> | <img src="docs/screenshots/macos-dashboard.png" alt="Airkeep Mac dashboard with live AMS humidity and history" width="300"> |
@@ -29,16 +45,6 @@ AMS humidity describes the air around the filament.
 | Apple Watch | ESP32 display | Mac menu bar |
 | --- | --- | --- |
 | <img src="docs/screenshots/watch-dashboard.png" alt="Airkeep Watch app with AMS humidity, temperature and history navigation" width="240"> | <img src="docs/screenshots/esp32-lvgl.png" alt="Airkeep ESP32 dashboard with humidity, temperature and history" width="240"> | <img src="docs/screenshots/macos-menubar.png" alt="Airkeep menu-bar popover with live humidity, temperature and reading age" width="240"> |
-
-### Web overview
-
-![Airkeep web dashboard with AMS humidity, temperature and seven-day history](docs/screenshots/web-dashboard.png)
-
-## Set up the relay
-
-Run the relay on an always-on host that can reach the printer's LAN. You'll need the printer's address, serial number and LAN access code, plus an Airkeep account to sign in or pair a display.
-
-Follow [Docker deployment](docs/docker-deployment.md) to configure and start it. The guide covers persistent storage, HTTPS and optional APNs keys. Clients on other devices need a reachable HTTPS address with a trusted certificate. Keep the printer's MQTT port private.
 
 ## Build the Apple apps
 
@@ -51,7 +57,7 @@ open apple/Airkeep.xcodeproj
 
 Set your team and bundle prefix in `Local.xcconfig`, then select `Airkeep-iOS`, `Airkeep-macOS` or `Airkeep-watchOS`. The iOS app includes the Watch companion. [Apple setup](docs/apple-setup.md) covers signing, shared storage, push entitlements and project regeneration with XcodeGen.
 
-In Settings → Relay, enter the relay's HTTPS URL and sign in with your username and password. Credentials are stored in Keychain. For a UI preview, launch with `--demo`.
+In Settings → Relay, enter `https://dashboard.airkeep.io` for hosted Airkeep or your own relay's HTTPS URL, then sign in. Credentials are stored in Keychain. For a UI preview, launch with `--demo`.
 
 ### Connect Apple Watch
 
@@ -61,9 +67,9 @@ The Watch app fetches directly from the relay, with a reachable-iPhone fallback 
 
 ## Web dashboard
 
-The dashboard runs in an Nginx container alongside the Python backend. Nginx serves the frontend and forwards API requests, so the dashboard and native clients use the same HTTPS address. [Docker deployment](docs/docker-deployment.md) covers the two GHCR images and shared image tags. Create the first administrator using [account setup](docs/docker-deployment.md#accounts-and-sign-in), then sign in with your username and password.
+The self-hosted dashboard runs in an Nginx container alongside the Python backend. Nginx serves the frontend and forwards API requests, so the dashboard and native clients use the same HTTPS address. [Docker deployment](docs/docker-deployment.md) covers the two GHCR images and shared image tags. Create the first administrator using [account setup](docs/docker-deployment.md#accounts-and-sign-in), then sign in with your username and password.
 
-Each user has their own rules and a seven-day timeline of triggered and recovered alerts. Administrators can create accounts and switch to Admin view. Admin view shows relay health, device subscriptions, Live Activity sessions, Watch widget registrations and recent APNs requests. Manage rules in User view and device subscriptions in each Apple app. Successful push requests are labelled **Accepted by Apple**.
+Each user has their own rules and a seven-day timeline of triggered and recovered alerts. On a self-hosted relay, administrators can create accounts and switch to Admin view to see relay health, device subscriptions, Live Activity sessions, Watch widget registrations and recent APNs requests. Manage rules in the dashboard and device subscriptions in each Apple app. Successful push requests are labelled **Accepted by Apple**.
 
 ## Install the desk display
 
@@ -86,7 +92,7 @@ In Settings → Humidity alerts, or Humidity alerts on the web, create named rul
 
 Choose Receive alerts on this device in Settings → Notifications on each iPhone, iPad or Mac that should receive them. In the Watch app, open Alerts and enable Receive alerts on this Watch for delivery over Wi-Fi or cellular, even when the iPhone is off. Your rules apply to your subscribed devices.
 
-Remote alerts, background Live Activity updates and Watch widget push updates need an Apple Developer Program account and your own APNs signing keys. Follow [push setup](docs/push-setup.md) for alerts and Live Activities, and [Watch widget push setup](docs/web-dashboard.md#watch-widget-updates) for the Watch topic and keys. Readings, history and scheduled widget refreshes work independently of APNs.
+On a self-hosted relay, remote alerts, background Live Activity updates and Watch widget push updates need an Apple Developer Program account and your own APNs signing keys. Follow [push setup](docs/push-setup.md) for alerts and Live Activities, and [Watch widget push setup](docs/web-dashboard.md#watch-widget-updates) for the Watch topic and keys. Readings, history and scheduled widget refreshes work independently of APNs.
 
 Choose Start Live Activity in Settings → Live Activities on iPhone to show humidity on the Lock Screen and in Dynamic Island on supported iPhones for up to eight hours. The app shows when the session ends. Widget refreshes follow the system's schedule, and push updates can be delayed. Cached readings retain their original timestamps so their age stays visible.
 
