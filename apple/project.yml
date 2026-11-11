@@ -29,6 +29,7 @@ targets:
     sources: [Shared, App, iOS, WatchShared/WatchState.swift, AppIcon.icon]
     settings:
       base:
+        PROVISIONING_PROFILE_SPECIFIER: $(AIRKEEP_PROFILE_IOS)
         PRODUCT_BUNDLE_IDENTIFIER: $(AIRKEEP_BUNDLE_ID_PREFIX)
         TARGETED_DEVICE_FAMILY: '1,2'
         INFOPLIST_FILE: iOS/Info.plist
@@ -44,10 +45,12 @@ targets:
     sources: [Shared, App, macOS, AppIcon.icon]
     settings:
       base:
+        PROVISIONING_PROFILE_SPECIFIER: $(AIRKEEP_PROFILE_MAC)
         PRODUCT_BUNDLE_IDENTIFIER: $(AIRKEEP_BUNDLE_ID_PREFIX).mac
         INFOPLIST_FILE: macOS/Info.plist
         CODE_SIGN_ENTITLEMENTS: macOS/Airkeep.entitlements
         ENABLE_APP_SANDBOX: YES
+        ENABLE_HARDENED_RUNTIME: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
       - target: AirkeepWidgets-macOS
@@ -57,6 +60,7 @@ targets:
     sources: [Shared, Widgets]
     settings:
       base:
+        PROVISIONING_PROFILE_SPECIFIER: $(AIRKEEP_PROFILE_IOS_WIDGETS)
         PRODUCT_BUNDLE_IDENTIFIER: $(AIRKEEP_BUNDLE_ID_PREFIX).widgets
         INFOPLIST_FILE: Widgets/Info.plist
         CODE_SIGN_ENTITLEMENTS: Widgets/iOS.entitlements
@@ -68,10 +72,12 @@ targets:
     sources: [Shared, Widgets]
     settings:
       base:
+        PROVISIONING_PROFILE_SPECIFIER: $(AIRKEEP_PROFILE_MAC_WIDGETS)
         PRODUCT_BUNDLE_IDENTIFIER: $(AIRKEEP_BUNDLE_ID_PREFIX).mac.widgets
         INFOPLIST_FILE: Widgets/Info.plist
         CODE_SIGN_ENTITLEMENTS: Widgets/macOS.entitlements
         ENABLE_APP_SANDBOX: YES
+        ENABLE_HARDENED_RUNTIME: YES
         APPLICATION_EXTENSION_API_ONLY: YES
         SKIP_INSTALL: YES
   Airkeep-watchOS:
@@ -80,6 +86,7 @@ targets:
     sources: [Watch, WatchShared, App/ChartView.swift, App/NotificationManager.swift, Shared/Models.swift, Shared/Configuration.swift, Shared/PrivacyInfo.xcprivacy, Shared/RelayClient.swift, Shared/RelayOAuth.swift, Shared/Theme.swift, AppIcon.icon]
     settings:
       base:
+        PROVISIONING_PROFILE_SPECIFIER: $(AIRKEEP_PROFILE_WATCH)
         PRODUCT_BUNDLE_IDENTIFIER: $(AIRKEEP_BUNDLE_ID_PREFIX).watch
         INFOPLIST_FILE: Watch/Info.plist
         CODE_SIGN_ENTITLEMENTS: Watch/Airkeep.entitlements
@@ -94,6 +101,7 @@ targets:
     sources: [WatchWidgets, WatchShared, Shared/Models.swift, Shared/Configuration.swift, Shared/PrivacyInfo.xcprivacy, Shared/RelayClient.swift, Shared/RelayOAuth.swift, Shared/Theme.swift]
     settings:
       base:
+        PROVISIONING_PROFILE_SPECIFIER: $(AIRKEEP_PROFILE_WATCH_WIDGETS)
         PRODUCT_BUNDLE_IDENTIFIER: $(AIRKEEP_BUNDLE_ID_PREFIX).watch.widgets
         INFOPLIST_FILE: WatchWidgets/Info.plist
         CODE_SIGN_ENTITLEMENTS: WatchWidgets/Airkeep.entitlements
