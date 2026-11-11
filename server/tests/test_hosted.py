@@ -102,11 +102,19 @@ def test_heartbeat_does_not_refresh_sensor_and_reenrollment_revokes_old_token(st
     assert error.value.status_code == 401
 
 
+def test_small_clock_skew_preserves_live_observation_time(store, users):
+    key = enroll(store, users[0])
+    observed = time.time()+15
+    save_batch(store, key, Batch(printerConnected=True, readings=[observation(when=observed)]))
+    with store.tenant(users[0]):
+        assert store.readings()[0].observedAt == observed
+
+
 def test_cross_tenant_delivery_foreign_keys_and_generic_push(store, users):
     first, second = users
     oauth = OAuth(store, Settings(jwt_signing_key='x'*64, web_origin=ORIGIN, _env_file=None))
     key = enroll(store, first)
-    save_batch(store, key, Batch(readings=[observation(80)]))
+    save_batch(store, key, Batch(printerConnected=True, readings=[observation(80)]))
     with store.tenant(first), store.transaction():
         grant = oauth.grant(first, 'apple-ios', 'same-installation')
         store.upsert_device('same-installation', 'a'*64, 'io.airkeep', 'sandbox', True)
@@ -122,6 +130,31 @@ def test_cross_tenant_delivery_foreign_keys_and_generic_push(store, users):
             store.execute('INSERT INTO outbox(device,json,next,created,rule_id) VALUES(?,?,?,?,?)',
                           ('same-installation', '{}', time.time(), time.time(), rule['id']))
         assert store.rows('SELECT * FROM devices') == []
+
+
+@pytest.mark.asyncio
+async def test_hosted_worker_pauses_alerts_on_disconnect_and_runs_maintenance(store, users):
+    from app import tick
+    from push import APNs
+
+    user = users[0]
+    key = enroll(store, user)
+    now = time.time()
+    save_batch(store, key, Batch(printerConnected=True, readings=[observation(80, when=now-1)]))
+    settings = Settings(jwt_signing_key='x'*64, web_origin=ORIGIN, _env_file=None)
+    push = APNs(settings)
+    try:
+        with store.tenant(user):
+            rule = store.create_rule(NamedAlertInput(enabled=True, holdSeconds=20), user)
+            await tick(store, settings, push, now, True)
+            assert store.get_rule(rule['id'], user)['active'] is False
+        save_batch(store, key, Batch(printerConnected=False))
+        with store.tenant(user):
+            await tick(store, settings, push, now+30, True)
+            assert store.get_rule(rule['id'], user)['active'] is False
+            assert store.rows('SELECT * FROM alert_events') == []
+    finally:
+        await push.close()
 
 
 def test_concurrent_refresh_replay_revokes_grant(store, users):
@@ -160,3 +193,10 @@ def test_hosted_api_normal_entrypoints_scope_every_client(store, users, monkeypa
             assert client.get('/v2/admin/devices', headers=headers).status_code == 403
         assert client.get('/auth/session').json()['hosted'] is True
         assert client.get('/auth/session').json()['public_signup'] is False
+        with store.tenant(users[1]), store.transaction():
+            cookie = oauth.grant(users[1], 'dashboard', None)['access_token']
+        client.cookies.set(oauth.cookie_name, cookie, domain='dashboard.airkeep.io', path='/')
+        assert client.get('/v1/snapshot').json()['readings'][0]['humidity'] == 75
+        lower_case = {'Authorization': 'bearer '+clients[0]}
+        assert client.get('/v1/snapshot', headers=lower_case).json()['readings'][0]['humidity'] == 35
+        assert client.get('/v1/snapshot', headers={'Authorization': 'Basic invalid'}).status_code == 401

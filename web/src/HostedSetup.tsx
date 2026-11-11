@@ -30,7 +30,7 @@ export function HostedSetup() {
   }, []);
   return <section className="hosted-setup">
     <div className="hosted-setup-heading"><h2>{relay?.status === "unpaired" ? "Add printer" : "Your printer"}</h2>
-      <button aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? "Hide setup" : "Printer setup"}</button></div>
+      {relay && relay.status !== "unpaired" && <button aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? "Hide setup" : "Printer setup"}</button>}</div>
     {relay && <p role="status">{descriptions[relay.status]}</p>}
     {(expanded || relay?.status === "unpaired") && <>
       <h3>Connect your local relay</h3>
@@ -38,7 +38,7 @@ export function HostedSetup() {
       <p>Open the pairing link shown by your relay and sign in to this account. Check that its code matches before approving.</p>
       <a className="primary" href="/device">Enter relay pairing code</a>
       <p><a href="https://github.com/danohn/airkeep/blob/main/agent/README.md" target="_blank" rel="noreferrer">Relay installation instructions</a></p>
-      {relay?.status !== "unpaired" && <div className="hosted-setup-actions">
+      {relay && relay.status !== "unpaired" && <div className="hosted-setup-actions">
         <button disabled={busy} onClick={() => setConfirm("disconnect")}>Disconnect relay</button>
         <button disabled={busy} onClick={() => setConfirm("replace")}>Replace printer</button>
       </div>}

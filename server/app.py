@@ -7,6 +7,7 @@ import time
 from typing import Literal
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security.utils import get_authorization_scheme_param
 from pydantic import BaseModel, Field
 
 from accounts import OAuth, install_accounts
@@ -150,6 +151,16 @@ def create_app(settings: Settings | None = None):
     security = HTTPBearer(auto_error=False)
     browser = BrowserAuth(store,settings)
 
+    def resolve_connection(request):
+        if not oauth:
+            raise HTTPException(401, 'Sign in to Airkeep.')
+        if 'authorization' in request.headers:
+            scheme, token = get_authorization_scheme_param(request.headers['authorization'])
+            if scheme.lower() != 'bearer' or not token:
+                raise HTTPException(401, 'Sign in to Airkeep.')
+            return oauth.authenticate(token)
+        return oauth.browser_session(request)
+
     if hosted:
         from postgres import tenant_id
         from starlette.concurrency import run_in_threadpool
@@ -158,28 +169,24 @@ def create_app(settings: Settings | None = None):
         async def tenant_scope(request: Request, call_next):
             context = tenant_id.set('')
             try:
-                header = request.headers.get('authorization', '')
                 try:
-                    if header.startswith('Bearer '):
-                        identity = await run_in_threadpool(oauth.authenticate, header[7:])
-                    else:
-                        identity = await run_in_threadpool(oauth.browser_session, request)
-                except HTTPException:
-                    identity = None
-                if identity:
+                    identity = await run_in_threadpool(resolve_connection, request)
+                except HTTPException as error:
+                    request.state.airkeep_identity = error
+                else:
+                    request.state.airkeep_identity = identity
                     tenant_id.set(identity.user)
                 return await call_next(request)
             finally:
                 tenant_id.reset(context)
 
     def connection(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)):
-        if not oauth:
-            raise HTTPException(401, 'Sign in to Airkeep.')
-        if 'authorization' in request.headers:
-            if credentials is None:
-                raise HTTPException(401, 'Sign in to Airkeep.')
-            return oauth.authenticate(credentials.credentials)
-        return oauth.browser_session(request)
+        if hosted:
+            identity = request.state.airkeep_identity
+            if isinstance(identity, HTTPException):
+                raise identity
+            return identity
+        return resolve_connection(request)
 
     def principal(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)):
         identity = connection(request, credentials)
@@ -300,8 +307,7 @@ def create_app(settings: Settings | None = None):
         now = time.time()
         connected = bool(collector and collector.connected)
         if hosted:
-            from hosted_ingest import relay_status
-            connected = relay_status(store, now)['status'] in ('connected', 'stale_readings', 'waiting_for_ams')
+            connected = store.printer_connected(now)
         value = {"serverTime":now,"staleAfter":settings.stale_seconds,
                  "printerConnected":connected,
                  "readings":store.readings()}

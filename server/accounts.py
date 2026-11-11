@@ -450,7 +450,7 @@ def install_accounts(app, oauth, principal, admin, connection):
         if identity.client != 'dashboard':
             raise HTTPException(403,'Manage connections in the dashboard.')
         now = time.time()
-        rows = store.rows("""SELECT id,client,expires,CASE WHEN client='esp32' THEN substr(installation,-4) END AS display_suffix FROM oauth_grants
+        rows = store.rows("""SELECT id,client,expires,CASE WHEN client='esp32' THEN substr(installation,length(installation)-3) END AS display_suffix FROM oauth_grants
             WHERE user=? AND revoked=0 AND expires>? AND idle_until>?
             ORDER BY client,id""",(identity.user,now,now))
         return [{**dict(row),'current':row['id']==identity.grant} for row in rows]

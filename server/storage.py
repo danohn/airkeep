@@ -206,7 +206,8 @@ class Store:
         # CRUD, evaluation state, and queued events share the same transaction lock.
         with self.lock, self.db:
             self.db.execute('BEGIN IMMEDIATE')
-            readings = {r.amsID:r for r in self.readings()}
+            observed = self.alert_readings(now) if getattr(self, 'hosted', False) else self.readings()
+            readings = {reading.amsID: reading for reading in observed}
             query = ('SELECT r.* FROM alert_rules r JOIN accounts a ON a.id=r.owner_id WHERE a.disabled=0'
                      if multiuser else 'SELECT * FROM alert_rules WHERE owner_id IS NULL')
             for row in self.db.execute(query).fetchall():

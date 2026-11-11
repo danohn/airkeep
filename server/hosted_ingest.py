@@ -60,12 +60,14 @@ def relay_status(store, now=None):
         status = 'relay_offline'
     elif not row['connected']:
         status = 'printer_disconnected'
-    elif not store.readings():
-        status = 'waiting_for_ams'
-    elif all(now-reading.observedAt > 90 for reading in store.readings()):
-        status = 'stale_readings'
     else:
-        status = 'connected'
+        readings = store.readings()
+        if not readings:
+            status = 'waiting_for_ams'
+        elif all(now-reading.observedAt > 90 for reading in readings):
+            status = 'stale_readings'
+        else:
+            status = 'connected'
     return {'status': status, 'printerID': row['id']}
 
 
@@ -142,7 +144,7 @@ def save_batch(store, token_hash, batch):
                              ON CONFLICT(tenant_id,printer_id,ams,at) DO UPDATE SET json=excluded.json
                              WHERE (samples.json::jsonb->>'observedAt')::double precision < (excluded.json::jsonb->>'observedAt')::double precision''',
                           (user, printer, value.amsID, at, data))
-            if not value.replay and now-90 <= value.observedAt <= now:
+            if not value.replay and now-90 <= value.observedAt:
                 store.execute('''INSERT INTO latest(tenant_id,printer_id,ams,json) VALUES(?,?,?,?)
                                  ON CONFLICT(tenant_id,printer_id,ams) DO UPDATE SET json=excluded.json
                                  WHERE (latest.json::jsonb->>'observedAt')::double precision < (excluded.json::jsonb->>'observedAt')::double precision''',

@@ -6,7 +6,9 @@ row security also protects direct access to the underlying tables.
 """
 from contextlib import contextmanager
 from contextvars import ContextVar
+from pathlib import Path
 import re
+import sys
 import threading
 
 import psycopg
@@ -95,10 +97,14 @@ class Database:
             return self
         context = self.store.pool.connection()
         connection = context.__enter__()
+        try:
+            connection.execute("SELECT set_config('airkeep.tenant_id', %s, true)", (tenant_id.get(),))
+        except BaseException:
+            context.__exit__(*sys.exc_info())
+            raise
         self.local.context = context
         self.local.connection = connection
         self.local.depth = 1
-        connection.execute("SELECT set_config('airkeep.tenant_id', %s, true)", (tenant_id.get(),))
         return self
 
     def __exit__(self, kind, value, traceback):
@@ -147,7 +153,11 @@ class PostgresStore(Store):
             if role['rolsuper'] or role['rolbypassrls'] or owns:
                 self.pool.close()
                 raise RuntimeError('Hosted runtime needs a non-owner role without superuser or BYPASSRLS.')
-            if not connection.execute("SELECT to_regclass('public.schema_migrations') AS name").fetchone()['name']:
+            migrations = {file.name for file in (Path(__file__).parent / 'migrations').glob('*.sql')}
+            present = connection.execute("SELECT to_regclass('public.schema_migrations') AS name").fetchone()['name']
+            if not present or not migrations or not migrations.issubset(
+                {row['name'] for row in connection.execute('SELECT name FROM schema_migrations')}
+            ):
                 self.pool.close()
                 raise RuntimeError('Run hosted database migrations before starting Airkeep.')
 
@@ -166,6 +176,13 @@ class PostgresStore(Store):
     def readings(self):
         rows = self.rows('SELECT json FROM latest WHERE tenant_id=? ORDER BY ams', (tenant_id.get(),))
         return [Reading.model_validate_json(row[0]) for row in rows]
+
+    def printer_connected(self, now):
+        return bool(self.rows('SELECT 1 FROM printers WHERE tenant_id=? AND connected=1 AND heartbeat>=?',
+                              (tenant_id.get(), now-90)))
+
+    def alert_readings(self, now):
+        return self.readings() if self.printer_connected(now) else []
 
     def history(self, ams, since):
         import json
