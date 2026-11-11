@@ -1247,3 +1247,26 @@ tbody tr:hover {
   overflow-wrap: anywhere;
   user-select: all;
 }
+.hosted-setup {
+  padding: 24px;
+  margin: 24px 32px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  display: grid;
+  gap: 16px;
+}
+.hosted-setup-heading,
+.hosted-setup-actions {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.hosted-setup h3 { margin: 0; font-weight: 500; }
+.hosted-setup a { text-decoration: underline; text-underline-offset: 3px; }
+.hosted-setup button { padding: 10px 0; color: var(--amber); }
+.hosted-setup .notice { display: grid; gap: 12px; }
+@media (max-width: 650px) {
+  .hosted-setup { margin: 16px; padding: 20px; }
+}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api } from "./api";
 import { devicePairingCode, devicePairingPath } from "./auth";
 
-type Pairing = { user_code: string; display: string };
+type Pairing = { user_code: string; display: string; client_id?: string };
 
 export function DevicePairing() {
   const [code, setCode] = useState(devicePairingCode);
@@ -25,7 +25,7 @@ export function DevicePairing() {
           method: "POST", body: JSON.stringify({ user_code: pairing.user_code, approve }),
         });
         setPairing(undefined);
-        setMessage(approve ? "Display approved. Return to your ESP32." : "Pairing denied.");
+        setMessage(approve ? pairing.client_id === "airkeep-relay" ? "Relay approved. Return to relay setup." : "Display approved. Return to your ESP32." : "Pairing denied.");
         history.replaceState(null, "", "/device");
       }
     } catch (err) {
@@ -37,13 +37,13 @@ export function DevicePairing() {
 
   return <main className="login"><form onSubmit={(event) => { event.preventDefault(); void submit(); }}>
     <img src="/brand/mark.svg" alt="" />
-    <h1>Pair display</h1>
+    <h1>{pairing?.client_id === "airkeep-relay" ? "Pair relay" : "Pair display or relay"}</h1>
     {message ? <p role="status">{message}</p> : pairing ? <>
       <p>Check that <strong>{pairing.user_code}</strong> matches the code on your {pairing.display}.</p>
       <button type="button" className="primary" disabled={busy} onClick={() => void submit(true)}>Approve</button>
       <button type="button" disabled={busy} onClick={() => void submit(false)}>Deny</button>
     </> : <>
-      <label htmlFor="pairing-code">Code on your display</label>
+      <label htmlFor="pairing-code">Code on your display or relay</label>
       <input id="pairing-code" autoComplete="off" autoCapitalize="characters" spellCheck={false}
         maxLength={16} required value={code} onChange={(event) => setCode(event.target.value)} />
       <button className="primary" disabled={busy}>Continue</button>

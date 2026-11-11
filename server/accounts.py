@@ -1,4 +1,5 @@
 """Local accounts and first-party OAuth authorization for the relay."""
+from contextlib import nullcontext
 from dataclasses import dataclass
 import base64
 import hashlib
@@ -36,7 +37,9 @@ def random_token():
 
 
 def schema(store):
-    with store.lock, store.db:
+    if getattr(store, 'hosted', False):
+        return
+    with store.transaction():
         store.db.executescript("""
             CREATE TABLE IF NOT EXISTS accounts(
                 id TEXT PRIMARY KEY, username TEXT NOT NULL COLLATE NOCASE UNIQUE,
@@ -68,9 +71,8 @@ def bootstrap(store, username, password_hash):
     schema(store)
     if not USERNAME.fullmatch(username) or not password_hash.startswith('$argon2id$'):
         raise ValueError('Use a valid username and an Argon2id password hash.')
-    with store.lock, store.db:
+    with store.transaction():
         db = store.db
-        db.execute('BEGIN IMMEDIATE')
         if db.execute('SELECT 1 FROM accounts LIMIT 1').fetchone():
             raise ValueError('Accounts already exist. Use the recovery command instead.')
         user = random_token()
@@ -81,6 +83,15 @@ def bootstrap(store, username, password_hash):
         for table in ('web_sessions', 'outbox', 'devices', 'activities', 'widget_installations'):
             db.execute(f'DELETE FROM {table}')
         db.execute("INSERT INTO config VALUES('accounts_enabled','true')")
+
+
+def tenant_context(store, user):
+    return store.tenant(user) if getattr(store, 'hosted', False) else nullcontext()
+
+
+def lock_account(store, user):
+    suffix = ' FOR UPDATE' if getattr(store, 'hosted', False) else ''
+    return store.db.execute('SELECT * FROM accounts WHERE id=?' + suffix, (user,)).fetchone()
 
 
 def cleanup_registrations(store, grant_id):
@@ -95,7 +106,10 @@ def revoke_grant(store, grant_id):
     db = store.db
     for row in db.execute('SELECT id FROM oauth_grants WHERE id=? OR parent=?', (grant_id, grant_id)).fetchall():
         db.execute('UPDATE oauth_grants SET revoked=1 WHERE id=?', (row['id'],))
-        cleanup_registrations(store, row['id'])
+        owner = db.execute('SELECT user FROM oauth_grants WHERE id=?', (row['id'],)).fetchone()
+        if owner:
+            with tenant_context(store, owner['user']):
+                cleanup_registrations(store, row['id'])
 
 
 def revoke_user(store, user):
@@ -105,8 +119,7 @@ def revoke_user(store, user):
 
 def recover(store, username, password_hash):
     schema(store)
-    with store.lock, store.db:
-        store.db.execute('BEGIN IMMEDIATE')
+    with store.transaction():
         row = store.db.execute("SELECT id FROM accounts WHERE username=? AND role='admin'", (username,)).fetchone()
         if not row:
             raise ValueError('No administrator has that username.')
@@ -136,7 +149,7 @@ class Authorization(BaseModel):
 
 class Credentials(BaseModel):
     transaction: str = Field(max_length=100)
-    username: str = Field(max_length=64)
+    username: str = Field(max_length=254)
     password: str = Field(min_length=1, max_length=1024)
     new_password: str | None = Field(default=None, min_length=12, max_length=1024)
 
@@ -201,6 +214,10 @@ class OAuth:
         identity = self.authenticate(token, browser=True)
         if request.method not in ('GET', 'HEAD', 'OPTIONS'):
             self.same_origin(request)
+        expected = request.headers.get('x-airkeep-account')
+        if expected is not None and not secrets.compare_digest(expected, identity.user):
+            raise HTTPException(409, 'Your signed-in account changed. Reload Airkeep.',
+                                headers={'X-Airkeep-Account-Changed': '1'})
         return identity
 
     def set_browser_cookie(self, response, token):
@@ -217,10 +234,13 @@ class OAuth:
 
     def rate_limit(self, request, username):
         now = time.time()
-        keys = ['account:' + username.lower(), 'ip:' + (request.client.host if request.client else '')]
-        with self.store.lock, self.store.db:
+        address = request.client.host if request.client else ''
+        if getattr(self.store, 'hosted', False):
+            from hosted_accounts import login_limit
+            return login_limit(self.store, self.key, username, address)
+        keys = ['account:' + username.lower(), 'ip:' + address]
+        with self.store.transaction():
             db = self.store.db
-            db.execute('BEGIN IMMEDIATE')
             db.execute('DELETE FROM oauth_attempts WHERE at<?', (now-300,))
             if any(db.execute('SELECT COUNT(*) FROM oauth_attempts WHERE bucket=?', (key,)).fetchone()[0] >= limit
                    for key, limit in zip(keys, (5, 30))):
@@ -246,6 +266,11 @@ class OAuth:
         return identifier
 
     def login(self, body, request):
+        if getattr(self.store, 'hosted', False):
+            from hosted_accounts import canonical_email
+            body = body.model_copy(update={'username': canonical_email(body.username, strict=False)})
+        elif len(body.username) > 64:
+            raise HTTPException(422, 'Check your username and password.')
         self.rate_limit(request, body.username)
         if not self.store.rows('SELECT 1 FROM oauth_requests WHERE id=? AND code IS NULL AND expires>?',
                                (digest(body.transaction),time.time())):
@@ -261,13 +286,12 @@ class OAuth:
             raise HTTPException(422, 'Choose a password different from the temporary password.')
         with PASSWORD_WORK:
             replacement = PASSWORD.hash(body.new_password) if user['temporary_until'] is not None and body.new_password else None
-        with self.store.lock, self.store.db:
+        with self.store.transaction():
             db = self.store.db
-            db.execute('BEGIN IMMEDIATE')
             tx = db.execute('SELECT * FROM oauth_requests WHERE id=? AND code IS NULL AND expires>?',
                             (digest(body.transaction),time.time())).fetchone()
-            current = db.execute('SELECT version FROM accounts WHERE id=? AND disabled=0', (user['id'],)).fetchone()
-            if not tx or not current or current[0] != user['version']:
+            current = lock_account(self.store, user['id'])
+            if not tx or not current or current['disabled'] or current['version'] != user['version']:
                 raise HTTPException(400, 'Start sign-in again.')
             version = user['version']
             if user['temporary_until'] is not None:
@@ -287,6 +311,9 @@ class OAuth:
         return transaction['redirect']+'?'+urlencode({'code':code,'state':transaction['state']})
 
     def grant(self, user, client, installation, parent=None):
+        account = lock_account(self.store, user)
+        if not account or account['disabled']:
+            raise HTTPException(401, 'Sign in to Airkeep.')
         now = time.time()
         identifier = random_token()
         expires = now + (BROWSER_SESSION_SECONDS if client == 'dashboard' else 90*DAY)
@@ -319,13 +346,17 @@ class OAuth:
 
     def exchange(self, data):
         kind, client = data.get('grant_type'), data.get('client_id')
-        with self.store.lock, self.store.db:
+        with self.store.transaction():
             db = self.store.db
-            db.execute('BEGIN IMMEDIATE')
             if kind == 'authorization_code':
                 row = db.execute("""SELECT r.* FROM oauth_requests r JOIN accounts a ON a.id=r.user
                     WHERE r.code=? AND r.expires>? AND a.disabled=0 AND a.version=r.version""",
                     (digest(data.get('code','')),time.time())).fetchone()
+                if row:
+                    current = lock_account(self.store, row['user'])
+                    row = db.execute("""SELECT r.* FROM oauth_requests r JOIN accounts a ON a.id=r.user
+                        WHERE r.code=? AND r.expires>? AND a.disabled=0 AND a.version=r.version""",
+                        (digest(data.get('code','')),time.time())).fetchone()
                 verifier = data.get('code_verifier','')
                 if not row or client != row['client'] or data.get('redirect_uri') != row['redirect'] or not VERIFIER.fullmatch(verifier):
                     return None
@@ -336,6 +367,10 @@ class OAuth:
                 return self.grant(row['user'],client,row['installation'])
             if kind == 'refresh_token':
                 item = db.execute('SELECT * FROM oauth_refresh WHERE hash=?',(digest(data.get('refresh_token','')),)).fetchone()
+                grant = self.active(item['grant_id']) if item else None
+                if grant:
+                    lock_account(self.store, grant['user'])
+                    item = db.execute('SELECT * FROM oauth_refresh WHERE hash=?', (digest(data.get('refresh_token','')),)).fetchone()
                 row = self.active(item['grant_id']) if item else None
                 if not row or row['client'] != client or client == 'dashboard':
                     return None
@@ -348,9 +383,8 @@ class OAuth:
         return None
 
     def maintain(self, now):
-        with self.store.lock, self.store.db:
+        with self.store.transaction():
             db = self.store.db
-            db.execute('BEGIN IMMEDIATE')
             for row in db.execute('SELECT id FROM oauth_grants WHERE revoked=0 AND (expires<=? OR idle_until<=?)', (now,now)).fetchall():
                 revoke_grant(self.store,row['id'])
             db.execute('DELETE FROM oauth_requests WHERE expires<=?',(now,))
@@ -403,8 +437,7 @@ def install_accounts(app, oauth, principal, admin, connection):
 
     @app.post('/auth/revoke', status_code=204)
     def revoke(response: Response, identity: Principal = Depends(connection)):
-        with store.lock, store.db:
-            store.db.execute('BEGIN IMMEDIATE')
+        with store.transaction():
             revoke_grant(store,identity.grant)
         if identity.client == 'dashboard':
             oauth.clear_browser_cookie(response)
@@ -434,8 +467,7 @@ def install_accounts(app, oauth, principal, admin, connection):
     def watch(body: WatchPair, identity: Principal = Depends(principal)):
         if identity.client != 'apple-ios':
             raise HTTPException(403,'Pair Apple Watch from your iPhone.')
-        with store.lock, store.db:
-            store.db.execute('BEGIN IMMEDIATE')
+        with store.transaction():
             parent = oauth.active(identity.grant)
             if parent is None:
                 raise HTTPException(401,'Sign in to Airkeep.')
@@ -447,8 +479,7 @@ def install_accounts(app, oauth, principal, admin, connection):
     def unpair(identity: Principal = Depends(principal)):
         if identity.client != 'apple-ios':
             raise HTTPException(403,'Manage Apple Watch from your iPhone.')
-        with store.lock, store.db:
-            store.db.execute('BEGIN IMMEDIATE')
+        with store.transaction():
             for row in store.db.execute('SELECT id FROM oauth_grants WHERE parent=?',(identity.grant,)).fetchall():
                 revoke_grant(store,row['id'])
 
@@ -460,14 +491,18 @@ def install_accounts(app, oauth, principal, admin, connection):
         user = store.rows('SELECT hash,version FROM accounts WHERE id=?',(identity.user,))[0]
         if not oauth.verify(body.password,user['hash']):
             raise HTTPException(401,'Check your current password.')
-        replacement = PASSWORD.hash(body.new_password)
-        with store.lock, store.db:
-            store.db.execute('BEGIN IMMEDIATE')
+        with PASSWORD_WORK:
+            replacement = PASSWORD.hash(body.new_password)
+        with store.transaction():
+            lock_account(store, identity.user)
             changed = store.db.execute('UPDATE accounts SET hash=?,version=version+1 WHERE id=? AND version=? AND disabled=0',
                                        (replacement,identity.user,user['version']))
             if not changed.rowcount:
                 raise HTTPException(409,'Your account changed. Sign in again.')
             revoke_user(store,identity.user)
+            if getattr(store, 'hosted', False):
+                from hosted_accounts import cancel_links
+                cancel_links(store.db, identity.user)
         oauth.clear_browser_cookie(response)
 
     def public_accounts():
@@ -483,8 +518,7 @@ def install_accounts(app, oauth, principal, admin, connection):
         temporary = random_token()
         password_hash = PASSWORD.hash(temporary)
         identifier = random_token()
-        with store.lock, store.db:
-            store.db.execute('BEGIN IMMEDIATE')
+        with store.transaction():
             actor = oauth.active(identity.grant)
             if not actor or actor['role'] != 'admin':
                 raise HTTPException(403,'Administrator access required.')
@@ -496,9 +530,8 @@ def install_accounts(app, oauth, principal, admin, connection):
 
     @app.patch('/v2/admin/accounts/{user}', status_code=204)
     def edit(user: str, body: EditAccount, identity: Principal = Depends(admin)):
-        with store.lock, store.db:
+        with store.transaction():
             db = store.db
-            db.execute('BEGIN IMMEDIATE')
             actor = oauth.active(identity.grant)
             if not actor or actor['role'] != 'admin':
                 raise HTTPException(403,'Administrator access required.')
@@ -520,8 +553,7 @@ def install_accounts(app, oauth, principal, admin, connection):
     def reset(user: str, identity: Principal = Depends(admin)):
         temporary = random_token()
         password_hash = PASSWORD.hash(temporary)
-        with store.lock, store.db:
-            store.db.execute('BEGIN IMMEDIATE')
+        with store.transaction():
             actor = oauth.active(identity.grant)
             if not actor or actor['role'] != 'admin':
                 raise HTTPException(403,'Administrator access required.')
