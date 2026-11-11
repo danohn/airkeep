@@ -120,6 +120,11 @@ def save_batch(store, token_hash, batch):
     with store.tenant(user), store.transaction():
         if not store.rows('SELECT 1 FROM relay_credentials WHERE hash=? AND revoked=0', (token_hash,)):
             raise HTTPException(401, 'Pair this relay again.')
+        bucket = 'ingest:' + token_hash
+        store.execute('DELETE FROM oauth_attempts WHERE bucket=? AND at<?', (bucket, now-60))
+        if store.rows('SELECT COUNT(*) FROM oauth_attempts WHERE bucket=?', (bucket,))[0][0] >= 60:
+            raise HTTPException(429, 'Slow telemetry uploads temporarily.', headers={'Retry-After': '60'})
+        store.execute('INSERT INTO oauth_attempts(bucket,at) VALUES(?,?)', (bucket, now))
         if batch.printerConnected is not None:
             store.execute('UPDATE printers SET heartbeat=?,connected=? WHERE tenant_id=? AND id=?',
                           (now, int(batch.printerConnected), user, printer))

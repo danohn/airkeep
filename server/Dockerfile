@@ -14,6 +14,7 @@ RUN groupadd --gid 10001 airkeep && useradd --uid 10001 --gid 10001 --no-create-
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY server/*.py server/bambu-ca.pem ./
+COPY server/migrations ./migrations
 COPY LICENSE /usr/share/licenses/airkeep/LICENSE
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 AIRKEEP_DB_PATH=/data/airkeep.sqlite3
 USER 10001:10001
