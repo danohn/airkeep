@@ -1,6 +1,6 @@
 [project]
 name = "airkeep-relay"
-version = "0.5.1"
+version = "0.5.2"
 description = "Local Bambu MQTT telemetry, history, humidity alerts and Apple push relay"
 requires-python = ">=3.14"
 dependencies = [
