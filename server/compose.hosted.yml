@@ -28,7 +28,7 @@ x-backend: &backend
   read_only: true
   cap_drop: [ALL]
   security_opt: [no-new-privileges:true]
-  tmpfs: [/tmp:rw,noexec,nosuid,size=32m]
+  tmpfs: ['/tmp:rw,noexec,nosuid,size=32m']
   init: true
   restart: unless-stopped
   volumes:
@@ -99,7 +99,7 @@ services:
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    tmpfs: [/tmp:rw,noexec,nosuid,size=32m]
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=32m']
     logging:
       driver: json-file
       options: {max-size: 10m, max-file: '3'}

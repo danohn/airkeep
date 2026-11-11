@@ -111,7 +111,6 @@ export function App() {
         if (launchSSO) history.replaceState(null, "", "/");
         let next = initial;
         if (initial.mode === "oauth") {
-          if (mounted) setSession(initial);
           if (initial.configured && await finishDashboardAuthorization()) {
             next = await api<Session>("/auth/session");
           } else if (mounted && launchSSO && initial.configured && initial.oidc_label && !initial.authenticated) {
