@@ -138,6 +138,6 @@ git tag -a v0.4.0 <merge-commit> -m 'Airkeep 0.4.0'
 git push origin v0.4.0
 ```
 
-GitHub Actions publishes the matching relay and dashboard images to GHCR, then creates the GitHub Release with their digests and the checked ESP32 factory image. After release, GitHub Pages publishes the same firmware and checksum to the web installer. The rolling container `latest` tags track successful builds from `main`.
+The tag triggers publication of the matching relay and dashboard images to GHCR. After **Container images** succeeds, run **Publish Airkeep release** on the same tag with an unused Mac build number. It publishes one GitHub release with the notarized Mac DMG, ESP32 factory firmware, and container digests. GitHub Pages then publishes that firmware and checksum to the web installer. The rolling container `latest` tags track successful builds from `main`. See [release instructions](docs/apple-release.md#publish-a-coordinated-release).
 
 [Brand assets](design/brand/README.md) contain the editable logos, GitHub artwork and native app icon. Airkeep is available under the [MIT license](LICENSE).
