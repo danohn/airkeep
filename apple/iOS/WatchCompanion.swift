@@ -153,6 +153,11 @@ import WatchConnectivity
                     let readings = try await client.history(amsID: request.amsID, hours: request.hours)
                     data = try JSONEncoder().encode(WatchHistoryPacket.compact(readings))
                 }
+                guard client.isCurrent,
+                      self.defaults.bool(forKey: "watch.linkEnabled"),
+                      self.defaults.string(forKey: "watch.activeLinkID") == request.linkID else {
+                    throw RelayClient.RelayError.connectionChanged
+                }
                 response = .init(data: data)
             } catch { response = .init(error: "Open Airkeep on iPhone to reconnect.") }
             if let encoded = try? JSONEncoder().encode(response) { reply.call(encoded) }

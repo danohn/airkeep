@@ -5,9 +5,11 @@ struct RefreshAirkeepIntent: AppIntent {
     static let title: LocalizedStringResource = "Refresh AMS humidity"
     static let description = IntentDescription("Fetch the latest reading from your Airkeep relay.")
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let snapshot = try await RelayClient().snapshot()
+        let client = RelayClient()
+        let snapshot = try await client.snapshot()
+        guard client.isCurrent else { throw RelayClient.RelayError.connectionChanged }
         let reading = snapshot.readings.first { $0.amsID == SharedConfiguration.amsID }
-        SharedConfiguration.cached = reading
+        SharedConfiguration.cacheReading(reading, endpoint: client.endpoint, token: client.token)
         WidgetCenter.shared.reloadAllTimelines()
         guard let reading else { return .result(dialog: "No AMS reading is available yet.") }
         if reading.isStale(after: snapshot.staleAfter) {

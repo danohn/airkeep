@@ -12,7 +12,7 @@
 #include "display.h"
 
 LV_FONT_DECLARE(airkeep_digits_128);
-static QueueHandle_t readings, statuses, pairing_updates, actions;
+static QueueHandle_t readings, statuses, pairing_updates, actions, resets;
 static airkeep_pairing_t pairing_state = AIRKEEP_STARTING;
 static lv_obj_t *footer_caption, *pair_screen, *pair_message, *pair_code, *pair_uri, *disconnect_button;
 #if LV_USE_QRCODE
@@ -118,6 +118,19 @@ static void timer(lv_timer_t *timer)
 {
     (void)timer;
     char text[256], connection[80];
+    bool reset;
+    if (xQueueReceive(resets, &reset, 0) == pdTRUE) {
+        has_reading = false;
+        current = (airkeep_reading_t){0};
+        history_count = history_write = 0;
+        chart_at = 0;
+        memset(history, 0, sizeof(history));
+        lv_label_set_text(value, "—");
+        lv_label_set_text(temperature, "--°C");
+        lv_bar_set_value(bar, 0, LV_ANIM_OFF);
+        lv_chart_set_all_value(chart, series, LV_CHART_POINT_NONE);
+        lv_label_set_text(chart_range, "Waiting for readings");
+    }
     pairing_update_t pairing;
     if (xQueueReceive(pairing_updates, &pairing, 0) == pdTRUE) update_pairing(&pairing);
     if (xQueueReceive(readings,&current,0)==pdTRUE) {
@@ -168,6 +181,14 @@ void airkeep_ui_status(const char *text) { char out[80]; strlcpy(out,text,sizeof
 void airkeep_ui_pairing(airkeep_pairing_t state, const char *message,
                         const char *code, const char *uri, const char *qr)
 {
+    if (state == AIRKEEP_UNPAIRED || state == AIRKEEP_PAIRING || state == AIRKEEP_RETRY) {
+        // Reset independently of pairing_updates, whose next state may overwrite
+        // an unpair event before the UI timer runs.
+        xQueueReset(readings);
+        xQueueReset(statuses);
+        bool reset = true;
+        xQueueOverwrite(resets, &reset);
+    }
     pairing_update_t update = {.state = state};
     strlcpy(update.message, message, sizeof(update.message));
     if (code) strlcpy(update.code, code, sizeof(update.code));
@@ -189,8 +210,9 @@ void airkeep_ui_start(const char *relay_url, const char *ams_id)
     configured_ams_id = ams_id;
     readings=xQueueCreate(1,sizeof(airkeep_reading_t)); statuses=xQueueCreate(1,80);
     pairing_updates = xQueueCreate(1, sizeof(pairing_update_t));
+    resets = xQueueCreate(1, sizeof(bool));
     actions = xQueueCreate(1, sizeof(airkeep_action_t));
-    if (!readings || !statuses || !pairing_updates || !actions || !airkeep_display_start()) abort();
+    if (!readings || !statuses || !pairing_updates || !actions || !resets || !airkeep_display_start()) abort();
     bsp_display_brightness_set(65);
     if (!bsp_display_lock(3000)) abort();
     lv_obj_t *screen=lv_screen_active();

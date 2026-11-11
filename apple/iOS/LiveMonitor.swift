@@ -57,7 +57,9 @@ import Observation
               NotificationManager.shared.server == .available else { throw LiveError.unavailable }
         isStarting = true
         defer { isStarting = false }
-        await stopAll()
+        let client = RelayClient()
+        await stopAll(relay: client)
+        guard client.isCurrent else { throw RelayClient.RelayError.connectionChanged }
         let end = Date.now.addingTimeInterval(LiveActivityTiming.duration)
         let activity = try Activity.request(attributes: MonitorAttributes(amsName: reading.amsName, amsID: reading.amsID, endsAt: end),
             content: content(reading, endsAt: end, staleAfter: staleAfter), pushType: .token)

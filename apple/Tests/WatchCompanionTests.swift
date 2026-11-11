@@ -29,6 +29,40 @@ private func widgetStatus(_ request: WidgetRegistrationRequest) -> WidgetRegistr
 }
 
 @Suite struct WatchStorageTests {
+    @Test func sameOriginAccountReplacementClearsAllTelemetryAndRejectsFormerWrites() throws {
+        let fixture = WatchStorageFixture(); defer { fixture.cleanup() }
+        let store = fixture.store
+        try fixture.connect(store)
+        let old = fixture.connection
+        let snapshot = Snapshot(serverTime: 100, staleAfter: 90, printerConnected: true,
+            pushConfigured: true, readings: [.init(amsID: "0", humidity: 19, observedAt: 100)],
+            alertRule: .init(), alertActive: false)
+        try store.cache(snapshot, endpoint: old.endpoint, connection: old)
+        try store.cache(history: snapshot.readings, endpoint: old.endpoint, ams: "0", hours: 1, connection: old)
+        try store.cache(rules: [.init(name: "Private rule", enabled: true, threshold: 25)], endpoint: old.endpoint, connection: old)
+        try store.configureWidgets(token: "widget-token", amsIDs: ["0"], environment: "sandbox", bundleID: "io.airkeep.watch")
+        let registration = try #require(store.read().registrations[old.endpoint]?.request)
+        var next = old
+        next.token = "another-account"
+        next.linkID = "another-link"
+        try store.apply(.init(revision: 2, connection: next, amsID: "1"))
+        #expect(try store.read().snapshot.isEmpty)
+        #expect(try store.read().history.isEmpty)
+        #expect(try store.read().rules.isEmpty)
+        #expect(try store.read().selectedAMS == "1")
+        #expect(try store.read().registrations[old.endpoint]!.request.generation > registration.generation)
+        #expect(try !store.cache(snapshot, endpoint: old.endpoint, connection: old))
+        try store.cache(history: snapshot.readings, endpoint: old.endpoint, ams: "0", hours: 1, connection: old)
+        try store.cache(rules: [.init(name: "Late private rule", enabled: true, threshold: 25)], endpoint: old.endpoint, connection: old)
+        #expect(try store.read().snapshot.isEmpty)
+        #expect(try store.read().history.isEmpty)
+        #expect(try store.read().rules.isEmpty)
+        #expect(try store.cache(snapshot, endpoint: next.endpoint, connection: next))
+        try store.apply(.init(revision: 3, connection: nil, amsID: "1"))
+        #expect(try store.read().snapshot.isEmpty)
+        #expect(try !store.cache(snapshot, endpoint: next.endpoint, connection: next))
+    }
+
     @Test func widgetRecommendationsAcceptDynamicAMSNames() {
         // WidgetKit traps when an interpolated LocalizedStringKey reaches this initializer.
         #expect(WatchWidgetSetup.recommendations(amsIDs: ["1", "0", "1"]).count == 2)

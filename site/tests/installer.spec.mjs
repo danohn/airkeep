@@ -87,6 +87,7 @@ async function fakeSerial(page, { cancel = false, disconnectOnce = false, ignore
 async function fillSettings(page, password) {
   await page.getByLabel("Wi-Fi name").fill("Test network");
   await page.getByLabel("Wi-Fi password").fill(password);
+  await page.getByLabel("Airkeep service").selectOption("custom");
   await page.getByLabel("Relay HTTPS URL").fill("https://relay.example.org:8443/");
 }
 
@@ -161,4 +162,24 @@ test("identifies Airkeep, rejects invalid settings, and retries after a USB disc
   expect(JSON.parse(commands[3].slice("AIRKEEP_CONFIG ".length))).toEqual({
     ssid: "Test network", password: "test password", relayUrl: "https://relay.example.org:8443", amsId: "0",
   });
+});
+
+
+test("pairs through hosted service by default and retains a custom relay choice", async ({ page }) => {
+  await fakeSerial(page);
+  await page.goto(origin + "/pages/install/");
+  await page.getByRole("button", { name: "Connect display" }).click();
+  await page.getByLabel("Wi-Fi name").fill("Hosted network");
+  await expect(page.getByLabel("Airkeep service")).toHaveValue("hosted");
+  await expect(page.getByLabel("Relay HTTPS URL")).toBeHidden();
+  await page.getByLabel("Airkeep service").selectOption("custom");
+  await page.getByLabel("Relay HTTPS URL").fill("https://relay.example.org");
+  await page.getByLabel("Airkeep service").selectOption("hosted");
+  await page.getByLabel("Airkeep service").selectOption("custom");
+  await expect(page.getByLabel("Relay HTTPS URL")).toHaveValue("https://relay.example.org");
+  await page.getByLabel("Airkeep service").selectOption("hosted");
+  await page.getByRole("button", { name: "Save and restart" }).click();
+  await expect(page.locator("#setup-status")).toContainText("Settings saved");
+  const commands = await page.evaluate(() => window.commands);
+  expect(JSON.parse(commands[1].slice("AIRKEEP_CONFIG ".length)).relayUrl).toBe("https://dashboard.airkeep.io");
 });

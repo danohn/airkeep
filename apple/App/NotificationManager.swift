@@ -231,6 +231,19 @@ import UIKit
         } catch { permissionError = error.localizedDescription }
         await refresh()
     }
+    func connectionChanged() {
+        generation = UUID()
+        refreshTask?.cancel()
+        refreshTask = nil
+        confirmedConnection = nil
+        confirmedToken = nil
+        registration = .unchecked
+        server = .unchecked
+        receiveAlerts = nil
+        supportsSubscription = false
+        subscriptionError = nil
+        isRefreshing = false
+    }
     func refresh(forceRegistration: Bool = false) async {
         refreshTask?.cancel()
         let id = UUID()

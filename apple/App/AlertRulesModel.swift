@@ -59,6 +59,16 @@ import Observation
         guard let lastSynced else { return }
         dependencies.cache(connection.endpoint, .init(rules: rules, syncedAt: lastSynced))
     }
+    func connectionChanged() {
+        generation = UUID()
+        connection = dependencies.connection()
+        isRefreshing = false
+        isOnline = false
+        requiresUpdate = false
+        error = nil
+        busyIDs = []
+        restoreCache()
+    }
     func refresh() async {
         let current = dependencies.connection()
         if current != connection {
