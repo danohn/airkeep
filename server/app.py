@@ -287,8 +287,10 @@ def create_app(settings: Settings | None = None):
             install_oidc(app, oauth, settings, admin)
     if hosted:
         from hosted_accounts import install_hosted_accounts
+        from hosted_admin_routes import install_hosted_admin
         from hosted_ingest import install_ingest
         app.state.hosted_accounts = install_hosted_accounts(app, oauth, settings, principal)
+        install_hosted_admin(app, connection, app.state.hosted_accounts, settings)
         install_ingest(app, store, principal)
 
     @app.put('/v2/widgets/{installation_id}')

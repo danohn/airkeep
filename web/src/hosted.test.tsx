@@ -10,6 +10,14 @@ const request = vi.mocked(api);
 beforeEach(() => request.mockResolvedValue({}));
 afterEach(() => { cleanup(); vi.clearAllMocks(); history.replaceState(null, "", "/"); });
 describe("hosted account links", () => {
+  it("shows an explicit closed signup page with the privacy notice", () => {
+    history.replaceState(null, "", "/signup");
+    render(<HostedAccountFlow publicSignup={false} />);
+    expect(screen.getByRole("heading", { name: "Public signup is closed" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Privacy notice" }).getAttribute("href")).toBe("https://airkeep.io/privacy/");
+    expect(screen.queryByLabelText("Email address")).toBeNull();
+    expect(request).not.toHaveBeenCalled();
+  });
   it.each(["/signup/complete", "/reset-password"])("keeps the one-use token across StrictMode renders at %s", async (path) => {
     history.replaceState(null, "", path + "#token=" + "s".repeat(43));
     render(<StrictMode><HostedAccountFlow /></StrictMode>);

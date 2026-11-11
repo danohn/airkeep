@@ -16,6 +16,16 @@ def token_fingerprint(token):
     return hashlib.sha256(token.encode()).hexdigest()[:12] if token else None
 
 
+def push_setup(settings):
+    checks = []
+    for platform, topic in [('ios', settings.ios_topic), ('mac', settings.mac_topic), ('watch', settings.watch_topic)]:
+        for environment in ('sandbox', 'production'):
+            configuration, reason = settings.notification_configuration(platform, environment, topic)
+            checks.append({'platform': platform, 'topic': topic, 'environment': environment,
+                           'configuration': configuration, 'reason': reason})
+    return checks
+
+
 def record_attempt(store, now, kind, destination, token, environment, topic, outcome):
     store.execute('''INSERT INTO push_attempts(at,kind,destination,fingerprint,environment,topic,status,reason,apns_id)
         VALUES(?,?,?,?,?,?,?,?,?)''', (now,kind,destination,token_fingerprint(token),environment,topic,
@@ -180,15 +190,10 @@ def install_web(app, store, settings, auth, authorize_user, collector, admin, oa
     def overview():
         latest = store.readings()
         now = time.time()
-        checks = []
-        for platform, topic in [('ios',settings.ios_topic),('mac',settings.mac_topic),('watch',settings.watch_topic)]:
-            for environment in ('sandbox','production'):
-                configuration, reason = settings.notification_configuration(platform,environment,topic)
-                checks.append({'platform':platform,'topic':topic,'environment':environment,'configuration':configuration,'reason':reason})
         return {'version':app.version,'uptimeSeconds':now-started,'printerConnected':bool(collector and collector.connected),
                 'readingAgeSeconds': max((now-r.observedAt for r in latest),default=None),
                 'databaseBytes':store.rows('PRAGMA page_count')[0][0]*store.rows('PRAGMA page_size')[0][0],
-                'historyDays':7,'eventHistoryDays':7,'pushSetup':checks,
+                'historyDays':7,'eventHistoryDays':7,'pushSetup':push_setup(settings),
                 'counts':{table:store.rows('SELECT COUNT(*) FROM '+table)[0][0]
                     for table in ('samples','devices','activities','alert_rules','outbox')},
                 'timelineStartedAt':json.loads(store.rows("SELECT json FROM config WHERE id='events_started_at'")[0][0])}

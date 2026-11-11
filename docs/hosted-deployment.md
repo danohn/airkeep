@@ -12,7 +12,7 @@ uv run --no-project --python 3.14 python scripts/setup-hosted.py \
 
 dc=(docker compose --env-file server/.env.hosted -f server/compose.hosted.yml)
 "${dc[@]}" config --quiet
-"${dc[@]}" build migrate web
+"${dc[@]}" build api web
 "${dc[@]}" up -d --wait postgres
 "${dc[@]}" run --rm --no-deps migrate
 "${dc[@]}" up -d --wait api worker web ingress
@@ -46,15 +46,27 @@ Recreate API and worker after editing settings. Use this command to close signup
 "${dc[@]}" up -d --wait --force-recreate api worker
 ```
 
-Before enabling production signup, verify the following on staging with a controlled account and mailbox.
+Before enabling production signup for the web release, verify the following on staging with controlled accounts and email.
 
 1. Temporarily set `AIRKEEP_PUBLIC_SIGNUP=true` on staging. Complete email verification, sign-in and password reset. Check a reused or expired link fails, an unknown address gives the same reset response, and a reset revokes existing app and relay access. Close staging signup after testing.
-2. Enroll a LAN agent and verify the live snapshot, stale indicator and replayed history. Confirm two accounts with the same AMS ID have separate readings, rules and notifications. Verify Watch child-grant and ESP32 QR pairing, revocation and re-pairing. Check client caches clear on account replacement and sign-out.
+2. Enroll a LAN agent and verify the live snapshot and replayed history. Confirm two accounts with the same AMS ID have separate readings and rules. Verify hosted Admin access, tenant selection, suspension, reactivation, invitations, and email resets.
 3. Delete a disposable account from `/account`. Confirm sign-in and all prior grants fail, `python hosted_admin.py deletion-ledger` in the API container shows the deletion entry, and an isolated restore of a backup from before deletion removes the account and its data when supplied the latest ledger.
-4. Check release builds from iOS TestFlight with Watch, macOS TestFlight, and the signed Developer ID DMG. Check DMG notarization, checksum and provenance with [the Apple release runbook](apple-release.md).
-5. Verify off-host backup delivery, 30-day expiration and a completed isolated restore. Confirm the privacy notice and support contact match the live account and data deletion paths.
+4. Verify encrypted backups, 30-day expiration, and a completed isolated restore. Confirm the public privacy notice and support contact match the live account and data deletion paths.
 
 Enable production signup by setting `AIRKEEP_PUBLIC_SIGNUP=true`, recreating API and worker, and checking `/auth/session` plus a controlled production verification message. Keep the env flag off when the checks above are still pending.
+
+Verify signed Apple builds, push delivery, Watch pairing, and client account switching for the Apple release. Verify ESP32 pairing on hardware for the display release. Off-host backup delivery is deferred for this web release. The on-server backup covers restore drills and database recovery while the VPS and its backup disk are available.
+
+## Cloud administrators
+
+Grant or remove a hosted administrator role by canonical email from the API container.
+
+```bash
+"${dc[@]}" exec -T api python hosted_admin.py grant-admin operator@example.com
+"${dc[@]}" exec -T api python hosted_admin.py revoke-admin operator@example.com
+```
+
+The account must already exist and be active. Role changes preserve ordinary client and relay grants. The Admin dashboard can view service health and selected-account diagnostics, suspend and reactivate member accounts, and queue invitations or password-reset emails. Audit events appear in the API container logs. Preserve the output of host role changes in the operator log.
 
 ## Verification pipeline
 
@@ -132,7 +144,7 @@ Before starting application containers, invalidate restored sessions, relay enro
 ```bash
 "${rc[@]}" exec -T postgres psql -X --set=ON_ERROR_STOP=1 -U airkeep_migration -d airkeep <<'SQL'
 BEGIN;
-UPDATE public.accounts SET hash='!reset-required',version=version+1;
+UPDATE public.accounts SET hash='!reset-required',version=version+1,role='member';
 UPDATE public.oauth_grants SET revoked=1;
 UPDATE public.relay_credentials SET revoked=1;
 DELETE FROM public.oauth_requests;
@@ -147,6 +159,8 @@ DELETE FROM airkeep_data.widget_installations;
 COMMIT;
 SQL
 ```
+
+After recovery, regrant cloud administrator roles from the current operator list once the intended accounts have recovered access.
 
 After verification and cutover, remove the temporary recovery container and its named volume. Record the backup date, latest ledger date, and restore check results without recording account IDs or credentials.
 

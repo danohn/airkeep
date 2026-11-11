@@ -1267,6 +1267,48 @@ tbody tr:hover {
 .hosted-setup a { text-decoration: underline; text-underline-offset: 3px; }
 .hosted-setup button { padding: 10px 0; color: var(--amber); }
 .hosted-setup .notice { display: grid; gap: 12px; }
+.hosted-admin-scope,
+.hosted-admin-card {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.hosted-admin-scope,
+.hosted-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+.hosted-admin-scope > div,
+.hosted-admin-actions > div {
+  display: grid;
+  gap: 8px;
+  flex: 1 1 230px;
+  max-width: 440px;
+  min-width: 0;
+}
+.hosted-admin-scope select,
+.hosted-admin-actions input {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: inherit;
+  background: var(--surface);
+  font: inherit;
+}
+.hosted-admin-card h2 { margin: 0 0 12px; overflow-wrap: anywhere; }
+.hosted-admin-card p { margin: 12px 0; }
+.hosted-admin-account-link {
+  color: var(--amber);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.hosted-admin-scope .load-more,
+.hosted-admin-actions .load-more { margin: 0; }
 @media (max-width: 650px) {
   .hosted-setup { margin: 16px; padding: 20px; }
 }

@@ -106,10 +106,7 @@ class HostedAccounts:
         now = time.time()
         address = request.client.host if request.client else ''
         with self.store.transaction() as db:
-            ip_ok = limited(db, self.oauth.key, 'email-ip', address, 30, 900, now)
-            email_ok = limited(db, self.oauth.key, 'email-account', email, 4, 900, now)
-            global_ok = limited(db, self.oauth.key, 'email-global', '', 600, 900, now)
-            if not (ip_ok and email_ok and global_ok):
+            if not self.allow_email(db, email, address, now):
                 return GENERIC
             row = db.execute('SELECT * FROM accounts WHERE username=?', (email,)).fetchone()
             if (kind == 'signup' and row) or (kind == 'reset' and (not row or row['disabled'])):
@@ -118,16 +115,29 @@ class HostedAccounts:
                 row = lock_account(self.store, row['id'])
                 if not row or row['disabled']:
                     return GENERIC
-            token = random_token()
-            expires = now + (3600 if kind == 'signup' else 1200)
-            db.execute('''INSERT INTO hosted_account_links
-                (hash,kind,email,account_id,account_version,created,expires) VALUES(?,?,?,?,?,?,?)''',
-                (digest(token), kind, email, row['id'] if row else None,
-                 row['version'] if row else None, now, expires))
-            db.execute('''INSERT INTO hosted_email_outbox
-                (id,link_hash,sealed_secret,next_attempt,created,updated) VALUES(?,?,?,?,?,?)''',
-                (random_token(), digest(token), self.cipher.encrypt(token.encode()).decode(), now, now, now))
+            self.queue_link(db, kind, email, row, now)
         return GENERIC
+
+    def allow_email(self, db, email, address, now, *, actor=None):
+        key = self.oauth.key
+        if actor and not limited(db, key, 'email-admin', actor, 20, 900, now):
+            return False
+        ip_ok = limited(db, key, 'email-ip', address, 30, 900, now)
+        email_ok = limited(db, key, 'email-account', email, 4, 900, now)
+        global_ok = limited(db, key, 'email-global', '', 600, 900, now)
+        return ip_ok and email_ok and global_ok
+
+    def queue_link(self, db, kind, email, account, now):
+        token = random_token()
+        link_hash = digest(token)
+        expires = now + (3600 if kind == 'signup' else 1200)
+        db.execute('''INSERT INTO hosted_account_links
+            (hash,kind,email,account_id,account_version,created,expires) VALUES(?,?,?,?,?,?,?)''',
+            (link_hash, kind, email, account['id'] if account else None,
+             account['version'] if account else None, now, expires))
+        db.execute('''INSERT INTO hosted_email_outbox
+            (id,link_hash,sealed_secret,next_attempt,created,updated) VALUES(?,?,?,?,?,?)''',
+            (random_token(), link_hash, self.cipher.encrypt(token.encode()).decode(), now, now, now))
 
     def complete(self, body, request, kind):
         self.oauth.same_origin(request)
