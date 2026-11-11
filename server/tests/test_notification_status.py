@@ -13,7 +13,7 @@ def configuration(tmp_path, **overrides):
 
 
 def status(client, **overrides):
-    params = dict(device="mac-one", platform="mac", environment="sandbox", bundle_id="io.airkeep.mac")
+    params = dict(device="mac-one", platform="mac", environment="sandbox", bundle_id="io.airkeep")
     params.update(overrides)
     return client.get("/v1/notifications/status", params=params)
 

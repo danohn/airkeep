@@ -10,8 +10,8 @@ The default identifiers are:
 | --- | --- |
 | iOS/iPadOS app | `io.airkeep` |
 | iOS widget and Live Activity extension | `io.airkeep.widgets` |
-| Mac app | `io.airkeep.mac` |
-| Mac widget extension | `io.airkeep.mac.widgets` |
+| Mac app | `io.airkeep` |
+| Mac widget extension | `io.airkeep.macwidgets` |
 | Watch companion | `io.airkeep.watch` |
 | Watch widget extension | `io.airkeep.watch.widgets` |
 

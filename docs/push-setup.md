@@ -5,7 +5,7 @@ Remote alerts need an Apple Developer Program team and an APNs token-signing key
 ## Configure APNs
 
 1. In Apple Developer → Certificates, Identifiers & Profiles → Keys, create separate sandbox and production topic-specific APNs keys restricted to your configured iOS and Mac bundle IDs. Record the key IDs and team ID. Store the keys in a private directory with owner-only permissions. The Docker deployment mounts them read-only from its private runtime directory.
-2. Enable Push Notifications and provision both app identifiers as described in [Apple setup](apple-setup.md).
+2. Enable Push Notifications and provision the shared iOS and macOS app identifier as described in [Apple setup](apple-setup.md).
 3. Set the relay's APNs configuration in its ignored `.env`:
 
 ```dotenv
@@ -16,7 +16,7 @@ AIRKEEP_APNS_KEY_ENVIRONMENT=sandbox
 AIRKEEP_APNS_PRODUCTION_KEY_ID=YOUR_PRODUCTION_KEY_ID
 AIRKEEP_APNS_PRODUCTION_KEY_PATH=/private/path/AuthKey_PRODUCTION_KEY_ID.p8
 AIRKEEP_IOS_TOPIC=io.airkeep
-AIRKEEP_MAC_TOPIC=io.airkeep.mac
+AIRKEEP_MAC_TOPIC=io.airkeep
 ```
 
 4. Restart the relay. In Settings → Relay, check Apple push setup. "Configuration found" means the relay has a readable P-256 key for this app's topic and push environment. It does not verify Apple's topic authorization or delivery. Advanced shows the read-only environment and app topic.

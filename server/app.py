@@ -160,7 +160,7 @@ def create_app(settings: Settings | None = None):
         await push.close()
         store.close()
 
-    app = FastAPI(title="Airkeep relay",version="0.5.0",lifespan=lifespan,docs_url=None,redoc_url=None)
+    app = FastAPI(title="Airkeep relay",version="0.5.1",lifespan=lifespan,docs_url=None,redoc_url=None)
     app.state.store, app.state.collector, app.state.push = store, collector, push
     security = HTTPBearer(auto_error=False)
     browser = BrowserAuth(store,settings)
@@ -433,7 +433,10 @@ def create_app(settings: Settings | None = None):
         identity=Depends(alert_device),
     ):
         topic = device_topic(platform, identity)
-        owned = not identity or bool(store.rows("SELECT 1 FROM registration_owners WHERE kind='device' AND id=? AND grant_id=?",(device,identity.grant)))
+        client = "watch" if platform == "watch" else f"apple-{platform}"
+        owned = not identity or (identity.client == client and bool(store.rows(
+            "SELECT 1 FROM registration_owners WHERE kind='device' AND id=? AND grant_id=?", (device, identity.grant)
+        )))
         rows = store.rows(
             "SELECT receive_alerts FROM devices WHERE id=? AND topic=? AND environment=?",
             (device, topic, environment),

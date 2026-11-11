@@ -13,8 +13,8 @@ import zipfile
 
 TARGETS = {
     "ios-store": {"": "IOS", ".widgets": "IOS_WIDGETS", ".watch": "WATCH", ".watch.widgets": "WATCH_WIDGETS"},
-    "mac-store": {".mac": "MAC", ".mac.widgets": "MAC_WIDGETS"},
-    "mac-direct": {".mac": "MAC", ".mac.widgets": "MAC_WIDGETS"},
+    "mac-store": {"": "MAC", ".macwidgets": "MAC_WIDGETS"},
+    "mac-direct": {"": "MAC", ".macwidgets": "MAC_WIDGETS"},
 }
 
 
@@ -62,6 +62,7 @@ def main():
     installed_paths = directory / "installed-profiles.txt"
     installed_paths.write_text("")
     app_group = os.environ.get("APPLE_APP_GROUP") or "group." + prefix
+    platform = "iOS" if args.mode == "ios-store" else "OSX"
     with zipfile.ZipFile(io.BytesIO(base64.b64decode(os.environ["PROFILES_BASE64"], validate=True))) as archive:
         for item in archive.infolist():
             if Path(item.filename).suffix not in {".mobileprovision", ".provisionprofile"}:
@@ -74,7 +75,7 @@ def main():
             entitlements = profile.get("Entitlements", {})
             identifier = entitlements.get("application-identifier", entitlements.get("com.apple.application-identifier", ""))
             bundle_id = identifier.partition(".")[2]
-            if bundle_id not in required:
+            if bundle_id not in required or platform not in profile.get("Platform", []):
                 continue
             uuid = validate_profile(profile, team, bundle_id, app_group, args.mode == "mac-direct")
             if bundle_id in profiles:

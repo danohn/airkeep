@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     apns_production_key_id: str = ""
     apns_production_key_path: str = ""
     ios_topic: str = "io.airkeep"
-    mac_topic: str = "io.airkeep.mac"
+    mac_topic: str = "io.airkeep"
     watch_topic: str = "io.airkeep.watch"
     watch_apns_key_id: str = ""
     watch_apns_key_path: str = ""
