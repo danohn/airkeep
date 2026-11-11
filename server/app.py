@@ -101,7 +101,12 @@ async def tick(store: Store, settings: Settings, push: APNs, now: float, multius
 
 def create_app(settings: Settings | None = None):
     settings = settings or Settings()
-    store = Store(settings.db_path)
+    hosted = settings.deployment == 'hosted'
+    if hosted:
+        from postgres import PostgresStore
+        store = PostgresStore(settings.database_url.get_secret_value())
+    else:
+        store = Store(settings.db_path)
     if not settings.jwt_signing_key and store.rows("SELECT 1 FROM config WHERE id='accounts_enabled'"):
         store.close()
         raise RuntimeError('Set the JWT signing key to start a relay with accounts.')
@@ -127,13 +132,14 @@ def create_app(settings: Settings | None = None):
             if not settings.printer_ip or not settings.printer_serial or not settings.printer_code:
                 raise RuntimeError("Set printer IP, serial and LAN access code in .env")
             collector.start()
-        task = asyncio.create_task(monitor())
+        task = None if hosted else asyncio.create_task(monitor())
         yield
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
         if collector:
             collector.stop()
         await push.close()
@@ -143,6 +149,28 @@ def create_app(settings: Settings | None = None):
     app.state.store, app.state.collector, app.state.push = store, collector, push
     security = HTTPBearer(auto_error=False)
     browser = BrowserAuth(store,settings)
+
+    if hosted:
+        from postgres import tenant_id
+        from starlette.concurrency import run_in_threadpool
+
+        @app.middleware('http')
+        async def tenant_scope(request: Request, call_next):
+            context = tenant_id.set('')
+            try:
+                header = request.headers.get('authorization', '')
+                try:
+                    if header.startswith('Bearer '):
+                        identity = await run_in_threadpool(oauth.authenticate, header[7:])
+                    else:
+                        identity = await run_in_threadpool(oauth.browser_session, request)
+                except HTTPException:
+                    identity = None
+                if identity:
+                    tenant_id.set(identity.user)
+                return await call_next(request)
+            finally:
+                tenant_id.reset(context)
 
     def connection(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)):
         if not oauth:
@@ -155,7 +183,7 @@ def create_app(settings: Settings | None = None):
 
     def principal(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)):
         identity = connection(request, credentials)
-        if identity.client == 'esp32':
+        if identity.client not in ('dashboard', 'apple-ios', 'apple-mac', 'watch'):
             raise HTTPException(403, 'This display connection is limited to live readings.')
         return identity
 
@@ -171,6 +199,8 @@ def create_app(settings: Settings | None = None):
         return authorize_user(request, credentials)
 
     def admin(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)):
+        if hosted:
+            raise HTTPException(403, 'Use the hosted operator command for platform administration.')
         if not oauth:
             return browser.require(request)
         identity = principal(request, credentials)
@@ -234,6 +264,11 @@ def create_app(settings: Settings | None = None):
         install_accounts(app,oauth,principal,admin,connection)
         if settings.oidc_issuer:
             install_oidc(app, oauth, settings, admin)
+    if hosted:
+        from hosted_accounts import install_hosted_accounts
+        from hosted_ingest import install_ingest
+        app.state.hosted_accounts = install_hosted_accounts(app, oauth, settings, principal)
+        install_ingest(app, store, principal)
 
     @app.put('/v2/widgets/{installation_id}')
     def register_widgets(installation_id: str, body: WidgetRegistration, identity=Depends(watch)):
@@ -256,13 +291,19 @@ def create_app(settings: Settings | None = None):
 
     @app.get("/health")
     def health():
+        if hosted:
+            store.rows('SELECT 1')
         return {"ok":True}
 
     @app.get("/v1/snapshot")
     def snapshot(identity=Depends(snapshot_access)):
         now = time.time()
+        connected = bool(collector and collector.connected)
+        if hosted:
+            from hosted_ingest import relay_status
+            connected = relay_status(store, now)['status'] in ('connected', 'stale_readings', 'waiting_for_ams')
         value = {"serverTime":now,"staleAfter":settings.stale_seconds,
-                 "printerConnected":bool(collector and collector.connected),
+                 "printerConnected":connected,
                  "readings":store.readings()}
         if not oauth:
             value.update(pushConfigured=settings.apns_ready,alertRule=store.rule(),alertActive=store.alert().active)

@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from accounts import Principal, digest, random_token
 
 CLIENT = 'esp32'
+RELAY_CLIENT = 'airkeep-relay'
 GRANT = 'urn:ietf:params:oauth:grant-type:device_code'
 ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 LIFETIME = 600
@@ -52,6 +53,8 @@ class DeviceFlow:
     def __init__(self, oauth):
         self.oauth = oauth
         self.store = oauth.store
+        if getattr(self.store, 'hosted', False):
+            return
         with self.store.lock, self.store.db:
             self.store.db.executescript("""
                 CREATE TABLE IF NOT EXISTS oauth_device_requests(
@@ -70,7 +73,7 @@ class DeviceFlow:
                                     headers={'Retry-After': '300'})
         db.executemany('INSERT INTO oauth_attempts VALUES(?,?)', ((bucket, now) for bucket, _ in buckets))
 
-    def start(self, installation, address):
+    def start(self, installation, address, client=CLIENT):
         now = time.time()
         device = random_token()
         with self.store.transaction() as db:
@@ -84,6 +87,8 @@ class DeviceFlow:
                 (device_hash,user_hash,installation,expires,next_poll,poll_interval)
                 VALUES(?,?,?,?,?,?)''',
                 (digest(device), digest(short), installation, now + LIFETIME, now + INTERVAL, INTERVAL))
+            if getattr(self.store, 'hosted', False):
+                db.execute('UPDATE oauth_device_requests SET client=? WHERE device_hash=?', (client, digest(device)))
         code = short[:4] + '-' + short[4:]
         uri = self.oauth.origin + '/device'
         return {'device_code': device, 'user_code': code, 'verification_uri': uri,
@@ -98,7 +103,7 @@ class DeviceFlow:
             if not actor:
                 raise HTTPException(401, 'Sign in to Airkeep.')
             self.limit(db, [('display-check:ip:' + address, 40), ('display-check:user:' + identity.user, 20)], now)
-            row = db.execute('''SELECT installation,expires FROM oauth_device_requests
+            row = db.execute('''SELECT * FROM oauth_device_requests
                 WHERE user_hash=? AND expires>? AND decision='pending' ''', (digest(code), now)).fetchone()
             if row and approve is not None:
                 version = db.execute('SELECT version FROM accounts WHERE id=?', (identity.user,)).fetchone()['version']
@@ -107,17 +112,23 @@ class DeviceFlow:
         # Failed lookups still count against the limit.
         if not row:
             raise HTTPException(404, 'This pairing code is invalid or has expired.')
-        return {'user_code': code[:4] + '-' + code[4:], 'display': 'ESP32 display · ' + row['installation'][-4:],
-                'expires_at': row['expires']}
+        client = row['client'] if getattr(self.store, 'hosted', False) else CLIENT
+        label = 'LAN relay' if client == RELAY_CLIENT else 'ESP32 display'
+        return {'user_code': code[:4] + '-' + code[4:], 'display': label + ' · ' + row['installation'][-4:],
+                'client_id': client, 'expires_at': row['expires']}
 
     def exchange(self, data):
-        if data.get('client_id') != CLIENT or not data.get('device_code'):
+        client = data.get('client_id')
+        allowed = (CLIENT, RELAY_CLIENT) if getattr(self.store, 'hosted', False) else (CLIENT,)
+        if client not in allowed or not data.get('device_code'):
             return oauth_error('invalid_grant')
         now = time.time()
         with self.store.transaction() as db:
             row = db.execute('SELECT * FROM oauth_device_requests WHERE device_hash=?',
                              (digest(data['device_code']),)).fetchone()
             if not row or row['decision'] == 'used':
+                return oauth_error('invalid_grant')
+            if getattr(self.store, 'hosted', False) and row['client'] != client:
                 return oauth_error('invalid_grant')
             if row['expires'] <= now:
                 return oauth_error('expired_token')
@@ -136,6 +147,12 @@ class DeviceFlow:
             db.execute("UPDATE oauth_device_requests SET decision='used' WHERE device_hash=?", (row['device_hash'],))
             if not owner or owner['version'] != row['owner_version']:
                 return oauth_error('access_denied')
+            if client == RELAY_CLIENT:
+                from hosted_ingest import enroll_relay
+                return enroll_relay(self.store, row['owner'])
+            if getattr(self.store, 'hosted', False):
+                with self.store.tenant(row['owner']):
+                    return self.oauth.grant(row['owner'], CLIENT, row['installation'])
             return self.oauth.grant(row['owner'], CLIENT, row['installation'])
 
 
@@ -156,11 +173,12 @@ def install_device_flow(app, oauth, principal):
         if 'origin' in request.headers:
             oauth.same_origin(request)
         data = await form_data(request)
-        if not data or data.get('client_id') != CLIENT or not INSTALLATION.fullmatch(data.get('installation_id', '')):
+        allowed = (CLIENT, RELAY_CLIENT) if getattr(oauth.store, 'hosted', False) else (CLIENT,)
+        if not data or data.get('client_id') not in allowed or not INSTALLATION.fullmatch(data.get('installation_id', '')):
             return oauth_error('invalid_request')
         if not oauth.origin.startswith('https://'):
             return oauth_error('invalid_request')
-        return await run_in_threadpool(flow.start, data['installation_id'], address(request))
+        return await run_in_threadpool(flow.start, data['installation_id'], address(request), data['client_id'])
 
     @app.post('/auth/device/verify')
     def verify(body: Verification, request: Request, identity: Principal = Depends(principal)):

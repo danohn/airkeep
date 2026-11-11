@@ -229,6 +229,9 @@ class Store:
                 payload = json.dumps({'aps':{'alert':{'title':title,'body':body},'sound':'default',
                                              'thread-id':f'airkeep.ams.{rule.amsID}'},
                                       'amsID':rule.amsID,'ruleID':row['id'],'eventID':event_id})
+                if getattr(self, 'hosted', False):
+                    payload = json.dumps({'aps': {'alert': {'title': 'Airkeep humidity alert',
+                        'body': 'Open Airkeep to view your current alerts.'}, 'sound': 'default'}})
                 if multiuser:
                     self.db.execute("""INSERT INTO outbox(device,json,next,created,rule_id)
                         SELECT d.id,?,?,?,? FROM devices d JOIN registration_owners o
