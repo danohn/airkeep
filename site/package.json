@@ -1,0 +1,14 @@
+{
+  "name": "airkeep-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "esp-web-tools": "10.4.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1"
+  }
+}

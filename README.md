@@ -65,9 +65,9 @@ The dashboard runs in an Nginx container alongside the Python backend. Nginx ser
 
 Each user has their own rules and a seven-day timeline of triggered and recovered alerts. Administrators can create accounts and switch to Admin view. Admin view shows relay health, device subscriptions, Live Activity sessions, Watch widget registrations and recent APNs requests. Manage rules in User view and device subscriptions in each Apple app. Successful push requests are labelled **Accepted by Apple**.
 
-## Build the desk display
+## Install the desk display
 
-The firmware targets **Waveshare ESP32-S3-Touch-AMOLED-1.8 V2**, with a CO5300 panel and CST820 touch controller. It uses LVGL and an existing ESP-IDF v5.5.x installation. The build helper searches for an installed SDK.
+The firmware targets **Waveshare ESP32-S3-Touch-AMOLED-1.8 V2**, with a CO5300 panel and CST820 touch controller. Use the [web installer](https://airkeep.io/install/) to flash and configure it over USB. To build from source, use ESP-IDF v5.5.x. The build helper searches for an installed SDK.
 
 ```sh
 scripts/idf.sh menuconfig
@@ -78,7 +78,7 @@ scripts/idf.sh -p /dev/cu.YOUR_BOARD flash monitor
 
 Tap **Pair display**, scan the QR code, then sign in to Airkeep and approve the code. Tap **Details** on the display to adjust brightness. [Firmware setup](firmware/README.md) covers the board, networking and host renderer.
 
-Wi-Fi credentials are stored in ignored local configuration and compiled firmware. Keep those binaries private.
+USB setup saves Wi-Fi settings on the display. Keep binaries built with Wi-Fi credentials private.
 
 ## Alerts and monitoring
 
@@ -132,6 +132,6 @@ git tag -a v0.4.0 <merge-commit> -m 'Airkeep 0.4.0'
 git push origin v0.4.0
 ```
 
-GitHub Actions publishes `airkeep-relay:0.4.0` and `airkeep-web:0.4.0` to GHCR, verifies both images, then creates the GitHub Release with their digests. The numbered tags pin a matching pair. The rolling `latest` tags track successful builds from `main`.
+GitHub Actions publishes the matching relay and dashboard images to GHCR, then creates the GitHub Release with their digests and the checked ESP32 factory image. After release, GitHub Pages publishes the same firmware and checksum to the web installer. The rolling container `latest` tags track successful builds from `main`.
 
 [Brand assets](design/brand/README.md) contain the editable logos, GitHub artwork and native app icon. Airkeep is available under the [MIT license](LICENSE).

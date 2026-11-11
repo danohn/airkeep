@@ -15,6 +15,7 @@
 #include "nvs.h"
 #include "display_relay.h"
 #include "relay_snapshot.h"
+#include "setup.h"
 #include "ui.h"
 
 #define SECOND 1000000LL
@@ -202,7 +203,7 @@ static void poll_snapshot(relay_t *relay, credentials_t *creds)
     gettimeofday(&now, NULL);
     airkeep_reading_t reading;
     bool connected;
-    if (airkeep_parse_snapshot(relay->response.body, relay->response.size, CONFIG_AIRKEEP_AMS_ID,
+    if (airkeep_parse_snapshot(relay->response.body, relay->response.size, airkeep_config.ams_id,
             now.tv_sec + now.tv_usec / 1000000.0, esp_timer_get_time(), &reading, &connected)) {
         static bool reported;
         if (!reported) {
@@ -221,9 +222,7 @@ void airkeep_relay_task(void *network)
     relay_t *relay = calloc(1, sizeof(*relay));
     credentials_t *creds = calloc(1, sizeof(*creds));
     if (!relay || !creds) abort();
-    strlcpy(relay->origin, CONFIG_AIRKEEP_RELAY_URL, sizeof(relay->origin));
-    size_t len = strlen(relay->origin);
-    if (relay->origin[len - 1] == '/') relay->origin[len - 1] = 0;
+    strlcpy(relay->origin, airkeep_config.relay_url, sizeof(relay->origin));
     const esp_http_client_config_t config = {
         .url = relay->origin, .crt_bundle_attach = esp_crt_bundle_attach,
         .event_handler = receive, .user_data = &relay->response, .timeout_ms = 10000,

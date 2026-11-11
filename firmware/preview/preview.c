@@ -51,7 +51,7 @@ lv_display_t *airkeep_display_start(void)
 }
 int main(int argc,char **argv)
 {
-    airkeep_ui_start();
+    airkeep_ui_start("https://airkeep.example.com:8443", "0");
     if (argc>1 && !strcmp(argv[1],"--test-relay-state")) {
         airkeep_reading_t reading={.humidity=25,.temperature=27.1,.sampled_us=now_us-120000000,.stale_after_seconds=60};
         airkeep_ui_reading(&reading);
