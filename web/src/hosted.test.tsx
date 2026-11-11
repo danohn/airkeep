@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { api } from "./api";
+import { App } from "./App";
 import { HostedAccountFlow } from "./HostedAccounts";
 vi.mock("./api", async () => ({ ...(await vi.importActual("./api")), api: vi.fn() }));
 const request = vi.mocked(api);
@@ -27,4 +28,13 @@ describe("hosted account links", () => {
     expect(screen.getByRole("link", { name: "Request a fresh email link" }).getAttribute("href")).toBe("/forgot-password");
     expect(screen.queryByRole("button", { name: "Set password" })).toBeNull();
   });
+});
+
+
+it("shows hosted sign-in again when the OAuth callback has expired", async () => {
+  history.replaceState(null, "", "/auth/callback?code=expired");
+  request.mockResolvedValue({ authenticated: false, configured: true, mode: "oauth", hosted: true });
+  render(<App />);
+  await screen.findByText("Start sign-in again.");
+  expect(screen.getByLabelText("Email address")).toBeTruthy();
 });

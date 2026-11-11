@@ -111,10 +111,15 @@ export function App() {
         if (launchSSO) history.replaceState(null, "", "/");
         let next = initial;
         if (initial.mode === "oauth") {
-          if (initial.configured && await finishDashboardAuthorization()) {
-            next = await api<Session>("/auth/session");
-          } else if (mounted && launchSSO && initial.configured && initial.oidc_label && !initial.authenticated) {
-            await startOIDC(await beginDashboardSignIn());
+          try {
+            if (initial.configured && await finishDashboardAuthorization()) {
+              next = await api<Session>("/auth/session");
+              if (mounted && location.pathname === "/account") setPage("password");
+            } else if (mounted && launchSSO && initial.configured && initial.oidc_label && !initial.authenticated) {
+              await startOIDC(await beginDashboardSignIn());
+            }
+          } catch (error) {
+            if (mounted) setSessionError((error as Error).message);
           }
         }
         if (mounted) {
@@ -149,8 +154,9 @@ export function App() {
       setRulesError((e as Error).message);
     }
   };
+  const publicAccountFlow = session?.hosted && hostedAccountPaths.includes(location.pathname);
   useEffect(() => {
-    if (!session?.authenticated) return;
+    if (!session?.authenticated || publicAccountFlow) return;
     let active = true;
     const load = async () => {
       if (document.hidden) return;
@@ -188,12 +194,14 @@ export function App() {
     void load();
     const t = setInterval(load, 5000);
     document.addEventListener("visibilitychange", load);
+    window.addEventListener("focus", load);
     return () => {
       active = false;
       clearInterval(t);
       document.removeEventListener("visibilitychange", load);
+      window.removeEventListener("focus", load);
     };
-  }, [session?.authenticated, session?.account?.id]);
+  }, [session?.authenticated, session?.account?.id, publicAccountFlow]);
   const enabledAlerts = rules.filter((rule) => rule.enabled).length;
   const reading = snapshot?.readings.find((r) => r.amsID === ams);
   const stale =
@@ -211,7 +219,7 @@ export function App() {
   };
   useEffect(() => {
     const sync = () => {
-      const value = (location.pathname === "/account" ? "password" : location.hash.slice(1)) as Page;
+      const value = (location.hash.slice(1) || (location.pathname === "/account" ? "password" : "")) as Page;
       if (value === "password" || value === "accounts" || [...userPages, ...adminPages].some((p) => p[0] === value)) {
         setPage(value);
         setMode(value === "accounts" || adminPages.some((p) => p[0] === value) ? "admin" : "user");
@@ -226,7 +234,7 @@ export function App() {
   const effectiveMode = canAdmin ? mode : "user";
   const adminPage = adminPages.some(([key]) => key === page);
   const effectivePage = !canAdmin && (adminPage || page === "accounts") ? "overview" : page;
-  if (session?.hosted && hostedAccountPaths.includes(location.pathname)) return <HostedAccountFlow />;
+  if (publicAccountFlow) return <HostedAccountFlow />;
   if (!session?.authenticated && oauth)
     return <AccountLogin configured={session.configured} error={sessionError} oidcLabel={session.oidc_label} hosted={session.hosted} publicSignup={session.public_signup} />;
   if (!session?.authenticated)
