@@ -8,7 +8,7 @@ from fastapi import HTTPException, Response
 import httpx
 import pytest
 
-from accounts import OAuth, PASSWORD
+from accounts import OAuth, PASSWORD, revoke_user
 from hosted_accounts import CompleteLink, DeleteAccount, EmailAddress, EmailSettings, HostedAccounts, login_limit
 from storage import Store
 
@@ -167,3 +167,17 @@ def test_browser_account_guard_rejects_reads_and_writes_after_cookie_switch(host
             service.oauth.browser_session(request)
         assert caught.value.status_code == 409
         assert caught.value.headers['X-Airkeep-Account-Changed'] == '1'
+
+
+def test_password_revocation_disables_hosted_relay_credentials(hosted):
+    service, request = hosted
+    account = signup(service, request)
+    service.store.execute('CREATE TABLE relay_credentials(hash TEXT,user TEXT,revoked INTEGER DEFAULT 0)')
+    service.store.execute('INSERT INTO relay_credentials(hash,user) VALUES(?,?)', ('relay-hash',account['id']))
+    service.store.hosted = True
+    try:
+        with service.store.transaction():
+            revoke_user(service.store, account['id'])
+        assert service.store.rows('SELECT revoked FROM relay_credentials')[0]['revoked'] == 1
+    finally:
+        service.store.hosted = False

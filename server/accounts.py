@@ -113,6 +113,8 @@ def revoke_grant(store, grant_id):
 
 
 def revoke_user(store, user):
+    if getattr(store, 'hosted', False):
+        store.db.execute('UPDATE relay_credentials SET revoked=1 WHERE user=?', (user,))
     for row in store.db.execute('SELECT id FROM oauth_grants WHERE user=? AND revoked=0 AND parent IS NULL', (user,)).fetchall():
         revoke_grant(store, row['id'])
 
