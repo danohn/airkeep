@@ -332,7 +332,7 @@ class OAuth:
         now = time.time()
         updated = db.execute('''UPDATE oauth_requests SET user=?,version=?,code=?,expires=?
             WHERE id=? AND code IS NULL AND expires>?''',
-                             (user_id, version, digest(code), now+60, transaction['id']))
+                             (user_id, version, digest(code), now+60, transaction['id'], now))
         if not updated.rowcount:
             raise HTTPException(400, 'Start sign-in again.')
         return transaction['redirect']+'?'+urlencode({'code':code,'state':transaction['state']})
