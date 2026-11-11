@@ -160,7 +160,7 @@ def create_app(settings: Settings | None = None):
         await push.close()
         store.close()
 
-    app = FastAPI(title="Airkeep relay",version="0.5.1",lifespan=lifespan,docs_url=None,redoc_url=None)
+    app = FastAPI(title="Airkeep relay",version="0.5.2",lifespan=lifespan,docs_url=None,redoc_url=None)
     app.state.store, app.state.collector, app.state.push = store, collector, push
     security = HTTPBearer(auto_error=False)
     browser = BrowserAuth(store,settings)
