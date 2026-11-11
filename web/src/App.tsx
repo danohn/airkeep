@@ -38,6 +38,7 @@ import type {
 import { AccountLogin, AccountSettings, beginDashboardSignIn, startOIDC } from "./AccountAuth";
 import { clearLegacyBrowserCredentials, finishDashboardAuthorization, type Account } from "./auth";
 import { HostedAccountFlow, hostedAccountPaths } from "./HostedAccounts";
+import { HostedAdmin, hostedAdminPath } from "./HostedAdmin";
 import { HostedSetup } from "./HostedSetup";
 import { DevicePairing } from "./DevicePairing";
 import "@fontsource/quicksand/latin-700.css";
@@ -168,6 +169,7 @@ export function App() {
             window.dispatchEvent(new Event("airkeep:account-changed"));
             return;
           }
+          if (latest.account?.role !== session.account?.role) setSession(latest);
         } catch { return; }
       }
       try {
@@ -201,7 +203,7 @@ export function App() {
       document.removeEventListener("visibilitychange", load);
       window.removeEventListener("focus", load);
     };
-  }, [session?.authenticated, session?.account?.id, publicAccountFlow]);
+  }, [session?.authenticated, session?.account?.id, session?.account?.role, publicAccountFlow]);
   const enabledAlerts = rules.filter((rule) => rule.enabled).length;
   const reading = snapshot?.readings.find((r) => r.amsID === ams);
   const stale =
@@ -230,11 +232,14 @@ export function App() {
     return () => window.removeEventListener("hashchange", sync);
   }, []);
   const oauth = session?.mode === "oauth";
-  const canAdmin = !session?.hosted && (!oauth || session.account?.role === "admin");
+  const canAdmin = !!session?.authenticated && (session.hosted
+    ? session.account?.role === "admin"
+    : !oauth || session.account?.role === "admin");
   const effectiveMode = canAdmin ? mode : "user";
+  const cloudAdmin = session?.hosted && effectiveMode === "admin";
   const adminPage = adminPages.some(([key]) => key === page);
   const effectivePage = !canAdmin && (adminPage || page === "accounts") ? "overview" : page;
-  if (publicAccountFlow) return <HostedAccountFlow />;
+  if (publicAccountFlow) return <HostedAccountFlow publicSignup={session?.public_signup} />;
   if (!session?.authenticated && oauth)
     return <AccountLogin configured={session.configured} error={sessionError} oidcLabel={session.oidc_label} hosted={session.hosted} publicSignup={session.public_signup} />;
   if (!session?.authenticated)
@@ -294,7 +299,7 @@ export function App() {
               {(canAdmin ? ["user", "admin"] as const : ["user"] as const).map((m) => (
                 <button
                   key={m}
-                  className={mode === m ? "chosen" : ""}
+                  className={effectiveMode === m ? "chosen" : ""}
                   onClick={() => {
                     setMode(m);
                     go(m === "user" ? "overview" : "relay");
@@ -324,7 +329,7 @@ export function App() {
       </aside>
       <main>
         <header className="topbar">
-          <div className="topbar-left">
+          {cloudAdmin ? <div className="topbar-left"><span>Cloud administration</span></div> : <div className="topbar-left">
             <div className="ams-select">
               <select
                 aria-label="AMS"
@@ -353,7 +358,7 @@ export function App() {
                     ? session.hosted ? "Connected through relay" : "Connected locally"
                     : "Printer reconnecting"}
             </span>
-          </div>
+          </div>}
           <div className="date">
             <span>
               {new Date(tick * 1000).toLocaleDateString([], {
@@ -372,13 +377,18 @@ export function App() {
             </span>
           </div>
         </header>
-        {connectionError && (
+        {!cloudAdmin && connectionError && (
           <p className="notice" role="status">
             {connectionError}
           </p>
         )}
         {session.hosted && effectivePage === "overview" && <HostedSetup />}
-        {oauth && (effectivePage === "password" || effectivePage === "accounts") ? (
+        {cloudAdmin ? (
+          <HostedAdmin directory={effectivePage === "accounts"}>
+            {(accountId) => <Admin key={JSON.stringify([effectivePage, accountId])}
+              page={effectivePage} hostedAccountId={accountId} />}
+          </HostedAdmin>
+        ) : oauth && (effectivePage === "password" || effectivePage === "accounts") ? (
           <AccountSettings key={effectivePage} admin={effectivePage === "accounts"} signedOut={loggedOut}
             oidcLabel={session.oidc_label} localPassword={session.account?.local_password} hosted={session.hosted} />
         ) : effectiveMode === "user" ? (
@@ -1293,16 +1303,31 @@ function RuleEditor({
   );
 }
 
-function Admin({ page }: { page: Page }) {
+type HostedHealth = {
+  version: string;
+  uptimeSeconds: number;
+  database: { status: string; bytes: number };
+  pushSetup: RecordRow[];
+  email: { configured: boolean; counts: Record<string, number> };
+};
+
+function Admin({ page, hostedAccountId }: { page: Page; hostedAccountId?: string | null }) {
   const [data, setData] = useState<RecordRow | null>(null),
     [error, setError] = useState("");
+  const [refresh, setRefresh] = useState(0);
+  const hosted = hostedAccountId !== undefined;
+  const base = hostedAccountId
+    ? `${hostedAdminPath}/accounts/${encodeURIComponent(hostedAccountId)}`
+    : "/v2/admin";
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     setData(null);
+    setError("");
     const load = async () => {
-      if (document.hidden) return;
+      if (!hosted && document.hidden) return;
       try {
-        const paths =
+        const sections =
           page === "relay"
             ? ["overview"]
             : page === "devices"
@@ -1311,12 +1336,16 @@ function Admin({ page }: { page: Page }) {
                 ? ["activities"]
                 : page === "queue"
                   ? ["queue", "widgets"]
-                  : ["overview", "push-attempts"];
-        const values = await Promise.all(
-          paths.map((p) => api(`/v2/admin/${p}`)),
-        );
+                  : hosted ? ["push-attempts"] : ["overview", "push-attempts"];
+        const paths = hosted && !hostedAccountId ? [] : sections.map((section) => [section, `${base}/${section}`]);
+        if (hosted && (page === "relay" || page === "push")) {
+          paths.push(["health", `${hostedAdminPath}/health`]);
+        }
+        const values = await Promise.all(paths.map(async ([section, path]) =>
+          [section, await api(path, { signal: controller.signal })] as const,
+        ));
         if (active) {
-          setData(Object.fromEntries(paths.map((p, i) => [p, values[i]])));
+          setData(Object.fromEntries(values));
           setError("");
         }
       } catch (e) {
@@ -1324,13 +1353,15 @@ function Admin({ page }: { page: Page }) {
       }
     };
     void load();
-    const t = setInterval(load, 10000);
+    const timer = hosted ? undefined : setInterval(load, 10000);
     return () => {
       active = false;
-      clearInterval(t);
+      controller.abort();
+      if (timer !== undefined) clearInterval(timer);
     };
-  }, [page]);
+  }, [base, hosted, hostedAccountId, page, refresh]);
   const overview = data?.overview as RecordRow | undefined;
+  const health = data?.health as HostedHealth | undefined;
   const title = {
     overview: "Overview",
     history: "History",
@@ -1350,9 +1381,24 @@ function Admin({ page }: { page: Page }) {
           <span className="eyebrow">Admin</span>
           <h1>{title}</h1>
         </div>
+        {hosted && <button className="load-more" onClick={() => setRefresh((value) => value + 1)}>Refresh</button>}
       </div>
-      {error && <p className="notice">{error}</p>}
+      {error && <p className="notice" role="alert">{error}</p>}
       {!data && !error && <p className="empty">Loading…</p>}
+      {page === "relay" && health && <>
+        <div className="stat-grid">
+          {[
+            ["Service", health.database.status === "ok" ? "Healthy" : "Needs attention"],
+            ["API uptime", `${Math.floor(health.uptimeSeconds / 3600)} hr ${Math.floor((health.uptimeSeconds % 3600) / 60)} min`],
+            ["PostgreSQL", `${(health.database.bytes / 1024 / 1024).toFixed(1)} MB`],
+            ["Email", health.email.configured ? "Configured" : "Needs setup"],
+          ].map(([name, value]) => <section className="stat" key={name}>
+            <span className="eyebrow">{name}</span><strong>{value}</strong>
+          </section>)}
+        </div>
+        <DataTable title="Email queue" rows={Object.entries(health.email.counts).map(([state, count]) => ({ state, count }))} />
+      </>}
+      {hosted && !hostedAccountId && data && <p className="empty">Choose an account to view its diagnostics.</p>}
       {page === "relay" && overview && (
         <>
           <div className="stat-grid">
@@ -1361,7 +1407,7 @@ function Admin({ page }: { page: Page }) {
                 "Printer",
                 overview.printerConnected ? "Connected" : "Reconnecting",
               ],
-              [
+              ...(hosted ? [] : [[
                 "Uptime",
                 `${Math.floor(Number(overview.uptimeSeconds) / 3600)} hr ${Math.floor((Number(overview.uptimeSeconds) % 3600) / 60)} min`,
               ],
@@ -1369,7 +1415,7 @@ function Admin({ page }: { page: Page }) {
                 "Database",
                 `${(Number(overview.databaseBytes) / 1024 / 1024).toFixed(1)} MB`,
               ],
-              ["History", `${overview.historyDays} days`],
+              ["History", `${overview.historyDays} days`]]),
             ].map(([name, value]) => (
               <section className="stat" key={String(name)}>
                 <span className="eyebrow">{name}</span>
@@ -1399,25 +1445,25 @@ function Admin({ page }: { page: Page }) {
               ? age(Date.now() / 1000 - overview.readingAgeSeconds)
               : "Unknown"}
           </p>
-          <p className="muted small">
-            Relay {String(overview.version)} · Alert history started{" "}
-            {when(Number(overview.timelineStartedAt))}
+          <p className="muted small">{hosted
+            ? `Airkeep ${health?.version ?? ""}`
+            : `Relay ${String(overview.version)} · Alert history started ${when(Number(overview.timelineStartedAt))}`}
           </p>
         </>
       )}
-      {page === "devices" && data && (
+      {page === "devices" && data && (!hosted || hostedAccountId) && (
         <>
           <DataTable title="Apple devices" rows={data.devices as RecordRow[]} />
           <DataTable title="Watch widgets" rows={data.widgets as RecordRow[]} />
         </>
       )}
-      {page === "activities" && data && (
+      {page === "activities" && data && (!hosted || hostedAccountId) && (
         <DataTable
           title="Registered sessions"
           rows={data.activities as RecordRow[]}
         />
       )}{" "}
-      {page === "queue" && data && (
+      {page === "queue" && data && (!hosted || hostedAccountId) && (
         <>
           <DataTable
             title="Humidity notifications"
@@ -1435,16 +1481,17 @@ function Admin({ page }: { page: Page }) {
         <>
           <DataTable
             title="Push configuration"
-            rows={(overview?.pushSetup || []) as RecordRow[]}
+            rows={(health?.pushSetup ?? overview?.pushSetup ?? []) as RecordRow[]}
           />
-          <PushAttempts
+          {(!hosted || hostedAccountId) && <PushAttempts
+            endpoint={`${base}/push-attempts`}
             initial={
               data["push-attempts"] as {
                 attempts: RecordRow[];
                 nextCursor: number | null;
               }
             }
-          />
+          />}
         </>
       )}
     </>
@@ -1569,8 +1616,10 @@ function DataTable({ title, rows }: { title: string; rows: RecordRow[] }) {
 }
 function PushAttempts({
   initial,
+  endpoint,
 }: {
   initial?: { attempts?: RecordRow[]; nextCursor?: number | null };
+  endpoint: string;
 }) {
   const incoming = Array.isArray(initial?.attempts) ? initial.attempts : [];
   const [rows, setRows] = useState(incoming),
@@ -1601,7 +1650,7 @@ function PushAttempts({
               const page = await api<{
                 attempts: RecordRow[];
                 nextCursor: number | null;
-              }>(`/v2/admin/push-attempts?before=${cursor}`);
+              }>(`${endpoint}?before=${cursor}`);
               paged.current = true;
               setRows((v) => [...v, ...page.attempts]);
               setCursor(page.nextCursor);

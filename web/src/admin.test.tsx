@@ -121,6 +121,57 @@ describe("Admin navigation", () => {
   });
 });
 
+describe("Hosted admin", () => {
+  const prefix = "/v2/admin/hosted";
+  const accounts = [
+    { id: "first", email: "first@example.test", role: "member", disabled: false },
+    { id: "second", email: "second@example.test", role: "member", disabled: false },
+  ];
+  function hostedReply(path: string, role: "member" | "admin" = "admin") {
+    if (path === "/auth/session") return { authenticated: true, configured: true, mode: "oauth", hosted: true,
+      account: { id: "actor", username: "operator@example.test", role } };
+    if (path === `${prefix}/accounts`) return { accounts, nextCursor: null };
+    if (path === `${prefix}/health`) return { version: "0.5.0", uptimeSeconds: 30,
+      database: { status: "ok", bytes: 1048576 }, pushSetup: [], email: { configured: true, counts: {} } };
+    return reply(path);
+  }
+  it("keeps a member on their user dashboard when opening an admin link", async () => {
+    history.replaceState(null, "", "/#devices");
+    request.mockImplementation(async (path) => hostedReply(path, "member") as never);
+    render(<App />);
+    await screen.findByText("Relative humidity");
+    expect(screen.queryByRole("button", { name: "Admin" })).toBeNull();
+    expect(request.mock.calls.some(([path]) => path.startsWith("/v2/admin"))).toBe(false);
+  });
+  it("starts with no selected tenant and ignores a response from a previous selection", async () => {
+    let finish!: (value: never) => void;
+    let previousSignal: AbortSignal | null | undefined;
+    request.mockImplementation(async (path, init) => {
+      if (path === `${prefix}/accounts/first/devices`) {
+        previousSignal = init?.signal;
+        return new Promise((resolve) => { finish = resolve; });
+      }
+      if (path === `${prefix}/accounts/second/devices`) return [{ id: "second-device" }] as never;
+      if (path.endsWith("/widgets")) return [] as never;
+      return hostedReply(path) as never;
+    });
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Admin" }));
+    await screen.findByText("Choose an account to view its diagnostics.");
+    expect(request.mock.calls.some(([path]) => path.includes("/accounts/first/"))).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Registered devices" }));
+    await screen.findByRole("option", { name: "first@example.test" });
+    const select = screen.getByLabelText("Select account");
+    fireEvent.change(select, { target: { value: "first" } });
+    await screen.findByText("Loading…");
+    fireEvent.change(select, { target: { value: "second" } });
+    await screen.findByText("second-device");
+    expect(previousSignal?.aborted).toBe(true);
+    await act(async () => finish([{ id: "late-first-device" }] as never));
+    expect(screen.queryByText("late-first-device")).toBeNull();
+  });
+});
+
 describe("Overview copy", () => {
   it.each([0, 1, 2])(
     "uses the correct alert noun for %i enabled rules",

@@ -3,7 +3,7 @@ import { api } from "./api";
 
 export const hostedAccountPaths = ["/signup", "/signup/complete", "/forgot-password", "/reset-password"];
 
-export function HostedAccountFlow() {
+export function HostedAccountFlow({ publicSignup = false }: { publicSignup?: boolean }) {
   const reset = location.pathname === "/forgot-password" || location.pathname === "/reset-password";
   const completion = location.pathname === "/signup/complete" || location.pathname === "/reset-password";
   const [token] = useState(() => new URLSearchParams(location.hash.slice(1)).get("token") ?? "");
@@ -18,6 +18,14 @@ export function HostedAccountFlow() {
   useEffect(() => {
     if (location.hash) history.replaceState(null, "", location.pathname);
   }, []);
+  if (!reset && !completion && !publicSignup) {
+    return <main className="login"><section className="account-settings">
+      <h1>Public signup is closed</h1>
+      <p>If you received an invitation, open the link in your email to set your password.</p>
+      <a className="primary" href="/">Sign in</a>
+      <p><a href="https://airkeep.io/privacy/">Privacy notice</a></p>
+    </section></main>;
+  }
   async function submit() {
     setBusy(true);
     setError("");
@@ -53,7 +61,9 @@ export function HostedAccountFlow() {
           required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
         <button className="primary" disabled={busy}>Set password</button>
       </> : <p>Open the link in your email to set your password.</p>}
-      <a href={reset ? "/forgot-password" : "/signup"}>Request a fresh email link</a>
+      {reset || publicSignup
+        ? <a href={reset ? "/forgot-password" : "/signup"}>Request a fresh email link</a>
+        : <p>Ask the Airkeep administrator for a fresh invitation if this link has expired.</p>}
     </> : <>
       <p>{sent ? "If this email address can receive an Airkeep link, check your inbox shortly." : reset ? "We’ll email a link to set a new password." : "Verify your email address, then choose a password."}</p>
       <label htmlFor="hosted-email">Email address</label>
@@ -63,6 +73,7 @@ export function HostedAccountFlow() {
     </>}
     {error && <p className="error" role="alert">{error}</p>}
     {!done && <a href="/">Back to sign-in</a>}
+    {!reset && <a href="https://airkeep.io/privacy/">Privacy notice</a>}
   </form></main>;
 }
 
