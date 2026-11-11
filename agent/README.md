@@ -6,17 +6,26 @@ The printer IP, serial and LAN access code stay in the agent's private local SQL
 
 ## Run with uv
 
-From the repository root, with [uv installed](https://docs.astral.sh/uv/getting-started/installation/), run the following command. uv manages Python 3.14 and installs the locked dependencies.
+With [uv installed](https://docs.astral.sh/uv/getting-started/installation/), run:
 
 ```sh
-PYTHONPATH=server uv run --locked --project agent python -m agent
+uvx airkeep
 ```
 
-On first run, open `http://127.0.0.1:8788`. Read the one-time secret from `.local/agent/setup-secret` and paste it into the page. This secret is consumed after one successful login. It is regenerated when restarting an unfinished setup. Access is protected by a separate browser session cookie after login.
+To install the command for regular use:
+
+```sh
+uv tool install airkeep
+airkeep
+```
+
+On first run, open the local setup link printed by Airkeep, normally `http://127.0.0.1:8788/`. The wizard opens on the printer form.
 
 Enter the printer's private LAN IP, serial and eight-character LAN access code. The wizard tests the connection, then begins dashboard sign-in. The default hosted origin is `https://dashboard.airkeep.io`. You can enter your own HTTPS dashboard origin. Follow the displayed verification link, sign in and approve the displayed code. Keep the setup page open until it confirms completion. The setup listener closes automatically, and collection begins.
 
-The local data directory has mode `0700` and newly created files have mode `0600`. Its SQLite database contains both printer credentials and the dashboard bearer token. Treat the directory as private. Choose its location with `--data-dir /path/to/private/directory` or `AIRKEEP_AGENT_DATA`. Only one process can use each data directory at a time.
+Airkeep stores its SQLite database in `~/.local/state/airkeep` by default, or in `$XDG_STATE_HOME/airkeep` if set. Running from a checkout with an existing `.local/agent/agent.sqlite3` reuses that directory. To reuse it from another working directory, pass its absolute directory path with `--data-dir`. `AIRKEEP_AGENT_DATA` also sets the data directory. The directory has mode `0700` and newly created files have mode `0600`. Only one process can use each data directory at a time.
+
+For development, run `uv run --locked --project agent airkeep` from the repository root.
 
 ## Docker on Linux
 
@@ -29,11 +38,7 @@ docker run -d --name airkeep-agent \
   ghcr.io/danohn/airkeep-agent:latest
 ```
 
-Read the first-run secret directly from the container, then use the local setup page.
-
-```sh
-docker exec airkeep-agent cat /data/setup-secret
-```
+Open the local setup page to configure the printer.
 
 For a headless Linux host, forward its loopback port over SSH and open `http://127.0.0.1:8788` on your computer.
 
@@ -65,7 +70,7 @@ To replace credentials or enroll again, stop the running agent and run the same 
 docker stop airkeep-agent
 docker run --rm -it --network host \
   --mount type=volume,source=airkeep-agent,target=/data \
-  ghcr.io/danohn/airkeep-agent:latest python -m agent --setup
+  ghcr.io/danohn/airkeep-agent:latest airkeep --setup
 ```
 
 This process continues running after setup. Stop it with Ctrl-C, then restart the original container with `docker start airkeep-agent`. Successful replacement enrollment atomically clears previous buffered readings and creates a new installation identity, preventing delivery of a previous account's history into the replacement account. An interrupted replacement keeps the saved enrollment intact.
@@ -76,4 +81,10 @@ This process continues running after setup. Stop it with Ctrl-C, then restart th
 uv run --locked --directory agent pytest -q
 ```
 
-The tests cover queue persistence, 24-hour pruning, sample throttling, event ordering and IDs, retries, replay, heartbeat transitions, revoked enrollment, device-flow pacing, local setup authentication and TLS serial validation. Testing against a physical P2S requires that printer's LAN settings and network access.
+The tests cover queue persistence, 24-hour pruning, sample throttling, event ordering and IDs, retries, replay, heartbeat transitions, revoked enrollment, device-flow pacing, local setup and TLS serial validation. Testing against a physical P2S requires that printer's LAN settings and network access.
+
+## Publish to PyPI
+
+Configure the [PyPI Trusted Publisher](https://pypi.org/manage/account/publishing/) for project `airkeep`, owner `danohn`, repository `airkeep`, workflow `publish-agent.yml`, and environment `pypi`. Use a pending publisher before the first release. Configure the GitHub `pypi` environment to accept release tags matching `agent-v*`.
+
+Update the version in `agent/pyproject.toml`, then regenerate the agent and server lockfiles. Push a matching tag such as `agent-v0.1.0` to publish the wheel and source distribution. The workflow tests the agent and checks the tag against the package version before publishing. [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/)

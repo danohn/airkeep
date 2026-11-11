@@ -2,11 +2,11 @@ name: LAN agent image
 
 on:
   pull_request:
-    paths: ['agent/**', 'server/collector.py', 'server/domain.py', 'server/bambu-ca.pem', '.dockerignore', '.github/workflows/agent.yml']
+    paths: ['agent/**', '.dockerignore', '.github/workflows/agent.yml']
   push:
     branches: [main]
     tags: ['v*']
-    paths: ['agent/**', 'server/collector.py', 'server/domain.py', 'server/bambu-ca.pem', '.dockerignore', '.github/workflows/agent.yml']
+    paths: ['agent/**', '.dockerignore', '.github/workflows/agent.yml']
   workflow_dispatch:
 
 permissions:
@@ -29,7 +29,7 @@ jobs:
           cache-dependency-glob: agent/uv.lock
       - run: uv run --locked --directory agent pytest -q
       - run: docker build -f agent/Dockerfile -t airkeep-agent:ci .
-      - run: docker run --rm airkeep-agent:ci python -m agent --help
+      - run: docker run --rm airkeep-agent:ci airkeep --help
 
   publish:
     needs: checks

@@ -34,10 +34,10 @@ export function HostedSetup() {
     {relay && <p role="status">{descriptions[relay.status]}</p>}
     {(expanded || relay?.status === "unpaired") && <>
       <h3>Connect your local relay</h3>
-      <p>Run the Airkeep relay on a computer or device on your printer’s network. Open its local setup page, then enter your printer’s address, serial number, and LAN access code.</p>
+      <p>Run <code>uvx airkeep</code> on a computer on your printer’s network. Open the setup link it prints and enter your printer’s address, serial number, and LAN access code.</p>
       <p>Open the pairing link shown by your relay and sign in to this account. Check that its code matches before approving.</p>
       <a className="primary" href="/device">Enter relay pairing code</a>
-      <p><a href="https://github.com/danohn/airkeep/blob/main/agent/README.md" target="_blank" rel="noreferrer">Relay installation instructions</a></p>
+      <p><a href="https://pypi.org/project/airkeep/" target="_blank" rel="noreferrer">Relay installation instructions</a></p>
       {relay && relay.status !== "unpaired" && <div className="hosted-setup-actions">
         <button disabled={busy} onClick={() => setConfirm("disconnect")}>Disconnect relay</button>
         <button disabled={busy} onClick={() => setConfirm("replace")}>Replace printer</button>

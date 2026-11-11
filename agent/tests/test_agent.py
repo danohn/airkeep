@@ -10,11 +10,11 @@ from urllib.parse import parse_qs
 import httpx
 import pytest
 
-from agent.cloud import Cloud, Uploader, https_origin
-from agent.setup import PrinterSettings, Setup, test_printer as check_printer
-from agent.spool import Spool
-from collector import Collector
-from domain import Reading, parse_readings
+from airkeep.cloud import Cloud, Uploader, https_origin
+from airkeep.setup import PrinterSettings, Setup, test_printer as check_printer
+from airkeep.spool import Spool
+from airkeep.collector import Collector
+from airkeep.telemetry import Reading, parse_readings
 
 
 def sample(at=None, ams='0'):
@@ -24,7 +24,7 @@ def sample(at=None, ams='0'):
 
 @pytest.fixture
 def spool(tmp_path):
-    value = Spool(tmp_path / 'agent.sqlite3')
+    value = Spool(tmp_path / 'airkeep.sqlite3')
     yield value
     value.close()
 
@@ -203,19 +203,22 @@ def test_printer_settings_stay_private_and_restrict_target():
             PrinterSettings.validate(dict(settings.private_config(), printer_ip=address))
 
 
-def test_wizard_one_time_secret_csrf_host_validation_and_no_secret_echo(tmp_path, spool):
-    setup = Setup(tmp_path, spool, 8788, printer_test=lambda _: True)
+def test_wizard_opens_printer_form_and_requires_local_origin(spool):
+    cloud = SimpleNamespace(
+        begin=lambda _: {'verification_uri': 'https://dashboard.example/device', 'user_code': 'TEST1234',
+                         'device_code': 'private', 'expires_in': 60},
+        close=lambda: None,
+    )
+    setup = Setup(spool, 8788, printer_test=lambda _: True, cloud_factory=lambda _: cloud)
     from http.server import HTTPServer
     server = HTTPServer(('127.0.0.1', 0), setup.handler())
     setup.origin = f'http://127.0.0.1:{server.server_port}'
     worker = threading.Thread(target=server.serve_forever, daemon=True)
     worker.start()
-    def request(path='/', fields=None, cookie=None, origin=None, host=None):
+    def request(path='/', fields=None, origin=None, host=None):
         from urllib.parse import urlencode
         connection = http.client.HTTPConnection('127.0.0.1', server.server_port)
         headers = {'Host': host or f'127.0.0.1:{server.server_port}'}
-        if cookie:
-            headers['Cookie'] = cookie
         if fields is not None:
             headers.update({'Origin': origin or setup.origin, 'Content-Type': 'application/x-www-form-urlencoded'})
         connection.request('GET' if fields is None else 'POST', path, body=None if fields is None else urlencode(fields), headers=headers)
@@ -223,23 +226,23 @@ def test_wizard_one_time_secret_csrf_host_validation_and_no_secret_echo(tmp_path
         result = response.status, dict(response.getheaders()), response.read().decode()
         connection.close()
         return result
-    secret = setup.secret
     try:
-        assert (tmp_path / 'setup-secret').stat().st_mode & 0o777 == 0o600
         assert request(host='evil.example')[0] == 403
-        assert request('/login', {'secret': secret}, origin='https://evil.example')[0] == 403
-        assert request('/login', {'secret': 'é'})[0] == 403
-        status, headers, body = request('/login', {'secret': secret})
-        assert status == 200
-        assert 'HttpOnly' in headers['Set-Cookie'] and 'SameSite=Strict' in headers['Set-Cookie']
-        assert not (tmp_path / 'setup-secret').exists()
-        assert secret not in body
-        assert request('/login', {'secret': secret})[0] == 403
-        assert request('/printer', {'printer_ip': '192.168.1.9'})[0] == 403
-        status, _, body = request('/printer', {'printer_ip': '192.168.1.9', 'printer_serial': '0123456789ABCDEF',
-            'printer_code': '12345678', 'origin': 'https://dashboard.example'}, cookie=headers['Set-Cookie'].split(';')[0])
+        assert request('/printer', {'printer_ip': '192.168.1.9'}, origin='https://evil.example')[0] == 403
+        assert request('/printer', {'printer_ip': '192.168.1.9'}, origin='null')[0] == 403
+        status, headers, body = request()
+        assert status == 200 and 'Printer LAN IP' in body
+        assert headers['Referrer-Policy'] == 'same-origin'
+        status, headers, _ = request('/printer', {'printer_ip': '192.168.1.9', 'printer_serial': '0123456789ABCDEF',
+            'printer_code': '12345678', 'origin': 'https://dashboard.example'})
+        assert status == 303 and headers['Location'] == '/'
+        status, _, body = request()
         assert status == 200 and 'verified' in body
         assert '12345678' not in body and '0123456789ABCDEF' not in body
+        status, headers, _ = request('/enroll', {})
+        assert status == 303 and headers['Location'] == '/'
+        status, _, body = request()
+        assert status == 200 and 'TEST1234' in body and 'http-equiv="refresh"' in body
     finally:
         server.shutdown()
         server.server_close()
@@ -247,10 +250,10 @@ def test_wizard_one_time_secret_csrf_host_validation_and_no_secret_echo(tmp_path
         setup.close()
 
 
-def test_setup_obeys_poll_interval_slowdown_expiry_and_completes(tmp_path, spool, monkeypatch):
+def test_setup_obeys_poll_interval_slowdown_expiry_and_completes(spool, monkeypatch):
     clock = [100.0]
-    monkeypatch.setattr('agent.setup.time.monotonic', lambda: clock[0])
-    setup = Setup(tmp_path, spool, 8788)
+    monkeypatch.setattr('airkeep.setup.time.monotonic', lambda: clock[0])
+    setup = Setup(spool, 8788)
     results = iter([{'error': 'slow_down'}, {'error': 'authorization_pending'}, {'access_token': 'opaque'}])
     setup.cloud = SimpleNamespace(origin='https://dashboard.example', poll=lambda _: next(results), close=lambda: None)
     setup.printer = PrinterSettings('192.168.1.9', '0123456789ABCDEF', '12345678')
@@ -290,10 +293,10 @@ def test_real_paho_reconnect_checks_serial_before_mqtt_connect(monkeypatch, seri
         assert sent == []
 
 
-def test_complete_setup_expiry_does_not_replace_saved_identity(tmp_path, spool, monkeypatch):
+def test_complete_setup_expiry_does_not_replace_saved_identity(spool, monkeypatch):
     spool.configure({'token': 'previous-account'})
-    monkeypatch.setattr('agent.setup.time.monotonic', lambda: 100)
-    setup = Setup(tmp_path, spool, 8788)
+    monkeypatch.setattr('airkeep.setup.time.monotonic', lambda: 100)
+    setup = Setup(spool, 8788)
     setup.enrollment = {'device_code': 'private'}
     setup.expires_at = 99
     setup.tick()
@@ -302,34 +305,32 @@ def test_complete_setup_expiry_does_not_replace_saved_identity(tmp_path, spool, 
     setup.close()
 
 
-def test_cli_first_run_keeps_setup_secret_out_of_process_output(tmp_path):
-    import os
+def test_cli_first_run_opens_printer_form(tmp_path):
     import socket
     import subprocess
     import sys
-    root = Path(__file__).resolve().parents[2]
     with socket.socket() as reservation:
         reservation.bind(('127.0.0.1', 0))
         port = reservation.getsockname()[1]
-    environment = dict(os.environ, PYTHONPATH=str(root / 'server'))
-    process = subprocess.Popen([sys.executable, '-m', 'agent', '--data-dir', str(tmp_path), '--setup-port', str(port)],
-                               cwd=root, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    process = subprocess.Popen([sys.executable, '-m', 'airkeep', '--data-dir', str(tmp_path), '--setup-port', str(port)],
+                               cwd=tmp_path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     try:
+        url = f'http://127.0.0.1:{port}'
         deadline = time.monotonic() + 5
-        while not (tmp_path / 'setup-secret').exists() and time.monotonic() < deadline:
-            assert process.poll() is None
-            time.sleep(0.02)
-        secret = (tmp_path / 'setup-secret').read_text().strip()
-        assert len(secret) >= 32
-        assert tmp_path.stat().st_mode & 0o777 == 0o700
         with httpx.Client(trust_env=False) as client:
-            response = client.get(f'http://127.0.0.1:{port}')
-            assert response.status_code == 200
-            assert secret not in response.text
-        process.terminate()
-        output, errors = process.communicate(timeout=5)
-        assert secret not in output + errors
+            while True:
+                try:
+                    response = client.get(url, timeout=0.5)
+                    break
+                except httpx.ConnectError:
+                    assert process.poll() is None and time.monotonic() < deadline
+                    time.sleep(0.02)
+        assert response.status_code == 200 and 'Printer LAN IP' in response.text
+        assert tmp_path.stat().st_mode & 0o777 == 0o700
         assert not (tmp_path / 'setup-secret').exists()
+        process.terminate()
+        output, _ = process.communicate(timeout=5)
+        assert f'Open {url} to set up your printer.' in output
     finally:
         if process.poll() is None:
             process.kill()
@@ -338,7 +339,7 @@ def test_cli_first_run_keeps_setup_secret_out_of_process_output(tmp_path):
 
 def test_new_live_observation_precedes_backlog_after_outage(spool, monkeypatch):
     clock = [100000.0]
-    monkeypatch.setattr('agent.spool.time.time', lambda: clock[0])
+    monkeypatch.setattr('airkeep.spool.time.time', lambda: clock[0])
     for index in range(110):
         spool.save_reading(sample(clock[0] - 5000 + index * 30))
     spool.save_reading(sample(clock[0]))
@@ -369,7 +370,7 @@ def test_new_live_observation_precedes_backlog_after_outage(spool, monkeypatch):
 
 def test_only_non_replay_observations_within_30_seconds_are_live(spool, monkeypatch):
     now = 100000.0
-    monkeypatch.setattr('agent.spool.time.time', lambda: now)
+    monkeypatch.setattr('airkeep.spool.time.time', lambda: now)
     for index, age in enumerate([0, 5, 30, 30.001, -1]):
         spool.save_reading(sample(now - age, str(index)))
     batch = spool.batch()
@@ -426,7 +427,7 @@ def test_permanent_rejection_quarantines_only_invalid_row_and_delivers_valid_his
 
 def test_rejected_clock_skew_does_not_block_subsequent_live_readings(spool, monkeypatch):
     clock = [100000.0]
-    monkeypatch.setattr('agent.spool.time.time', lambda: clock[0])
+    monkeypatch.setattr('airkeep.spool.time.time', lambda: clock[0])
     spool.save_reading(sample(clock[0] + 1000))
     future_id = spool.batch()[0]['eventID']
     spool.save_reading(sample(clock[0]))
@@ -455,7 +456,7 @@ def test_rejected_clock_skew_does_not_block_subsequent_live_readings(spool, monk
 
 def test_quarantine_is_bounded_and_expires_after_24_hours(spool, monkeypatch):
     now = 100000.0
-    monkeypatch.setattr('agent.spool.time.time', lambda: now)
+    monkeypatch.setattr('airkeep.spool.time.time', lambda: now)
     for index in range(105):
         row = dict(sample(now).model_dump(), eventID=str(index), replay=True)
         spool.quarantine(row, 422, now=now + index)

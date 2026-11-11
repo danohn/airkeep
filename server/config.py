@@ -1,4 +1,5 @@
 from pathlib import Path
+from airkeep.collector import BAMBU_CA
 from typing import Literal
 from pydantic import Field, SecretStr, model_validator
 from urllib.parse import urlsplit
@@ -14,7 +15,7 @@ class Settings(BaseSettings):
     deployment: Literal["self-hosted", "hosted"] = "self-hosted"
     database_url: SecretStr = SecretStr("")
     public_signup: bool = False
-    ca_path: Path = Path(__file__).parent / "bambu-ca.pem"
+    ca_path: Path = BAMBU_CA
     mqtt_enabled: bool = True
     stale_seconds: int = 90
     apns_team_id: str = ""

@@ -3,18 +3,16 @@ import html
 import ipaddress
 from pathlib import Path
 import re
-import secrets
 import time
 from dataclasses import dataclass, field
-from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs
 import uuid
 
 import httpx
 
-from collector import Collector
 from .cloud import Cloud, DEFAULT_ORIGIN, https_origin
+from .collector import BAMBU_CA, Collector
 
 
 @dataclass(repr=False)
@@ -22,7 +20,7 @@ class PrinterSettings:
     printer_ip: str
     printer_serial: str
     printer_code: str = field(repr=False)
-    ca_path: Path = Path(__file__).resolve().parents[1] / 'server' / 'bambu-ca.pem'
+    ca_path: Path = BAMBU_CA
 
     @classmethod
     def validate(cls, fields):
@@ -66,15 +64,9 @@ def test_printer(settings, timeout=12):
 
 
 class Setup:
-    def __init__(self, directory, spool, port, printer_test=test_printer, cloud_factory=Cloud):
+    def __init__(self, spool, port, printer_test=test_printer, cloud_factory=Cloud):
         self.spool = spool
         self.origin = f'http://127.0.0.1:{port}'
-        self.secret_path = directory / 'setup-secret'
-        self.secret = secrets.token_urlsafe(32)
-        self.secret_path.write_text(self.secret + '\n')
-        self.secret_path.chmod(0o600)
-        self.session = secrets.token_urlsafe(32)
-        self.authenticated = False
         self.printer_test, self.cloud_factory = printer_test, cloud_factory
         self.printer = None
         self.cloud = None
@@ -114,15 +106,12 @@ class Setup:
             self.completed_at = time.monotonic()
 
     def close(self):
-        self.secret_path.unlink(missing_ok=True)
         if self.cloud:
             self.cloud.close()
 
-    def page(self, logged_in):
+    def page(self):
         content = '<h1>Connect Airkeep</h1>'
-        if not logged_in:
-            content += '<p>Paste the one-time secret from the local setup-secret file.</p><form method="post" action="/login"><label>Setup secret <input name="secret" type="password" required autocomplete="off"></label><button>Continue</button></form>'
-        elif self.completed_at is not None:
+        if self.completed_at is not None:
             content += '<p>Setup complete. The agent is collecting printer readings and sending them to your dashboard. You can close this window.</p>'
         elif self.enrollment:
             uri = html.escape(self.enrollment['verification_uri'], quote=True)
@@ -138,9 +127,9 @@ class Setup:
             <label>LAN access code <input name="printer_code" type="password" required autocomplete="off"></label>
             <label>Dashboard HTTPS origin <input name="origin" value="{DEFAULT_ORIGIN}" type="url" required></label>
             <button>Test printer connection</button></form>'''
-        if logged_in and self.message:
+        if self.message:
             content += '<p role="status">' + html.escape(self.message) + '</p>'
-        refresh = '<meta http-equiv="refresh" content="3">' if logged_in and self.enrollment and self.completed_at is None else ''
+        refresh = '<meta http-equiv="refresh" content="3">' if self.enrollment and self.completed_at is None else ''
         return f'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">{refresh}<title>Airkeep setup</title>
         <style>body{{font:18px system-ui;max-width:38rem;margin:4rem auto;padding:1rem;background:#faf8f1;color:#20251e}}label{{display:block;margin:1rem 0}}input{{display:block;width:95%;font:inherit;padding:.5rem}}button{{font:inherit;padding:.6rem 1rem}}strong{{font:2rem monospace}}</style><main>{content}</main></html>'''.encode()
 
@@ -153,31 +142,23 @@ class Setup:
                 self.connection.settimeout(5)
 
             def log_message(self, *args):
-                # Never send paths, form values, cookies or enrollment codes to logs.
+                # Keep form values and enrollment codes out of logs.
                 pass
 
             def valid_host(self):
                 return self.headers.get('Host') == setup.origin.removeprefix('http://')
 
-            def logged_in(self):
-                cookie = SimpleCookie()
-                try:
-                    cookie.load(self.headers.get('Cookie', ''))
-                    value = cookie.get('airkeep_setup')
-                    return setup.authenticated and value is not None and secrets.compare_digest(value.value, setup.session)
-                except (ValueError, TypeError):
-                    return False
-
-            def respond(self, status=200, content=b'', cookie=None):
+            def respond(self, status=200, content=b''):
                 self.send_response(status)
                 self.send_header('Content-Type', 'text/html; charset=utf-8')
                 self.send_header('Content-Length', str(len(content)))
                 self.send_header('Cache-Control', 'no-store')
-                self.send_header('Referrer-Policy', 'no-referrer')
+                # Browsers need to send the real Origin on local form posts.
+                self.send_header('Referrer-Policy', 'same-origin')
                 self.send_header('X-Content-Type-Options', 'nosniff')
                 self.send_header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
-                if cookie:
-                    self.send_header('Set-Cookie', cookie)
+                if status == 303:
+                    self.send_header('Location', '/')
                 self.end_headers()
                 self.wfile.write(content)
 
@@ -185,32 +166,22 @@ class Setup:
                 if not self.valid_host() or self.path != '/':
                     self.respond(403)
                     return
-                self.respond(content=setup.page(self.logged_in()))
+                self.respond(content=setup.page())
 
             def do_POST(self):
-                if not self.valid_host() or self.headers.get('Origin') != setup.origin:
+                if (not self.valid_host() or self.headers.get('Origin') != setup.origin
+                        or setup.completed_at is not None):
                     self.respond(403)
                     return
                 try:
                     length = int(self.headers.get('Content-Length', '0'))
-                    if not 0 < length <= 4096 or self.headers.get('Content-Type') != 'application/x-www-form-urlencoded':
+                    if (not 0 <= length <= 4096 or (length == 0 and self.path != '/enroll')
+                            or self.headers.get('Content-Type') != 'application/x-www-form-urlencoded'):
                         self.respond(400)
                         return
                     fields = {key: value[0] for key, value in parse_qs(self.rfile.read(length).decode(), max_num_fields=8).items() if len(value) == 1}
                 except (ValueError, UnicodeError):
                     self.respond(400)
-                    return
-                if self.path == '/login':
-                    if setup.authenticated or not secrets.compare_digest(fields.get('secret', '').encode(), setup.secret.encode()):
-                        self.respond(403)
-                        return
-                    setup.authenticated = True
-                    setup.secret = ''
-                    setup.secret_path.unlink(missing_ok=True)
-                    self.respond(content=setup.page(True), cookie=f'airkeep_setup={setup.session}; HttpOnly; SameSite=Strict; Path=/')
-                    return
-                if not self.logged_in() or setup.completed_at is not None:
-                    self.respond(403)
                     return
                 try:
                     if self.path == '/printer' and setup.enrollment is None:
@@ -235,17 +206,18 @@ class Setup:
                         return
                 except (ValueError, KeyError, httpx.HTTPError):
                     setup.message = 'Setup could not complete. Check the settings and dashboard connection, then try again.'
-                self.respond(content=setup.page(True))
+                # The enrollment page refreshes automatically, so serve it at GET /.
+                self.respond(303)
 
         return Handler
 
 
-def run_setup(directory, spool, port, stopped=None):
-    setup = Setup(directory, spool, port)
+def run_setup(spool, port, stopped=None):
+    setup = Setup(spool, port)
     try:
         with HTTPServer(('127.0.0.1', port), setup.handler()) as server:
             server.timeout = 0.5
-            print(f'Open {setup.origin} and read the one-time secret from {setup.secret_path}', flush=True)
+            print(f'Open {setup.origin} to set up your printer.', flush=True)
             while setup.completed_at is None or time.monotonic() - setup.completed_at < 4:
                 if stopped is not None and stopped.is_set():
                     raise SystemExit('Local setup stopped.')

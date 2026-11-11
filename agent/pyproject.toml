@@ -1,13 +1,26 @@
 [project]
-name = "airkeep-agent"
+name = "airkeep"
 version = "0.1.0"
-description = "LAN-only Bambu collector for a hosted Airkeep dashboard"
+description = "Send Bambu AMS readings to your Airkeep dashboard"
+readme = "README.md"
 requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = ["paho-mqtt>=2.1,<3", "pydantic>=2.12,<3", "httpx>=0.28,<1"]
+
+[project.scripts]
+airkeep = "airkeep.__main__:main"
+
+[project.urls]
+Homepage = "https://airkeep.io"
+Repository = "https://github.com/danohn/airkeep"
+
+[build-system]
+requires = ["uv_build>=0.11.15,<0.12"]
+build-backend = "uv_build"
 
 [dependency-groups]
 dev = ["pytest>=8.4"]
 
 [tool.pytest.ini_options]
-pythonpath = ["..", "../server"]
 testpaths = ["tests"]
