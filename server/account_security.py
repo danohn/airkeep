@@ -195,11 +195,16 @@ class AccountSecurity:
         with self.store.transaction() as db:
             tx = self.transaction(db, binding)
             challenge = self.challenge(db, 'passkey-login', binding)
-            row = db.execute('SELECT * FROM account_passkeys WHERE credential_id=?', (credential.id,)).fetchone()
-            if not row or credential.response.user_handle != row['account_id'].encode():
+            owner = db.execute('SELECT account_id FROM account_passkeys WHERE credential_id=?',
+                               (credential.id,)).fetchone()
+            if not owner or credential.response.user_handle != owner['account_id'].encode():
                 raise error
-            account = lock_account(self.store, row['account_id'])
+            account = lock_account(self.store, owner['account_id'])
             if not account or account['disabled'] or not account['hash'] or account['temporary_until'] is not None:
+                raise error
+            row = db.execute('SELECT * FROM account_passkeys WHERE credential_id=? AND account_id=?',
+                             (credential.id, account['id'])).fetchone()
+            if not row:
                 raise error
             try:
                 result = verify_authentication_response(

@@ -10,6 +10,10 @@ import pyotp
 from webauthn.helpers import bytes_to_base64url, encode_cbor
 
 import account_security
+from accounts import OAuth, digest
+from config import Settings
+from fastapi import HTTPException
+import pytest
 from test_accounts import (
     ORIGIN, OWNER_PASSWORD, STATE, VERIFIER, begin, login, relay,
 )
@@ -129,3 +133,23 @@ def test_passkey_registration_and_pkce_sign_in(relay):
     assert client.request('DELETE', '/auth/security/passkeys/' + encoded_id, headers=session,
                           json={'password': OWNER_PASSWORD}).status_code == 204
     assert not client.get('/auth/security', headers=session).json()['passkeys']
+    transaction, _ = begin(client)
+    options = client.post('/auth/passkey/options', json={'transaction': transaction})
+    assert options.status_code == 200
+    data = client_data('webauthn.get', options.json()['challenge'])
+    assert verify(assertion(5)).status_code == 401
+
+
+def test_completing_sign_in_preserves_the_first_authorization_code(relay):
+    client, store, *_ = relay
+    oauth = OAuth(store, Settings(web_origin=ORIGIN, jwt_signing_key='x'*64, _env_file=None))
+    transaction, _ = begin(client)
+    request = store.rows('SELECT * FROM oauth_requests WHERE id=?', (digest(transaction),))[0]
+    account = store.rows("SELECT id,version FROM accounts WHERE username='Owner'")[0]
+    with store.transaction() as db:
+        oauth.complete(db, request, account['id'], account['version'])
+    original = store.rows('SELECT code FROM oauth_requests WHERE id=?', (request['id'],))[0]['code']
+    with pytest.raises(HTTPException) as error, store.transaction() as db:
+        oauth.complete(db, request, account['id'], account['version'])
+    assert error.value.status_code == 400
+    assert store.rows('SELECT code FROM oauth_requests WHERE id=?', (request['id'],))[0]['code'] == original
