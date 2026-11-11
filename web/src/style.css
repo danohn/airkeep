@@ -1302,6 +1302,11 @@ tbody tr:hover {
 }
 .hosted-admin-card h2 { margin: 0 0 12px; overflow-wrap: anywhere; }
 .hosted-admin-card p { margin: 12px 0; }
+.hosted-admin-account-link {
+  color: var(--amber);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .hosted-admin-scope .load-more,
 .hosted-admin-actions .load-more { margin: 0; }
 @media (max-width: 650px) {

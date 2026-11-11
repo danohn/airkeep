@@ -69,8 +69,19 @@ export function HostedAdmin({
       <span className="eyebrow">Admin</span>
       <h1>Accounts</h1>
     </div></div>}
-    <section className="data-section hosted-admin-scope" aria-label="Account scope">
-      <div>
+    <section className={directory ? "data-section" : "data-section hosted-admin-scope"}
+      aria-label={directory ? "Account directory" : "Account scope"}>
+      {directory ? accounts.length ? <div className="table-scroll">
+        <table>
+          <thead><tr><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Status</th></tr></thead>
+          <tbody>{accounts.map((account) => <tr key={account.id}>
+            <td><button className="hosted-admin-account-link" aria-pressed={selection === account.id}
+              onClick={() => setSelection(account.id)}>{account.email}</button></td>
+            <td>{account.role === "admin" ? "Administrator" : "Member"}</td>
+            <td>{account.disabled ? "Suspended" : "Active"}</td>
+          </tr>)}</tbody>
+        </table>
+      </div> : !error && <p className="empty">{loading ? "Loading accounts…" : "No accounts found."}</p> : <div>
         <label htmlFor="hosted-admin-account">Select account</label>
         <select id="hosted-admin-account" value={selection} onChange={(event) => setSelection(event.target.value)}>
           <option value="">{loading && !accounts.length ? "Loading accounts…" : "Choose an account"}</option>
@@ -78,7 +89,7 @@ export function HostedAdmin({
             {account.email}{account.disabled ? " (suspended)" : ""}
           </option>)}
         </select>
-      </div>
+      </div>}
       {cursor !== null && <button className="load-more" onClick={loadMore} disabled={loading}>
         Load more accounts
       </button>}
