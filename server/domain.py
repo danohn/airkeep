@@ -96,15 +96,21 @@ class NamedAlertInput(AlertRule):
 class AlertState:
     since: float | None = None
     active: bool = False
+    last_observed: float | None = None
 
-    def evaluate(self, rule: AlertRule, reading: Reading | None, now: float, stale: int) -> str | None:
+    def evaluate(self, rule: AlertRule, reading: Reading | None, now: float, stale: int, *, require_continuity=False) -> str | None:
         if not rule.enabled:
             self.since, self.active = None, False
+            self.last_observed = None
             return None
         if reading is None or now - reading.observedAt > stale:
             # An interrupted stream cannot satisfy a continuous hold.
             self.since = None
+            self.last_observed = None
             return None
+        if require_continuity and self.last_observed is not None and reading.observedAt-self.last_observed > stale:
+            self.since = None
+        self.last_observed = reading.observedAt
         if self.active:
             if reading.humidity <= rule.threshold - rule.hysteresis:
                 self.active, self.since = False, None

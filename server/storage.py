@@ -206,7 +206,8 @@ class Store:
         # CRUD, evaluation state, and queued events share the same transaction lock.
         with self.lock, self.db:
             self.db.execute('BEGIN IMMEDIATE')
-            observed = self.alert_readings(now) if getattr(self, 'hosted', False) else self.readings()
+            hosted = getattr(self, 'hosted', False)
+            observed = self.alert_readings(now) if hosted else self.readings()
             readings = {reading.amsID: reading for reading in observed}
             query = ('SELECT r.* FROM alert_rules r JOIN accounts a ON a.id=r.owner_id WHERE a.disabled=0'
                      if multiuser else 'SELECT * FROM alert_rules WHERE owner_id IS NULL')
@@ -214,7 +215,7 @@ class Store:
                 rule = AlertRule.model_validate_json(row['json'])
                 state = AlertState(**json.loads(row['state']))
                 reading = readings.get(rule.amsID)
-                event = state.evaluate(rule,reading,now,stale)
+                event = state.evaluate(rule,reading,now,stale,require_continuity=hosted)
                 self.db.execute('UPDATE alert_rules SET state=? WHERE id=?',(json.dumps(vars(state)),row['id']))
                 if not event or reading is None:
                     continue
@@ -230,7 +231,7 @@ class Store:
                 payload = json.dumps({'aps':{'alert':{'title':title,'body':body},'sound':'default',
                                              'thread-id':f'airkeep.ams.{rule.amsID}'},
                                       'amsID':rule.amsID,'ruleID':row['id'],'eventID':event_id})
-                if getattr(self, 'hosted', False):
+                if hosted:
                     payload = json.dumps({'aps': {'alert': {'title': 'Airkeep humidity alert',
                         'body': 'Open Airkeep to view your current alerts.'}, 'sound': 'default'}})
                 if multiuser:

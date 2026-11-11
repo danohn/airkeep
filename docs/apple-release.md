@@ -58,6 +58,8 @@ The direct macOS job verifies the app's signature and hardened-runtime flag, sub
 
 ## Release verification
 
+Publish the privacy notice and verify the App Store privacy answers against the [hosted data inventory](hosted-privacy.md). In the hosted deployment, `docker compose --env-file server/.env.hosted -f server/compose.hosted.yml exec api python hosted_admin.py seed-review` creates an isolated review login with sample AMS history. The command displays its generated credentials once. Enter them in App Review Information, tell reviewers which views use sample telemetry, and delete the review account after review. [App Review guidelines](https://developer.apple.com/app-store/review/guidelines/)
+
 Verify Store builds on an iPhone and Apple Watch through TestFlight, including pairing, account switching, sign-out, widgets, notifications and Live Activities. Verify the direct macOS DMG downloaded through a browser on a Gatekeeper-enabled Mac, including an offline launch after copying the app to Applications. Confirm the hosted service is reachable and that a new installation defaults to `https://dashboard.airkeep.io`. Existing installations keep their saved relay origin.
 
 The repository's automated checks cover shared Apple logic, simulator compilation and release-profile validation. Signed archives, App Store Connect processing, notarization and physical-device behavior require the configured Apple identities and services. Record the actual workflow run and resulting Store build identifiers with the release.

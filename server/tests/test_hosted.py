@@ -110,6 +110,18 @@ def test_small_clock_skew_preserves_live_observation_time(store, users):
         assert store.readings()[0].observedAt == observed
 
 
+def test_alert_hold_restarts_after_observation_gap():
+    from domain import AlertRule, AlertState, Reading
+
+    state = AlertState()
+    rule = AlertRule(enabled=True, holdSeconds=300)
+    previous = Reading(amsID='0', humidity=80, temperature=None, rawIndex=None, observedAt=1000)
+    assert state.evaluate(rule, previous, 1000, 90, require_continuity=True) is None
+    resumed = previous.model_copy(update={'observedAt': 4600})
+    assert state.evaluate(rule, resumed, 4600, 90, require_continuity=True) is None
+    assert state.since == 4600
+
+
 def test_cross_tenant_delivery_foreign_keys_and_generic_push(store, users):
     first, second = users
     oauth = OAuth(store, Settings(jwt_signing_key='x'*64, web_origin=ORIGIN, _env_file=None))

@@ -13,6 +13,7 @@ from config import Settings
 from hosted_accounts import HostedAccounts
 from postgres import PostgresStore
 from push import APNs
+from web_routes import maintain
 
 log = logging.getLogger('airkeep.worker')
 
@@ -43,16 +44,20 @@ async def run():
                         try:
                             oauth.maintain(now)
                             failed = False
-                            for row in store.rows('SELECT id FROM accounts WHERE disabled=0 ORDER BY id'):
+                            for row in store.rows('SELECT id,disabled FROM accounts ORDER BY id'):
                                 try:
                                     with store.tenant(row['id']):
-                                        await tick(store, settings, push, now, True)
+                                        if row['disabled']:
+                                            maintain(store, now)
+                                        else:
+                                            await tick(store, settings, push, now, True)
                                         store.execute('DELETE FROM samples WHERE at<?', (now-7*86400,))
                                         store.execute('DELETE FROM ingest_events WHERE at<?', (now-7*86400,))
                                 except Exception:
                                     failed = True
                                     log.exception('Tenant background iteration failed')
                             await accounts.tick()
+                            store.execute('DELETE FROM account_deletions WHERE deleted_at<?', (now-31*86400,))
                             if not failed:
                                 health.touch()
                         except Exception:
