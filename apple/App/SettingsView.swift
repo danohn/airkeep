@@ -259,7 +259,8 @@ struct RelaySettingsView: View {
             WatchCompanionSettings(amsID: model.selectedAMS, demo: model.demo)
             #endif
             Section("Privacy") {
-                if let url = URL(string: SharedConfiguration.endpoint + "/account") {
+                if SharedConfiguration.endpoint == SharedConfiguration.hostedEndpoint,
+                   let url = URL(string: SharedConfiguration.hostedEndpoint + "/account") {
                     Link("Manage or delete account", destination: url)
                 }
                 Text("Airkeep keeps your sign-in in Keychain.")

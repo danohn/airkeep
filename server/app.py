@@ -51,6 +51,7 @@ class ActivityRegistration(BaseModel):
 
 
 async def tick(store: Store, settings: Settings, push: APNs, now: float, multiuser=False):
+    hosted = getattr(store, 'hosted', False)
     readings = {r.amsID:r for r in store.readings()}
     store.evaluate_alerts(now,settings.stale_seconds,multiuser)
     # Do not deliver yesterday's threshold event after a long outage/configuration delay.
@@ -62,10 +63,14 @@ async def tick(store: Store, settings: Settings, push: APNs, now: float, multius
     for job in store.rows('''SELECT o.*,d.token,d.topic,d.environment,d.registered_at FROM outbox o
         JOIN devices d ON d.id=o.device JOIN alert_rules r ON r.id=o.rule_id
         WHERE o.next<=? AND d.receive_alerts=1 AND json_extract(r.json,'$.enabled')=1''' + outbox_filter + " LIMIT 25",(now,)):
-        if not store.rows('SELECT 1 FROM outbox o JOIN devices d ON d.id=o.device WHERE o.id=? AND d.receive_alerts=1',(job['id'],)):
-            continue
         if not settings.apns_credentials(job['environment'],job['topic']):
             continue
+        with store.transaction():
+            current = store.rows('''SELECT 1 FROM outbox o JOIN devices d ON d.id=o.device
+                WHERE o.id=? AND d.receive_alerts=1 AND d.token=? AND d.registered_at IS ?''',
+                (job['id'], job['token'], job['registered_at']))
+            if not current or (hosted and not store.claim_delivery('outbox', job['id'])):
+                continue
         result = await send_recorded(store,push,job['token'],job['topic'],job['environment'],json.loads(job['json']),
                                      now=now,kind='alert',destination=job['device'])
         status = result.status or 503
@@ -79,7 +84,8 @@ async def tick(store: Store, settings: Settings, push: APNs, now: float, multius
                             and current['registered_at']==job['registered_at']):
                         store.delete_device(job['device'])
         else:
-            store.execute("UPDATE outbox SET attempts=attempts+1,next=? WHERE id=?",(now+max(min(3600,30*2**job["attempts"]),result.retry_after_seconds or 0),job["id"]))
+            release = ',lease_until=0' if hosted else ''
+            store.execute(f"UPDATE outbox SET attempts=attempts+1,next=?{release} WHERE id=?",(now+max(min(3600,30*2**job["attempts"]),result.retry_after_seconds or 0),job["id"]))
     activity_filter = (" WHERE EXISTS (SELECT 1 FROM registration_owners o WHERE o.kind='activity' AND o.id=activities.id)"
                        if multiuser else "")
     for activity in store.rows("SELECT * FROM activities" + activity_filter):
@@ -88,6 +94,13 @@ async def tick(store: Store, settings: Settings, push: APNs, now: float, multius
             continue
         if not settings.apns_credentials(activity['environment'],settings.ios_topic):
             continue
+        if hosted:
+            with store.transaction():
+                current = store.rows('''SELECT 1 FROM activities WHERE id=? AND token=?
+                    AND registered_at IS ? AND expires=?''',
+                    (activity['id'], activity['token'], activity['registered_at'], activity['expires']))
+                if not current or not store.claim_delivery('activities', activity['id']):
+                    continue
         result = await send_recorded(store,push,activity['token'],settings.ios_topic,activity['environment'],
             activity_payload(readings.get(activity['ams']),now,settings.stale_seconds,end=end,expires_at=activity['expires']),
             now=now,kind='liveactivity',destination=activity['id'])
@@ -95,7 +108,8 @@ async def tick(store: Store, settings: Settings, push: APNs, now: float, multius
         if status == 410 or (status == 200 and end):
             store.execute("DELETE FROM activities WHERE id=? AND token=? AND environment=? AND registered_at IS ?",(activity["id"],activity["token"],activity["environment"],activity["registered_at"]))
         elif status == 200:
-            store.execute("UPDATE activities SET last_sent=? WHERE id=? AND token=? AND environment=? AND registered_at IS ?",(now,activity["id"],activity["token"],activity["environment"],activity["registered_at"]))
+            release = ',lease_until=0' if hosted else ''
+            store.execute(f"UPDATE activities SET last_sent=?{release} WHERE id=? AND token=? AND environment=? AND registered_at IS ?",(now,activity["id"],activity["token"],activity["environment"],activity["registered_at"]))
 
     await tick_widgets(store,settings,push,now,send_recorded,multiuser)
     maintain(store,now)

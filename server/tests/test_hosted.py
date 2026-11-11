@@ -137,6 +137,13 @@ def test_cross_tenant_delivery_foreign_keys_and_generic_push(store, users):
         payload = json.loads(store.rows('SELECT json FROM outbox')[0][0])
         assert 'Private spool' not in json.dumps(payload)
         assert '80' not in json.dumps(payload)
+        job = store.rows('SELECT id FROM outbox')[0][0]
+    def claim(_):
+        with store.tenant(first), store.transaction():
+            return store.claim_delivery('outbox', job)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sum(pool.map(claim, range(2))) == 1
     with store.tenant(second):
         with pytest.raises(psycopg.errors.ForeignKeyViolation):
             store.execute('INSERT INTO outbox(device,json,next,created,rule_id) VALUES(?,?,?,?,?)',

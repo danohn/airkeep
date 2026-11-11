@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import sys
 import threading
+import time
 
 import psycopg
 from psycopg_pool import ConnectionPool
@@ -183,6 +184,13 @@ class PostgresStore(Store):
 
     def alert_readings(self, now):
         return self.readings() if self.printer_connected(now) else []
+
+    def claim_delivery(self, table, identifier):
+        if table not in ('outbox', 'activities'):
+            raise ValueError('Invalid delivery table.')
+        now = time.time()
+        return self.execute(f'UPDATE {table} SET lease_until=? WHERE id=? AND lease_until<=?',
+                            (now+60, identifier, now)).rowcount == 1
 
     def history(self, ams, since):
         import json
